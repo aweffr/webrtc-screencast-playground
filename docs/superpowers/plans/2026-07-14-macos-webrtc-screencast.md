@@ -499,19 +499,19 @@ git commit -m "feat: share signaling protocol across clients"
 - Create: `apps/macos/WebRTCScreencastTests/VirtualDisplayConfigurationTests.swift`
 - Create: `apps/macos/WebRTCScreencastTests/ScreenCaptureConfigurationTests.swift`
 
-- [ ] **Step 1: Write failing pure configuration tests**
+- [x] **Step 1: Write failing pure configuration tests**
 
 Extract testable builders that prove virtual display mode is exactly 1920×1080, 1×, 60 Hz; capture is 1920×1080 NV12 video range, 30 fps, queue depth 3, cursor visible and aspect preserving; main mirror uses the tested letterbox destination; receiver PID exclusion is only allowed in direct-baseline local validation.
 
-- [ ] **Step 2: Verify RED and implement configuration values**
+- [x] **Step 2: Verify RED and implement configuration values**
 
 Run focused tests, implement the value builders, and rerun until PASS.
 
-- [ ] **Step 3: Implement isolated private API provider**
+- [x] **Step 3: Implement isolated private API provider**
 
 Declare only the four private CoreGraphics classes and properties needed. `VirtualExtendedDisplayProvider` strongly retains the display, applies one mode, publishes display ID after `NSApplication.didChangeScreenParametersNotification`, and has idempotent async stop that observes removal. Return a typed unsupported/creation/settings/timeout error. Keep the DeskPad MIT attribution in `NOTICE`.
 
-- [ ] **Step 4: Implement ScreenCaptureKit callback**
+- [x] **Step 4: Implement ScreenCaptureKit callback**
 
 Request shareable content, resolve `SCDisplay`, construct `SCContentFilter`, add a screen output on a serial queue, parse `.status`, `.dirtyRects`, `.contentRect`, `.scaleFactor` and PTS, feed Frame Gate, and deliver selected `CVPixelBuffer` plus nanosecond timestamp to an injected sink. Callback must not block or retain a backlog.
 
@@ -519,7 +519,7 @@ Request shareable content, resolve `SCDisplay`, construct `SCContentFilter`, add
 
 Run unit tests and `xcodebuild build`. Launch a small app path that calls `SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly:true)`; record the Screen Recording prompt/runbook behavior. Do not claim capture works until a real frame callback is observed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/macos NOTICE
@@ -740,3 +740,4 @@ Run `make verify`, E2E evidence verifiers, `git status --short`, `git log --onel
 - 2026-07-14: Spec and research verified the supplied universal XCFramework supports arm64/x86_64, targets macOS 14.0 and exposes `RTCCastTuning`, `setCodecPreferences`, screen-cast video source, RTCStats and `RTCMTLNSVideoView`.
 - 2026-07-14: The in-memory signaling registry requires one Pod with `Recreate`. A rolling surge or multiple replicas can route Receiver and Sender to different registries; HA stays out of phase one until a shared registry or equivalent routing contract exists.
 - 2026-07-14: Packaging validation: `yamllint` passed; kubeconform v0.7.0 reported 3/3 resources valid; Go test/build passed; a host-cross-compiled linux/arm64 binary ran successfully in the pinned distroless runtime image and served `/healthz` and `/metrics`. The complete multi-stage Docker build remains unchecked because Docker Hub timed out during the `golang:1.24.13-alpine3.22` metadata TLS handshake twice. Local `kubectl --dry-run=client` also attempted API discovery because no context is configured; this is not evidence about cluster availability.
+- 2026-07-14: The standalone `SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)` permission probe compiled and ran, but returned `displays=0 windows=32` with exit 2. The current host therefore has no verified display-capture grant for this probe. No real `SCStream` frame callback is claimed yet; formal app permission and frame evidence remains required in Task 12.
