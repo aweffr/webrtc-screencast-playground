@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webrtc-screencast-signaling
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: webrtc-screencast-signaling
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webrtc-screencast-signaling
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: webrtc-screencast-signaling
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: signaling
+          image: ghcr.io/aweffr/webrtc-screencast-signaling:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: PAIRING_TTL
+              value: "10m"
+            - name: MAX_PENDING
+              value: "1000"
+            - name: MAX_ACTIVE
+              value: "1000"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webrtc-screencast-signaling
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: webrtc-screencast-signaling
+spec:
+  selector:
+    app.kubernetes.io/name: webrtc-screencast-signaling
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webrtc-screencast-signaling
+  namespace: apps
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - cast.k3s.aweffr.cn
+      secretName: k3s-aweffr-cn-tls
+  rules:
+    - host: cast.k3s.aweffr.cn
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webrtc-screencast-signaling
+                port:
+                  name: http

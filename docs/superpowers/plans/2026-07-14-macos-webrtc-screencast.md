@@ -293,13 +293,13 @@ git commit -m "feat(signaling): serve websocket rendezvous"
 - Create: `scripts/run-local-signaling.sh`
 - Create: `docs/runbooks/signaling-server.md`
 
-- [ ] **Step 1: Add a reproducible server image**
+- [x] **Step 1: Add a reproducible server image**
 
 Use a pinned Go 1.24 build stage and a distroless/static runtime, run as non-root, expose 8080 and set the binary as entrypoint. Do not copy repository artifacts, secrets or macOS files into the image.
 
-- [ ] **Step 2: Add K3s resources**
+- [x] **Step 2: Add K3s resources**
 
-Create `apps` namespace-scoped Deployment, ClusterIP Service and Traefik Ingress for `cast.k3s.aweffr.cn`. Add readiness/liveness probes to `/healthz`, resource requests/limits, security context and rolling update. TLS is optional at the application layer but the ingress may reference the existing wildcard secret. Do not apply the manifest.
+Create `apps` namespace-scoped Deployment, ClusterIP Service and Traefik Ingress for `cast.k3s.aweffr.cn`. Add readiness/liveness probes to `/healthz`, resource requests/limits and a restrictive security context. Because registry state is in memory, use exactly one replica with `Recreate`; multiple replicas or a rolling surge would split pairing state. TLS is optional at the application layer but the ingress may reference the existing wildcard secret. Do not apply the manifest.
 
 - [ ] **Step 3: Validate packaging**
 
@@ -313,7 +313,7 @@ kubectl apply --dry-run=client -f ../deploy/k3s/signaling.yaml >/dev/null
 
 If Docker or kubectl context-free schema validation is unavailable, record the exact unavailable command in the plan Execution findings and still run `go build` plus YAML parse/schema tooling available locally.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/Dockerfile server/.dockerignore deploy scripts/run-local-signaling.sh docs/runbooks/signaling-server.md
@@ -738,3 +738,5 @@ Run `make verify`, E2E evidence verifiers, `git status --short`, `git log --onel
 - 2026-07-14: Host toolchain before implementation: Xcode 26.5 (17F42), Apple Swift 6.3.2, Go 1.24.13, XcodeGen available at `/opt/homebrew/bin/xcodegen`.
 - 2026-07-14: `github.com/coder/websocket` latest enumerated module version is v1.8.15; the plan pins it.
 - 2026-07-14: Spec and research verified the supplied universal XCFramework supports arm64/x86_64, targets macOS 14.0 and exposes `RTCCastTuning`, `setCodecPreferences`, screen-cast video source, RTCStats and `RTCMTLNSVideoView`.
+- 2026-07-14: The in-memory signaling registry requires one Pod with `Recreate`. A rolling surge or multiple replicas can route Receiver and Sender to different registries; HA stays out of phase one until a shared registry or equivalent routing contract exists.
+- 2026-07-14: Packaging validation: `yamllint` passed; kubeconform v0.7.0 reported 3/3 resources valid; Go test/build passed; a host-cross-compiled linux/arm64 binary ran successfully in the pinned distroless runtime image and served `/healthz` and `/metrics`. The complete multi-stage Docker build remains unchecked because Docker Hub timed out during the `golang:1.24.13-alpine3.22` metadata TLS handshake twice. Local `kubectl --dry-run=client` also attempted API discovery because no context is configured; this is not evidence about cluster availability.

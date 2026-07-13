@@ -1,0 +1,4 @@
+.git
+signaling-server
+**/*_test.go
+Dockerfile
