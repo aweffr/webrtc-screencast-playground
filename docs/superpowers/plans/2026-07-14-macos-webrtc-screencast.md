@@ -625,23 +625,23 @@ git commit -m "feat(macos): export screencast diagnostics"
 - Create: `apps/macos/WebRTCScreencast/UI/MetricsSummaryView.swift`
 - Create: `apps/macos/WebRTCScreencastTests/SessionCoordinatorTests.swift`
 
-- [ ] **Step 1: Write failing coordinator behavior tests**
+- [x] **Step 1: Write failing coordinator behavior tests**
 
 Inject signaling, WebRTC, capture, metrics and virtual-display protocols. Cover Receiver register/display code, Sender join/offer, Receiver answer, trickle ICE both ways, connected state, hangup, capture failure, profile violation and idempotent teardown order. Verify a consumed code is never retried automatically.
 
-- [ ] **Step 2: Verify RED, implement coordinator, verify GREEN**
+- [x] **Step 2: Verify RED, implement coordinator, verify GREEN**
 
 Make `SessionCoordinator` `@MainActor`, isolate media/network adapters behind actors, and map stable failures to user-safe actions. Run focused and full tests.
 
-- [ ] **Step 3: Implement task-focused UI**
+- [x] **Step 3: Implement task-focused UI**
 
 Start view selects role, signaling URL and profile. Receiver view shows pairing code, video canvas, connection/path/metrics summary, stop and export. Sender view accepts code, selects Main Display Mirror or Virtual Extended Display, shows connection/path/metrics summary, stop and export. Production relay is default; direct baseline is marked development. Do not display TURN secrets, requirements text, protocol fields or implementation instructions.
 
-- [ ] **Step 4: Add launch argument automation**
+- [x] **Step 4: Add launch argument automation**
 
 Parse `--role`, `--profile`, `--config`, `--pairing-code-file`, `--source`, and `--exclude-receiver-pid`. Receiver atomically writes pairing code to the requested mode-0600 file; Sender waits bounded time and reads it. These switches orchestrate two real app processes but do not create an in-process loopback.
 
-- [ ] **Step 5: Build, inspect UI and commit**
+- [x] **Step 5: Build, inspect UI and commit**
 
 Run all tests/build, launch each role, inspect that the main task is clear and no developer text or mock data is visible, then commit:
 

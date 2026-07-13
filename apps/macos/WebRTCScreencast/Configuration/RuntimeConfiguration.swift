@@ -45,6 +45,20 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         case excludedReceiverPID = "excluded_receiver_pid"
     }
 
+    init(
+        signalingURL: URL,
+        iceProfile: ICEProfile,
+        turn: TURNCredentials?,
+        metricsDirectory: URL,
+        excludedReceiverPID: pid_t?
+    ) {
+        self.signalingURL = signalingURL
+        self.iceProfile = iceProfile
+        self.turn = turn
+        self.metricsDirectory = metricsDirectory
+        self.excludedReceiverPID = excludedReceiverPID
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         signalingURL = try container.decode(URL.self, forKey: .signalingURL)
@@ -120,6 +134,21 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
             turnURL: iceProfile == .productionRelay ? turn?.url : nil,
             metricsDirectory: metricsDirectory,
             excludedReceiverPID: excludedReceiverPID
+        )
+    }
+
+
+    func overriding(
+        signalingURL: URL? = nil,
+        iceProfile: ICEProfile? = nil,
+        excludedReceiverPID: pid_t? = nil
+    ) -> RuntimeConfiguration {
+        RuntimeConfiguration(
+            signalingURL: signalingURL ?? self.signalingURL,
+            iceProfile: iceProfile ?? self.iceProfile,
+            turn: turn,
+            metricsDirectory: metricsDirectory,
+            excludedReceiverPID: excludedReceiverPID ?? self.excludedReceiverPID
         )
     }
 }
