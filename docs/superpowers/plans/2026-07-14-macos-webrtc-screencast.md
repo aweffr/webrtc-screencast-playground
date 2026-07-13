@@ -537,31 +537,31 @@ git commit -m "feat(macos): capture physical and virtual displays"
 - Create: `apps/macos/WebRTCScreencastTests/IceServerProviderTests.swift`
 - Create: `apps/macos/WebRTCScreencastTests/H264CodecPolicyTests.swift`
 
-- [ ] **Step 1: Write failing ICE profile tests**
+- [x] **Step 1: Write failing ICE profile tests**
 
 Assert direct uses `.all`, `.disabled` TCP and no ICE server; production uses `.relay`, `.disabled` TCP and exactly one `turn:...?transport=udp` server with runtime credential. Reject TURN URL without explicit UDP transport.
 
-- [ ] **Step 2: Verify RED, implement ICE provider, verify GREEN**
+- [x] **Step 2: Verify RED, implement ICE provider, verify GREEN**
 
 The provider returns an `RTCConfiguration` and a redacted evidence struct. Run focused tests until PASS.
 
-- [ ] **Step 3: Write failing H.264 policy tests**
+- [x] **Step 3: Write failing H.264 policy tests**
 
 Given synthetic capability descriptors, prove only video/H264 with `packetization-mode=1` remains, Baseline is preferred, RTX associated with retained H.264 payload is retained when represented, and no H.264 yields a typed failure. The pure selection logic must not touch SDP strings.
 
-- [ ] **Step 4: Verify RED, implement codec selection, verify GREEN**
+- [x] **Step 4: Verify RED, implement codec selection, verify GREEN**
 
 Map the selected descriptors to WebRTC `RTCRtpCodecCapability` instances from factory capabilities and call `setCodecPreferences:error:` before negotiation.
 
-- [ ] **Step 5: Implement WebRTCSession**
+- [x] **Step 5: Implement WebRTCSession**
 
 Load CastTuning JSON, create factory with default encoder/decoder, create Unified Plan PeerConnection, add one send-only or recv-only video transceiver, apply codec preferences, and expose async wrappers for create/set offer/answer and ICE candidate add. Sender creates `RTCVideoSource(forScreenCast: true)`, `RTCVideoCapturer(delegate:)`, wraps selected NV12 buffer in `RTCCVPixelBuffer` and delivers `RTCVideoFrame`; Receiver attaches first remote video track to both renderers. More than one video track is a protocol error.
 
-- [ ] **Step 6: Add selected path verification**
+- [x] **Step 6: Add selected path verification**
 
 Parse candidate-pair/local-candidate/remote-candidate stats by IDs. Direct baseline passes only when selected path is not relay; production relay passes only with relay candidate and UDP relay protocol. Emit `unknown` until enough stats exist and `violation` when connected data contradicts requested profile.
 
-- [ ] **Step 7: Build/link smoke and commit**
+- [x] **Step 7: Build/link smoke and commit**
 
 Run:
 
@@ -741,3 +741,5 @@ Run `make verify`, E2E evidence verifiers, `git status --short`, `git log --onel
 - 2026-07-14: The in-memory signaling registry requires one Pod with `Recreate`. A rolling surge or multiple replicas can route Receiver and Sender to different registries; HA stays out of phase one until a shared registry or equivalent routing contract exists.
 - 2026-07-14: Packaging validation: `yamllint` passed; kubeconform v0.7.0 reported 3/3 resources valid; Go test/build passed; a host-cross-compiled linux/arm64 binary ran successfully in the pinned distroless runtime image and served `/healthz` and `/metrics`. The complete multi-stage Docker build remains unchecked because Docker Hub timed out during the `golang:1.24.13-alpine3.22` metadata TLS handshake twice. Local `kubectl --dry-run=client` also attempted API discovery because no context is configured; this is not evidence about cluster availability.
 - 2026-07-14: The standalone `SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)` permission probe compiled and ran, but returned `displays=0 windows=32` with exit 2. The current host therefore has no verified display-capture grant for this probe. No real `SCStream` frame callback is claimed yet; formal app permission and frame evidence remains required in Task 12.
+- 2026-07-14: The supplied universal XCFramework archive has a malformed versioned framework layout: root `WebRTC.framework/WebRTC` is arm64+x86_64, while `Versions/A/WebRTC` is stale x86_64-only. Because the runtime install name resolves the versioned binary, `scripts/bootstrap-webrtc.sh` now canonicalizes only the ignored extracted copy by copying the verified fat binary into `Versions/A` and restoring the standard top-level symlink. The archive checksum and archive bytes remain unchanged.
+- 2026-07-14: WebRTC runtime smoke constructed real Sender and Receiver factories/transceivers with CastTuning and generated an offer containing H.264 but no VP8/VP9/AV1. The first teardown smoke reproduced a SIGSEGV in the WebRTC object destructor; releasing `RTCCastTuningController` before closing/destroying its attached PeerConnection fixed the crash and the focused construction/deinit tests now pass. The arm64 app embeds an arm64+x86_64 `WebRTC.framework`, includes the default CastTuning resource, and passes `codesign --verify --deep --strict`.

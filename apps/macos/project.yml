@@ -17,6 +17,8 @@ targets:
     platform: macOS
     sources:
       - path: WebRTCScreencast
+      - path: ../../config/cast-tuning.default.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cn.aweffr.WebRTCScreencast
