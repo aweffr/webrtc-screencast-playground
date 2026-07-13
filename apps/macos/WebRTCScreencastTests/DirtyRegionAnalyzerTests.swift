@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import XCTest
 @testable import WebRTCScreencast
 
@@ -51,5 +52,26 @@ final class DirtyRegionAnalyzerTests: XCTestCase {
             accuracy: 0.0001
         )
         XCTAssertEqual(DirtyRegionAnalyzer.dirtyRatio(of: [], frameSize: .zero), 0)
+    }
+
+    func testDirtyRectMetadataParserSupportsNSValueElements() {
+        let expected = CGRect(x: 1, y: 2, width: 30, height: 40)
+
+        let rects = DirtyRectMetadataParser.parse([NSValue(rect: expected)] as NSArray)
+
+        XCTAssertEqual(rects, [expected])
+    }
+
+    func testDirtyRectMetadataParserSupportsDictionaryElements() {
+        let value = [["X": 1.0, "Y": 2.0, "Width": 30.0, "Height": 40.0]] as NSArray
+
+        let rects = DirtyRectMetadataParser.parse(value)
+
+        XCTAssertEqual(rects, [CGRect(x: 1, y: 2, width: 30, height: 40)])
+    }
+
+    func testDirtyRectMetadataParserRejectsMalformedElements() {
+        XCTAssertNil(DirtyRectMetadataParser.parse([["X": 1.0]] as NSArray))
+        XCTAssertNil(DirtyRectMetadataParser.parse(nil))
     }
 }

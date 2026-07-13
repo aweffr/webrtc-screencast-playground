@@ -11,6 +11,10 @@ Grant Screen Recording permission first, then run both direct sources:
 ./scripts/run-dual-client.sh --profile direct-baseline --source virtual
 ```
 
+The main-display run can verify a stable initial frame without synthetic motion. A newly created virtual display is empty until it contains a window; during the bounded virtual run, move any ordinary app window onto the 1920×1080 extended display so the verifier can observe real pixels. This is only a minimal media stimulus, not a content-quality corpus.
+
+The Sender prevents idle display sleep while capture is active. If a headless test starts after the physical display has already slept, wake it before launching the main-display run (for example, `caffeinate -u -t 2`); the activity assertion prevents a subsequent idle transition but cannot reactivate an already-inactive display.
+
 The script:
 
 1. builds the app and signaling binary;
@@ -51,7 +55,7 @@ Re-run verification for preserved artifacts with:
 
 The verifier fails on missing pairing, negotiation, capture, H.264 encode, H.264 decode, render or selected-path evidence. It also requires both processes to contain exactly one identical canonical `session_id` and rejects raw libwebrtc log artifacts. For a virtual source it requires creation and removal events. When a runtime config is passed as the fourth argument, both directories are scanned for the configured TURN values without printing them.
 
-## Expected permission blocker
+## Permission blocker
 
 Screen Recording is an external macOS authorization. If permission is absent, the expected bounded result is:
 

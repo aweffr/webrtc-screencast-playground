@@ -60,4 +60,15 @@ final class ScreenCaptureConfigurationTests: XCTestCase {
             excludedReceiverPID: nil
         ))
     }
+
+    func testSourceResolutionErrorsHaveActionableDescriptions() {
+        XCTAssertEqual(
+            ScreenSourceProviderError.displayNotFound(7).errorDescription,
+            "Display 7 is not available to ScreenCaptureKit"
+        )
+        XCTAssertEqual(
+            ScreenSourceProviderError.excludedApplicationNotFound(42).errorDescription,
+            "Receiver process 42 is not available to ScreenCaptureKit"
+        )
+    }
 }

@@ -30,6 +30,7 @@ struct FrameGate: Sendable {
 
     mutating func evaluate(dirtyRatio rawDirtyRatio: Double, timestamp: Duration) -> FrameGateDecision {
         let dirtyRatio = min(max(rawDirtyRatio, 0), 1)
+        let isFirstFrame = lastTimestamp == nil
         if let lastTimestamp, timestamp < lastTimestamp {
             return FrameGateDecision(shouldSubmit: false, state: state, dirtyRatio: dirtyRatio)
         }
@@ -46,6 +47,13 @@ struct FrameGate: Sendable {
             }
         } else {
             downshiftIfNeeded(at: timestamp)
+        }
+
+        // ScreenCaptureKit may report its first complete frame without dirty rects.
+        // WebRTC still needs that base image before the receiver can retain idle content.
+        if isFirstFrame {
+            lastSubmittedAt = timestamp
+            return FrameGateDecision(shouldSubmit: true, state: state, dirtyRatio: dirtyRatio)
         }
 
         guard dirtyRatio > 0, let interval = state.minimumSubmitInterval else {

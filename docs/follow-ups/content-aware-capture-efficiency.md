@@ -2,7 +2,9 @@
 
 ## 当前决定
 
-一期保持 ScreenCaptureKit 最大 30 fps，由应用层 Frame Gate 决定哪些新画面进入 `RTCVideoSource`。画面进入 idle 后，应用不再提交新帧；M150 zero-hertz adapter 继续约每秒重发最后一帧。这一行为满足首版对静止画面、连接可恢复性和实现复杂度的要求。
+一期保持 ScreenCaptureKit 最大 30 fps，由应用层 Frame Gate 决定哪些新画面进入 `RTCVideoSource`。画面进入 idle 后，应用不再提交新帧，Receiver 持续显示最后一张已解码画面。
+
+M150 源码中的 zero-hertz adapter 支持约每秒重发最后一帧，产品上可以接受这一行为；但当前 CastTuning ObjC 接入只把 `max_fps` 传给 `RTCVideoSource.adaptOutputFormat`，没有把 `min_fps=0` 写入 source constraints。安全过滤后的实际运行日志因此显示 `Zero hertz mode disabled`。后续若需要 idle RTP repeat，必须先补齐并验证这条 framework 接入，不能把“源码具备能力”写成“当前 app 已启用”。
 
 一期不监听全局鼠标或键盘，不申请 Input Monitoring 或 Accessibility 权限，也不在静止后动态把 ScreenCaptureKit 降到 5 fps。核心媒体链路、跨网连接和可观测性先形成可重复的业务闭环。
 

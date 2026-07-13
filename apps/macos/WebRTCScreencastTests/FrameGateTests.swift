@@ -2,6 +2,15 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class FrameGateTests: XCTestCase {
+    func testFirstFrameIsSubmittedWithoutDirtyRegions() {
+        var gate = FrameGate()
+
+        let decision = gate.evaluate(dirtyRatio: 0, timestamp: .zero)
+
+        XCTAssertEqual(decision.state, .idle)
+        XCTAssertTrue(decision.shouldSubmit)
+    }
+
     func testLargeChangeImmediatelyEntersThirtyFPS() {
         var gate = FrameGate()
         let decision = gate.evaluate(dirtyRatio: 0.005, timestamp: .zero)

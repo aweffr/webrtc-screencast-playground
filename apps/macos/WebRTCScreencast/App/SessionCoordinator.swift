@@ -42,6 +42,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private var signaling: SignalingClient?
     private var peer: WebRTCSession?
     private var captureSource: ScreenCaptureSource?
+    private var displaySleepActivity: DisplaySleepActivity?
     private var virtualDisplay: VirtualExtendedDisplayProvider?
     private var recorder: MetricsRecorder?
     private var sampler: SessionMetricsSampler?
@@ -358,6 +359,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 case .stopCapture:
                     try? await captureSource?.stop()
                     captureSource = nil
+                    displaySleepActivity?.stop()
+                    displaySleepActivity = nil
 
                 case .closeSignaling:
                     signalingTask?.cancel()
@@ -395,6 +398,9 @@ final class SessionCoordinator: NSObject, ObservableObject {
 
     private func startCapture() async throws {
         guard let effectiveConfiguration, let source = effectiveConfiguration.source, let captureSource else { return }
+        let displaySleepActivity = DisplaySleepActivity()
+        displaySleepActivity.start()
+        self.displaySleepActivity = displaySleepActivity
         let displayID: CGDirectDisplayID
         switch source {
         case .mainDisplayMirror:

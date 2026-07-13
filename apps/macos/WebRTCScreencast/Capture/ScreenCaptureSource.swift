@@ -113,17 +113,18 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             method: .default
         )
         let dirtyRatio: Double
-        if metadata.status == .started {
+        if metadata.status == .started || metadata.dirtyRects == nil {
             dirtyRatio = 1
         } else {
             dirtyRatio = DirtyRegionAnalyzer.dirtyRatio(
-                of: metadata.dirtyRects,
+                of: metadata.dirtyRects ?? [],
                 frameSize: CGSize(
                     width: CVPixelBufferGetWidth(pixelBuffer),
                     height: CVPixelBufferGetHeight(pixelBuffer)
                 )
             )
         }
+        let dirtyRectCount = metadata.dirtyRects?.count ?? 0
         let decision = frameGate.evaluate(
             dirtyRatio: dirtyRatio,
             timestamp: .nanoseconds(scaledTime.value)
@@ -131,7 +132,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         telemetryLock.withLock {
             callbackFrames += 1
             lastTimestampNs = scaledTime.value
-            lastDirtyRectCount = metadata.dirtyRects.count
+            lastDirtyRectCount = dirtyRectCount
             lastDirtyRatio = dirtyRatio
             lastGateState = decision.state
             if decision.shouldSubmit { submittedFrames += 1 }
@@ -147,7 +148,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
                 status: metadata.status,
                 contentRect: metadata.contentRect,
                 scaleFactor: metadata.scaleFactor,
-                dirtyRectCount: metadata.dirtyRects.count,
+                dirtyRectCount: dirtyRectCount,
                 dirtyRatio: dirtyRatio,
                 gateState: decision.state
             )
@@ -184,12 +185,11 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             return nil
         }
 
-        let dirtyValues = attachment[.dirtyRects] as? [NSValue] ?? []
         let contentRect = (attachment[.contentRect] as? NSValue)?.rectValue ?? .zero
         let scaleFactor = (attachment[.scaleFactor] as? NSNumber)?.doubleValue ?? 1
         return FrameMetadata(
             status: status,
-            dirtyRects: dirtyValues.map(\.rectValue),
+            dirtyRects: DirtyRectMetadataParser.parse(attachment[.dirtyRects]),
             contentRect: contentRect,
             scaleFactor: scaleFactor
         )
@@ -198,7 +198,41 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
 
 private struct FrameMetadata {
     let status: SCFrameStatus
-    let dirtyRects: [CGRect]
+    let dirtyRects: [CGRect]?
     let contentRect: CGRect
     let scaleFactor: Double
+}
+
+enum DirtyRectMetadataParser {
+    static func parse(_ rawValue: Any?) -> [CGRect]? {
+        guard let values = rawValue as? NSArray else { return nil }
+        var rects: [CGRect] = []
+        rects.reserveCapacity(values.count)
+        for value in values {
+            guard let rect = parseElement(value) else { return nil }
+            rects.append(rect)
+        }
+        return rects
+    }
+
+    private static func parseElement(_ value: Any) -> CGRect? {
+        if let value = value as? NSValue {
+            return value.rectValue
+        }
+        guard let dictionary = value as? NSDictionary,
+              let x = number(in: dictionary, key: "X"),
+              let y = number(in: dictionary, key: "Y"),
+              let width = number(in: dictionary, key: "Width"),
+              let height = number(in: dictionary, key: "Height"),
+              x.isFinite, y.isFinite, width.isFinite, height.isFinite,
+              width >= 0, height >= 0
+        else {
+            return nil
+        }
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    private static func number(in dictionary: NSDictionary, key: String) -> CGFloat? {
+        (dictionary.object(forKey: key) as? NSNumber).map { CGFloat(truncating: $0) }
+    }
 }

@@ -77,9 +77,18 @@ struct ScreenCaptureConfigurationValues: Equatable, Sendable {
     }
 }
 
-enum ScreenSourceProviderError: Error, Equatable {
+enum ScreenSourceProviderError: Error, Equatable, LocalizedError {
     case displayNotFound(CGDirectDisplayID)
     case excludedApplicationNotFound(pid_t)
+
+    var errorDescription: String? {
+        switch self {
+        case .displayNotFound(let displayID):
+            "Display \(displayID) is not available to ScreenCaptureKit"
+        case .excludedApplicationNotFound(let processID):
+            "Receiver process \(processID) is not available to ScreenCaptureKit"
+        }
+    }
 }
 
 struct ResolvedScreenSource {

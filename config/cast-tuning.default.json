@@ -22,6 +22,7 @@
     "realtime": true,
     "allow_frame_reordering": false,
     "h264_profile": "CONSTRAINED_BASELINE",
+    "h264_level": "4.1",
     "max_frame_delay_count": 1,
     "max_qp": 42
   },

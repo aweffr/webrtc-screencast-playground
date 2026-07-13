@@ -111,7 +111,7 @@ Virtual display object 必须被强引用到 session 结束。退出、失败或
 - idle 收到任意变化立即恢复至少 15 fps；大变化直接恢复 30 fps。
 - Gate 只控制向 `RTCVideoSource` 的提交，不动态修改 ScreenCaptureKit cadence。
 
-通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。M150 zero-hertz adapter 在 idle 期间约每秒重发最后一帧，这被视为有效行为，不另造 heartbeat。
+通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。M150 zero-hertz adapter 在 idle 期间约每秒重发最后一帧，这种行为可以接受，因此不另造 heartbeat。实现后的运行证据表明当前 ObjC/CastTuning 接入尚未把 `min_fps=0` 应用到 source constraints；一期实际行为是停止提交新帧并由 Receiver 保留最后一帧，启用 zero-hertz adapter 记入 follow-up。
 
 ### WebRTC session 与 H.264 policy
 

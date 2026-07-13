@@ -13,11 +13,17 @@ enum H264CodecPolicyError: Error, Equatable {
 }
 
 enum H264CodecPolicy {
+    static let requiredProfileLevelID = "42e029"
+
+    static func isEligible(name: String, parameters: [String: String]) -> Bool {
+        name.caseInsensitiveCompare("H264") == .orderedSame
+            && parameters["packetization-mode"] == "1"
+    }
+
     static func select(_ capabilities: [CodecCapabilityDescriptor]) throws -> [CodecCapabilityDescriptor] {
         let eligibleH264 = capabilities.enumerated().filter { _, capability in
             capability.kind.caseInsensitiveCompare("video") == .orderedSame
-                && capability.name.caseInsensitiveCompare("H264") == .orderedSame
-                && capability.parameters["packetization-mode"] == "1"
+                && isEligible(name: capability.name, parameters: capability.parameters)
         }
         guard !eligibleH264.isEmpty else { throw H264CodecPolicyError.noEligibleH264 }
 
@@ -54,6 +60,16 @@ enum H264CodecPolicy {
             guard let index = remaining.firstIndex(where: { $0.0 == descriptor }) else { return nil }
             return remaining.remove(at: index).1
         }
+    }
+
+    static func normalize(_ codec: RTCVideoCodecInfo) -> RTCVideoCodecInfo {
+        var parameters = codec.parameters
+        parameters["profile-level-id"] = requiredProfileLevelID
+        return RTCVideoCodecInfo(
+            name: codec.name,
+            parameters: parameters,
+            scalabilityModes: codec.scalabilityModes
+        )
     }
 
     private static func profileRank(_ profileLevelID: String?) -> Int {

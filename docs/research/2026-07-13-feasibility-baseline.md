@@ -62,7 +62,7 @@ ScreenCaptureKit 可以在捕获阶段完成缩放和 NV12 转换。M150 的 `RT
 
 ### 调整后采用
 
-M150 的 zero-hertz adapter 在 screen-content mode、`min_fps=0`、`max_fps>0` 时启用。进入 idle 后，它会每 1 秒重发最后一帧，并非完全停止 RTP video。应用层 Frame Gate 可以停止提交新画面，WebRTC 的 idle repeat 负责维持可恢复性。这一行为比额外实现 2–5 秒视频 heartbeat 更适合作为首版基线。
+M150 的 zero-hertz adapter 在 screen-content mode、source constraints 为 `min_fps=0`、`max_fps>0` 时启用。进入 idle 后，它会每 1 秒重发最后一帧，并非完全停止 RTP video；这一行为可以接受，也不需要额外实现 2–5 秒视频 heartbeat。实现后的实际日志显示当前 CastTuning ObjC 路径没有应用 `min_fps` constraint，因此当前 app 尚未启用该 adapter；一期由 Frame Gate 停止提交、Receiver 保留最后一帧，framework 接入差距已转入 follow-up。
 
 第一阶段不动态把 ScreenCaptureKit 从 30 fps 降到 5 fps，也不监听全局键鼠。保持 capture 30 fps 可以在下一个系统画面更新时立即唤醒 Frame Gate；全局键盘监听会增加 Input Monitoring 或 Accessibility 权限。只有 CPU/GPU/功耗数据证明长期 30 fps capture 成本明显时，再增加第二层 capture cadence 调整。
 

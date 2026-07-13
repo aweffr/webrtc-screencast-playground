@@ -6,7 +6,6 @@ enum WebRTCSessionError: Error {
     case factoryCreationFailed
     case peerConnectionCreationFailed
     case transceiverCreationFailed
-    case codecPreferenceFailed(String)
     case missingSessionDescription
     case unexpectedRemoteVideoTrack
     case wrongRole
@@ -49,8 +48,8 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
 
         let tuningConfiguration = try RTCCastTuningConfiguration(jsonData: castTuningJSON)
         tuningConfiguration.apply(to: ice.configuration)
-        let encoderFactory = RTCDefaultVideoEncoderFactory()
-        let decoderFactory = RTCDefaultVideoDecoderFactory()
+        let encoderFactory = H264OnlyVideoEncoderFactory()
+        let decoderFactory = H264OnlyVideoDecoderFactory()
         let factory = try RTCCastTuningFactoryBuilder.peerConnectionFactory(
             with: encoderFactory,
             decoderFactory: decoderFactory,
@@ -92,16 +91,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             videoCapturer = nil
             transceiver = created
             tuningController.attach(created.receiver)
-        }
-
-        let capabilities = role == .sender
-            ? factory.rtpSenderCapabilities(forKind: kRTCMediaStreamTrackKindVideo).codecs
-            : factory.rtpReceiverCapabilities(forKind: kRTCMediaStreamTrackKindVideo).codecs
-        let selectedCodecs = try H264CodecPolicy.selectCapabilities(capabilities)
-        do {
-            try transceiver.setCodecPreferences(selectedCodecs, error: ())
-        } catch {
-            throw WebRTCSessionError.codecPreferenceFailed(error.localizedDescription)
         }
 
         super.init()
