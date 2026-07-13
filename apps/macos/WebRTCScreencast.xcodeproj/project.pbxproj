@@ -7,8 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		054FB425CB009B89E7EA994D /* CastingRole.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19BA7AAC4DE3CA2E303F3D8 /* CastingRole.swift */; };
 		0E66E870CFF7989CA06DBC95 /* WebRTC.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 02A2B6F4BCEB85631459895C /* WebRTC.xcframework */; };
+		3523480DF4B157BA377B1006 /* RuntimeConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532C4F24B656BF92416475F2 /* RuntimeConfigurationTests.swift */; };
+		430495243FD8AD923FED26BD /* WebRTCScreencastApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87E81AE5FF90AD97C1228DE /* WebRTCScreencastApp.swift */; };
+		8A69961EC6F2491278CC7696 /* SessionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 161FC4D11D79271ADAF10214 /* SessionStateTests.swift */; };
+		8CEFC11F258FBBF4CA3E732E /* ICEProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACBF6E0E982F8EA9392BCB42 /* ICEProfile.swift */; };
+		97E473CF3B506F11E2F1B501 /* EffectiveConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80E94F60847FEB70C2FF79BA /* EffectiveConfiguration.swift */; };
+		99597D67D722C961DF6415D7 /* SessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CFE7949066A009DC7B4F711 /* SessionState.swift */; };
 		ACB8C5CDBD3520CCB3F3BD51 /* WebRTC.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 02A2B6F4BCEB85631459895C /* WebRTC.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		CB34BBC9A8A885662637C46D /* RuntimeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEBDDB8854396B8DF09B2234 /* RuntimeConfiguration.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,8 +46,17 @@
 /* Begin PBXFileReference section */
 		02A2B6F4BCEB85631459895C /* WebRTC.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = WebRTC.xcframework; path = ../../Vendor/WebRTC.xcframework; sourceTree = "<group>"; };
 		1265C8313B7E15A1F62941F9 /* WebRTCScreencastTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WebRTCScreencastTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		161FC4D11D79271ADAF10214 /* SessionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStateTests.swift; sourceTree = "<group>"; };
 		4D34014B24EBC46E8A3265A5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4F182CEAC9FC80DC22C0CE1A /* WebRTCScreencast-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "WebRTCScreencast-Bridging-Header.h"; sourceTree = "<group>"; };
+		532C4F24B656BF92416475F2 /* RuntimeConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfigurationTests.swift; sourceTree = "<group>"; };
 		5678D1D0FF907239BE17F9C6 /* WebRTCScreencast.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WebRTCScreencast.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6CFE7949066A009DC7B4F711 /* SessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionState.swift; sourceTree = "<group>"; };
+		80E94F60847FEB70C2FF79BA /* EffectiveConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectiveConfiguration.swift; sourceTree = "<group>"; };
+		ACBF6E0E982F8EA9392BCB42 /* ICEProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICEProfile.swift; sourceTree = "<group>"; };
+		B19BA7AAC4DE3CA2E303F3D8 /* CastingRole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingRole.swift; sourceTree = "<group>"; };
+		C87E81AE5FF90AD97C1228DE /* WebRTCScreencastApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCScreencastApp.swift; sourceTree = "<group>"; };
+		CEBDDB8854396B8DF09B2234 /* RuntimeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfiguration.swift; sourceTree = "<group>"; };
 		D762CF2A6D8310C84C71C8A3 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -59,13 +76,36 @@
 			isa = PBXGroup;
 			children = (
 				D762CF2A6D8310C84C71C8A3 /* .gitkeep */,
+				532C4F24B656BF92416475F2 /* RuntimeConfigurationTests.swift */,
+				161FC4D11D79271ADAF10214 /* SessionStateTests.swift */,
 			);
 			path = WebRTCScreencastTests;
+			sourceTree = "<group>";
+		};
+		11FF85532BE7220F2E54EDB5 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				80E94F60847FEB70C2FF79BA /* EffectiveConfiguration.swift */,
+				CEBDDB8854396B8DF09B2234 /* RuntimeConfiguration.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		4C055D5979E2E5D1BBA804CE /* App */ = {
+			isa = PBXGroup;
+			children = (
+				C87E81AE5FF90AD97C1228DE /* WebRTCScreencastApp.swift */,
+			);
+			path = App;
 			sourceTree = "<group>";
 		};
 		54F89F84BD62873C777C8A8E /* WebRTCScreencast */ = {
 			isa = PBXGroup;
 			children = (
+				4C055D5979E2E5D1BBA804CE /* App */,
+				AF38A787118880CF3CE668C4 /* Bridging */,
+				11FF85532BE7220F2E54EDB5 /* Configuration */,
+				9A9D6CCA6F622D56598A4188 /* Domain */,
 				92B8696A7944EECB015F6C7E /* Resources */,
 			);
 			path = WebRTCScreencast;
@@ -77,6 +117,24 @@
 				4D34014B24EBC46E8A3265A5 /* Info.plist */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		9A9D6CCA6F622D56598A4188 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				B19BA7AAC4DE3CA2E303F3D8 /* CastingRole.swift */,
+				ACBF6E0E982F8EA9392BCB42 /* ICEProfile.swift */,
+				6CFE7949066A009DC7B4F711 /* SessionState.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		AF38A787118880CF3CE668C4 /* Bridging */ = {
+			isa = PBXGroup;
+			children = (
+				4F182CEAC9FC80DC22C0CE1A /* WebRTCScreencast-Bridging-Header.h */,
+			);
+			path = Bridging;
 			sourceTree = "<group>";
 		};
 		D905A79B8EA42BF15E199FC8 = {
@@ -185,6 +243,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				054FB425CB009B89E7EA994D /* CastingRole.swift in Sources */,
+				97E473CF3B506F11E2F1B501 /* EffectiveConfiguration.swift in Sources */,
+				8CEFC11F258FBBF4CA3E732E /* ICEProfile.swift in Sources */,
+				CB34BBC9A8A885662637C46D /* RuntimeConfiguration.swift in Sources */,
+				99597D67D722C961DF6415D7 /* SessionState.swift in Sources */,
+				430495243FD8AD923FED26BD /* WebRTCScreencastApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -192,6 +256,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3523480DF4B157BA377B1006 /* RuntimeConfigurationTests.swift in Sources */,
+				8A69961EC6F2491278CC7696 /* SessionStateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

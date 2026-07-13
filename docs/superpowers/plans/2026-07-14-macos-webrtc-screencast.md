@@ -332,7 +332,7 @@ git commit -m "build(signaling): add container and k3s manifests"
 - Create: `apps/macos/WebRTCScreencastTests/RuntimeConfigurationTests.swift`
 - Create: `apps/macos/WebRTCScreencastTests/SessionStateTests.swift`
 
-- [ ] **Step 1: Write failing runtime config tests**
+- [x] **Step 1: Write failing runtime config tests**
 
 Tests decode direct and relay profiles, reject missing TURN UDP credential for relay, reject `transport=tcp`, accept `ws` and `wss`, resolve CLI path over Application Support default, and prove sanitized/canonical config and SHA-256 hash never contain username/password.
 
@@ -350,7 +350,7 @@ struct RuntimeConfiguration: Decodable, Sendable {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Generate the project if needed and run:
 
@@ -360,11 +360,11 @@ xcodebuild test -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScr
 
 Expected: compile failure due to missing types.
 
-- [ ] **Step 3: Implement minimal config and verify GREEN**
+- [x] **Step 3: Implement minimal config and verify GREEN**
 
 Use `JSONDecoder`, `CryptoKit.SHA256`, URL scheme validation and a redacted `EffectiveConfiguration`. Never conform the secret-bearing type to `CustomStringConvertible`. Rerun the test until PASS.
 
-- [ ] **Step 4: Write failing session state tests**
+- [x] **Step 4: Write failing session state tests**
 
 Cover valid role-specific transitions, failure and idempotent cleanup; reject Sender code submission before signaling connection and Receiver offer creation. Desired reducer API:
 
@@ -376,11 +376,11 @@ struct SessionStateMachine: Sendable {
 }
 ```
 
-- [ ] **Step 5: Verify RED, implement reducer, verify GREEN**
+- [x] **Step 5: Verify RED, implement reducer, verify GREEN**
 
 Run the focused test before and after implementation. Then run all macOS tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/macos

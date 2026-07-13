@@ -1,0 +1,4 @@
+#ifndef WebRTCScreencast_Bridging_Header_h
+#define WebRTCScreencast_Bridging_Header_h
+
+#endif
