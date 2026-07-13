@@ -244,6 +244,7 @@ Go server 提供单 binary 和 container image。K3s manifest 部署到 `apps` n
 
 - [`CONTEXT.md`](../../../CONTEXT.md)
 - [`2026-07-13-feasibility-baseline.md`](../../research/2026-07-13-feasibility-baseline.md)
+- [`2026-07-14-automated-media-baseline-design.md`](./2026-07-14-automated-media-baseline-design.md) — 一期闭环后的单机自动化延迟与画质数据里程碑。
 - [`0001-use-private-api-for-virtual-extended-display.md`](../../adr/0001-use-private-api-for-virtual-extended-display.md)
 - [`content-aware-capture-efficiency.md`](../../follow-ups/content-aware-capture-efficiency.md)
 - [`apple-low-latency-rate-control.md`](../../follow-ups/apple-low-latency-rate-control.md)

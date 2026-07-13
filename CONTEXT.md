@@ -39,3 +39,19 @@ _Avoid_: 复制屏、主屏扩展
 **虚拟扩展屏（Virtual Extended Display）**:
 由客户端创建并由 macOS 视为独立桌面的 1920×1080、1× 显示区域；用户可以把窗口移动到该区域，接收端播放该区域的画面。
 _Avoid_: 已有第二屏、外接屏采集、扩展屏
+
+**自动化媒体基线（Automated Media Baseline）**:
+在同一台 Mac 上用两个独立客户端进程和确定性画面，重复测量媒体链路延迟并保存接收画面质量证据的基线。它不包含物理显示器 scan-out，也不代表双机或跨设备性能。
+_Avoid_: Glass-to-glass latency、光学延迟、双机性能基线
+
+**源提交到采集延迟（Marker Commit-to-Capture Latency）**:
+测量画面 marker 提交后，发送端首次从采集结果识别出同一 marker 所经过的时间。
+_Avoid_: Capture callback latency、Glass-to-glass latency
+
+**媒体管线延迟（Capture-to-Decode Latency）**:
+测量同一 marker 从发送端采集结果到接收端解码结果所经过的时间，覆盖编码、媒体传输、缓冲和解码。
+_Avoid_: Network latency、RTT、Glass-to-glass latency
+
+**软件端到端延迟（Software End-to-End Latency）**:
+测量同一 marker 从源画面提交到接收端解码结果所经过的时间，是自动化媒体基线的主延迟指标；不包含接收端物理显示器 scan-out。
+_Avoid_: Glass-to-glass latency、Photon-to-photon latency
