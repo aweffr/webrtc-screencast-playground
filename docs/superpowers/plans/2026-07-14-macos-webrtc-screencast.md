@@ -213,7 +213,7 @@ git commit -m "feat(signaling): add pairing protocol and registry"
 - Create: `server/internal/signaling/server_test.go`
 - Create: `server/cmd/signaling-server/main.go`
 
-- [ ] **Step 1: Write failing metrics tests**
+- [x] **Step 1: Write failing metrics tests**
 
 Assert that counters/gauges render deterministic Prometheus text without labels containing pairing code, SDP, ICE candidate or credentials. Required names:
 
@@ -228,11 +228,11 @@ screencast_signaling_rejections_total
 screencast_signaling_expired_total
 ```
 
-- [ ] **Step 2: Verify RED, implement atomic metrics, verify GREEN**
+- [x] **Step 2: Verify RED, implement atomic metrics, verify GREEN**
 
 Run `go test ./internal/observability -count=1`, implement an `http.Handler` backed by `atomic.Int64`, and rerun until PASS.
 
-- [ ] **Step 3: Write failing real-WebSocket integration tests**
+- [x] **Step 3: Write failing real-WebSocket integration tests**
 
 Use `httptest.NewServer`, convert its URL to `ws://.../ws`, and connect with `coder/websocket`. Tests must cover:
 
@@ -246,12 +246,12 @@ invalid order / oversized message / second sender → stable error and close whe
 slow writer queue → bounded session close rather than hub blockage
 ```
 
-- [ ] **Step 4: Run integration tests and verify RED**
+- [x] **Step 4: Run integration tests and verify RED**
 
 Run `go test ./internal/signaling -run Test -count=1`.
 Expected: compile failure because `NewServer` and routes do not exist.
 
-- [ ] **Step 5: Implement the server**
+- [x] **Step 5: Implement the server**
 
 `Server` owns registry, metrics, limiter and peer index. Each peer has one reader goroutine and one writer goroutine with a bounded `chan []byte`; only registry methods mutate pairing state. Configure `websocket.Accept` with compression disabled and an origin policy that permits native clients. Set read limit to 256 KiB. Use context cancellation and `Ping` for liveness. Structured logs contain only event, result, role, message type, duration and short session ID.
 
@@ -263,7 +263,7 @@ func (s *Server) Handler() http.Handler
 func (s *Server) Shutdown(ctx context.Context) error
 ```
 
-- [ ] **Step 6: Verify GREEN and race behavior**
+- [x] **Step 6: Verify GREEN and race behavior**
 
 Run:
 
@@ -273,11 +273,11 @@ go test -race ./internal/signaling ./internal/session ./internal/observability -
 
 Expected: PASS with no race or leaked test goroutine.
 
-- [ ] **Step 7: Add executable config and graceful shutdown**
+- [x] **Step 7: Add executable config and graceful shutdown**
 
 `main.go` reads only non-secret server environment values (`LISTEN_ADDR`, TTL, capacities, timeouts), installs `/healthz`, `/metrics`, `/ws`, starts `http.Server` with deadlines, and handles SIGINT/SIGTERM with a 10-second grace period. It must not read coturn secrets.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server
