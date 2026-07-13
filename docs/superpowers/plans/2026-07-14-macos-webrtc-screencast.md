@@ -127,7 +127,7 @@ git commit -m "build: bootstrap screencast workspace"
 - Create: `server/internal/session/registry.go`
 - Create: `server/internal/session/registry_test.go`
 
-- [ ] **Step 1: Initialize the Go module**
+- [x] **Step 1: Initialize the Go module**
 
 Run:
 
@@ -137,7 +137,7 @@ go mod init github.com/aweffr/webrtc-screencast-playground/server
 go get github.com/coder/websocket@v1.8.15
 ```
 
-- [ ] **Step 2: Write failing protocol tests**
+- [x] **Step 2: Write failing protocol tests**
 
 Tests must prove: version 1 is required; `message_id` is non-empty and bounded; only the fixed message type set is accepted; register has no payload fields; join accepts exactly an 8-character normalized Crockford code; SDP and ICE fields have explicit length bounds; unknown JSON fields are rejected.
 
@@ -156,21 +156,21 @@ func Encode(messageID string, typ MessageType, payload any) ([]byte, error)
 func NormalizePairingCode(string) (string, error)
 ```
 
-- [ ] **Step 3: Run the protocol tests and verify RED**
+- [x] **Step 3: Run the protocol tests and verify RED**
 
 Run `go test ./internal/protocol -run Test -count=1`.
 Expected: compile failure because `Envelope`, `Decode`, `Encode`, and `NormalizePairingCode` do not exist.
 
-- [ ] **Step 4: Implement strict protocol decoding**
+- [x] **Step 4: Implement strict protocol decoding**
 
 Use `json.Decoder.DisallowUnknownFields`, reject trailing JSON, define typed payload structs for register, registered, join, paired, SDP, ICE candidate, ICE complete, hangup and protocol error, and return stable sentinel errors. Do not parse SDP content or log payloads.
 
-- [ ] **Step 5: Run protocol tests and verify GREEN**
+- [x] **Step 5: Run protocol tests and verify GREEN**
 
 Run `go test ./internal/protocol -count=1`.
 Expected: PASS.
 
-- [ ] **Step 6: Write failing registry tests**
+- [x] **Step 6: Write failing registry tests**
 
 Use a fake clock and deterministic code generator. Cover receiver creation, 10-minute expiry, one-time join, a second concurrent join losing atomically, removal on disconnect, capacity limits and lookup by peer ID. The public registry API is:
 
@@ -186,7 +186,7 @@ func (r *Registry) Expire() []Pending
 func (r *Registry) Snapshot() Snapshot
 ```
 
-- [ ] **Step 7: Verify RED, implement registry, verify race-safe GREEN**
+- [x] **Step 7: Verify RED, implement registry, verify race-safe GREEN**
 
 Run before implementation: `go test ./internal/session -run Test -count=1` and observe missing API failure. Implement with a mutex around all indexes and cryptographic random session/code generation in production. Then run:
 
@@ -196,7 +196,7 @@ go test -race ./internal/session -count=50
 
 Expected: PASS with no race.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server
