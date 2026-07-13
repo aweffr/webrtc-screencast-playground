@@ -113,6 +113,19 @@ final class SignalingClientTests: XCTestCase {
         XCTAssertNoThrow(try transport.validate(url: XCTUnwrap(URL(string: "wss://localhost/ws"))))
         XCTAssertThrowsError(try transport.validate(url: XCTUnwrap(URL(string: "https://localhost/ws"))))
     }
+
+    func testURLSessionTransportEncodesProtocolJSONAsTextFrame() throws {
+        let data = Data(#"{"version":1}"#.utf8)
+
+        switch try URLSessionWebSocketTransport.message(for: data) {
+        case .string(let value):
+            XCTAssertEqual(value, #"{"version":1}"#)
+        case .data:
+            XCTFail("The signaling server intentionally rejects binary WebSocket frames")
+        @unknown default:
+            XCTFail("Unexpected WebSocket message type")
+        }
+    }
 }
 
 private enum TestTransportError: Error { case disconnected }

@@ -662,11 +662,11 @@ git commit -m "feat(macos): add sender and receiver workflows"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-07-14-macos-webrtc-screencast.md`
 
-- [ ] **Step 1: Add deterministic orchestration script**
+- [x] **Step 1: Add deterministic orchestration script**
 
 Build app, start local signaling on a random free port, start Receiver as a new process, wait for its mode-0600 pairing-code file, start Sender as a second process, and collect exit/status/log paths. Parameters select `direct-baseline|production-relay` and `main|virtual`; relay refuses to start when runtime TURN fields are empty. The script must trap EXIT and terminate both processes/server without deleting diagnostics.
 
-- [ ] **Step 2: Add evidence verifier**
+- [x] **Step 2: Add evidence verifier**
 
 `verify-diagnostics.sh <receiver-dir> <sender-dir> <profile>` parses JSONL with `jq`, requires pairing/negotiation/capture/encode/decode/render and selected-pair records, checks production relay candidate type + UDP, checks direct is not relay, verifies virtual display removal when applicable, and scans all exported text for configured secrets. It must fail on missing evidence rather than infer success.
 
@@ -692,7 +692,7 @@ Load ignored runtime config from the existing coturn secret material without pri
 
 Expected: selected candidate evidence includes relay and UDP; no TCP or direct fallback; metrics verifier passes. If NAT hairpin or external UDP allocation prevents same-host relay, preserve logs and record the exact external blocker rather than weakening ICE policy.
 
-- [ ] **Step 5: Run full static and automated verification**
+- [x] **Step 5: Run full static and automated verification**
 
 ```bash
 make verify
@@ -702,7 +702,7 @@ git diff --check
 
 `verify-no-secret-leaks.sh` reads the configured TURN values without echoing them, enumerates tracked files with `git grep`, and fails if either non-empty value occurs. Expected: all tests/build/checks pass and the secret scan returns no tracked match.
 
-- [ ] **Step 6: Record execution findings and commit**
+- [x] **Step 6: Record execution findings and commit**
 
 Update this plan’s `Execution findings` with exact tool versions, commands, E2E evidence directories, selected ICE path results and any unavailable external verification. Commit:
 
@@ -743,3 +743,10 @@ Run `make verify`, E2E evidence verifiers, `git status --short`, `git log --onel
 - 2026-07-14: The standalone `SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)` permission probe compiled and ran, but returned `displays=0 windows=32` with exit 2. The current host therefore has no verified display-capture grant for this probe. No real `SCStream` frame callback is claimed yet; formal app permission and frame evidence remains required in Task 12.
 - 2026-07-14: The supplied universal XCFramework archive has a malformed versioned framework layout: root `WebRTC.framework/WebRTC` is arm64+x86_64, while `Versions/A/WebRTC` is stale x86_64-only. Because the runtime install name resolves the versioned binary, `scripts/bootstrap-webrtc.sh` now canonicalizes only the ignored extracted copy by copying the verified fat binary into `Versions/A` and restoring the standard top-level symlink. The archive checksum and archive bytes remain unchanged.
 - 2026-07-14: WebRTC runtime smoke constructed real Sender and Receiver factories/transceivers with CastTuning and generated an offer containing H.264 but no VP8/VP9/AV1. The first teardown smoke reproduced a SIGSEGV in the WebRTC object destructor; releasing `RTCCastTuningController` before closing/destroying its attached PeerConnection fixed the crash and the focused construction/deinit tests now pass. The arm64 app embeds an arm64+x86_64 `WebRTC.framework`, includes the default CastTuning resource, and passes `codesign --verify --deep --strict`.
+- 2026-07-14: The native workflow adds Receiver-first pairing, Sender-only offer creation, answer handling, bidirectional trickle ICE, candidate buffering until remote SDP is set, connection-triggered capture, fixed idempotent teardown, task-focused SwiftUI and bounded dual-process launch automation. Focused flow/launch tests and the full 72-test macOS suite pass.
+- 2026-07-14: The first real dual-process run exposed a protocol-frame mismatch: Swift sent binary WebSocket frames while the Go service intentionally accepts text. Runtime metrics recorded `invalid_message: text messages are required`; a regression test was observed RED, `URLSessionWebSocketTransport` was changed to UTF-8 text frames, and the same E2E then completed register/join, H.264 offer/answer and trickle ICE.
+- 2026-07-14: Direct main evidence is preserved at `/var/folders/yf/__fg7fbd5ss0mf8g_gncd2l80000gn/T/webrtc-screencast-e2e.nFzESt`: two independent app PIDs exited cleanly, both selected paths were verified `host/udp`, and Sender recorded stable `capture_failed` because ScreenCaptureKit exposed no main display under the current Screen Recording authorization. No H.264 frame/render completion is claimed.
+- 2026-07-14: Direct virtual evidence is preserved at `/var/folders/yf/__fg7fbd5ss0mf8g_gncd2l80000gn/T/webrtc-screencast-e2e.tg50iB`: both selected paths were verified `host/udp`; display ID 7 was created, `SCStream.startCapture` succeeded, and the display was removed during teardown. Capture callback count remained zero for the bounded run, so the verifier correctly failed on missing H.264 encode evidence.
+- 2026-07-14: Production relay evidence is preserved at `/var/folders/yf/__fg7fbd5ss0mf8g_gncd2l80000gn/T/webrtc-screencast-e2e.edaAIc`: both Sender and Receiver RTCStats selected paths were verified `relay/udp` through the deployed coturn service with no TCP/direct fallback. Sender then hit the same Screen Recording blocker before `capture_started`; relay network policy is proven, media E2E is not.
+- 2026-07-14: Existing coturn `KEY=VALUE` material was converted without executing or printing it into ignored mode-0600 `secrets/runtime.json`. `verify-no-secret-leaks.sh` found no configured credential in tracked files, and direct scans found none in production diagnostic directories. Script-verifier positive/negative self-tests pass.
+- 2026-07-14: `make verify` passes: Go race tests, asset checksum/bootstrap, Xcode project generation, all 72 macOS tests, signed arm64 build and `git diff --check`. UI app launch succeeded as an independent PID, but host screenshot capture returned an all-black image under the same denied Screen Recording state; UI source inspection found no requirement text, mock data, TURN credentials, SDP or candidate values.

@@ -20,6 +20,7 @@ struct LaunchOptions: Equatable, Sendable {
     var pairingCodeFile: String?
     var source: CaptureSourceKind?
     var excludedReceiverPID: pid_t?
+    var runSeconds: Double?
 
     static func parse(_ arguments: [String]) throws -> LaunchOptions {
         var result = LaunchOptions()
@@ -52,6 +53,9 @@ struct LaunchOptions: Equatable, Sendable {
             case "--exclude-receiver-pid":
                 guard let pid = pid_t(value), pid > 0 else { throw LaunchOptionsError.invalidValue(option: option, value: value) }
                 result.excludedReceiverPID = pid
+            case "--run-seconds":
+                guard let seconds = Double(value), seconds > 0 else { throw LaunchOptionsError.invalidValue(option: option, value: value) }
+                result.runSeconds = seconds
             default:
                 throw LaunchOptionsError.invalidValue(option: option, value: value)
             }

@@ -7,13 +7,14 @@ final class LaunchOptionsTests: XCTestCase {
         let options = try LaunchOptions.parse([
             "app", "--role", "sender", "--profile", "direct-baseline",
             "--config", "/tmp/runtime.json", "--pairing-code-file", "/tmp/code",
-            "--source", "virtual", "--exclude-receiver-pid", "123",
+            "--source", "virtual", "--exclude-receiver-pid", "123", "--run-seconds", "20",
         ])
 
         XCTAssertEqual(options.role, .sender)
         XCTAssertEqual(options.profile, .directBaseline)
         XCTAssertEqual(options.source, .virtualExtendedDisplay)
         XCTAssertEqual(options.excludedReceiverPID, 123)
+        XCTAssertEqual(options.runSeconds, 20)
     }
 
     func testPairingCodeFileIsMode0600AndReadable() async throws {

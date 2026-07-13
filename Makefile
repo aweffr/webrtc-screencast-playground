@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: bootstrap generate test-go test-macos build-macos verify
+.PHONY: bootstrap generate test-go test-macos test-scripts build-macos verify
 
 bootstrap:
 	./scripts/bootstrap-webrtc.sh
@@ -14,8 +14,11 @@ test-go:
 test-macos: generate
 	xcodebuild test -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -destination 'platform=macOS' -derivedDataPath DerivedData
 
+test-scripts:
+	./scripts/test-verifiers.sh
+
 build-macos: generate
 	xcodebuild build -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -configuration Debug -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData
 
-verify: test-go test-macos build-macos
+verify: test-go test-macos test-scripts build-macos
 	git diff --check

@@ -50,7 +50,7 @@ struct StartView: View {
                     isStarting = true
                     Task {
                         defer { isStarting = false }
-                        try? await coordinator.start()
+                        await coordinator.start()
                     }
                 }
                 .buttonStyle(.borderedProminent)

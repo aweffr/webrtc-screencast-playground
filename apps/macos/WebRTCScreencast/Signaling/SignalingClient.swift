@@ -37,7 +37,14 @@ actor URLSessionWebSocketTransport: WebSocketTransport {
 
     func send(_ data: Data) async throws {
         guard let task else { throw WebSocketTransportError.notConnected }
-        try await task.send(.data(data))
+        try await task.send(try Self.message(for: data))
+    }
+
+    nonisolated static func message(for data: Data) throws -> URLSessionWebSocketTask.Message {
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw WebSocketTransportError.unsupportedMessage
+        }
+        return .string(text)
     }
 
     func receive() async throws -> Data {

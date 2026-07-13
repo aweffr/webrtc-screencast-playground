@@ -50,6 +50,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private var runtimeConfiguration: RuntimeConfiguration?
     private var currentSessionID: String?
     private var failureDuringTeardown = false
+    private var remoteDescriptionReady = false
+    private var pendingRemoteCandidates: [(candidate: String, mid: String, line: Int32)] = []
 
     init(configuration: RuntimeConfiguration? = nil, launchOptions: LaunchOptions? = nil) {
         baseConfiguration = configuration
@@ -79,13 +81,26 @@ final class SessionCoordinator: NSObject, ObservableObject {
             if role == .sender, let path = options.pairingCodeFile {
                 senderPairingCode = try await PairingCodeFile.waitForCode(at: URL(filePath: path))
             }
-            try await start()
+            await start()
+            if let seconds = options.runSeconds, isActive {
+                try await Task.sleep(for: .seconds(seconds))
+                await stop()
+                NSApplication.shared.terminate(nil)
+            }
         } catch {
             await fail(code: "launch_failed", error: error)
         }
     }
 
-    func start() async throws {
+    func start() async {
+        do {
+            try await beginSession()
+        } catch {
+            await fail(code: "session_start_failed", error: error)
+        }
+    }
+
+    private func beginSession() async throws {
         guard state == .idle || isFailed else { return }
         resetPresentation()
 
@@ -129,6 +144,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
             "process_id": .integer(Int(ProcessInfo.processInfo.processIdentifier)),
         ])
 
+        flow = SessionFlow(role: role, senderCode: senderCode)
+        state = .connectingSignaling(role: role)
         do {
             let ice = try IceServerProvider.make(profile: selectedProfile, turn: configuration.turn)
             let tuningData = try loadCastTuning()
@@ -169,11 +186,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 }
             }
 
-            flow = SessionFlow(role: role, senderCode: senderCode)
-            state = .connectingSignaling(role: role)
-            try await apply(try requireFlow(.start))
+            await apply(try requireFlow(.start))
         } catch {
-            await fail(code: "session_start_failed", error: error)
             throw error
         }
     }
@@ -249,7 +263,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
                     try await signaling.connect(url: effectiveConfiguration.signalingURL, role: selectedRole)
                     try await recorder?.record(event: "signaling_connected")
                     state = .waitingForPeer(role: selectedRole)
-                    try await apply(try requireFlow(.signalingConnected))
+                    await apply(try requireFlow(.signalingConnected))
 
                 case .registerReceiver:
                     try await signaling?.registerReceiver()
@@ -273,7 +287,9 @@ final class SessionCoordinator: NSObject, ObservableObject {
 
                 case .setRemoteOffer(let sdp):
                     try await peer?.setRemoteDescription(type: .offer, sdp: sdp)
+                    remoteDescriptionReady = true
                     try await recorder?.record(event: "remote_offer", fields: ["sdp": .string(sdp)])
+                    try await flushPendingRemoteCandidates()
 
                 case .createAndSendAnswer:
                     guard let peer else { continue }
@@ -283,11 +299,17 @@ final class SessionCoordinator: NSObject, ObservableObject {
 
                 case .setRemoteAnswer(let sdp):
                     try await peer?.setRemoteDescription(type: .answer, sdp: sdp)
+                    remoteDescriptionReady = true
                     try await recorder?.record(event: "remote_answer", fields: ["sdp": .string(sdp)])
+                    try await flushPendingRemoteCandidates()
 
                 case let .addRemoteCandidate(candidate, mid, line):
-                    try await peer?.addRemoteICECandidate(candidate: candidate, sdpMid: mid, sdpMLineIndex: line)
-                    try await recorder?.record(event: "ice_candidate_remote", fields: ["candidate": .string(candidate)])
+                    if remoteDescriptionReady {
+                        try await addRemoteCandidate(candidate: candidate, mid: mid, line: line)
+                    } else {
+                        pendingRemoteCandidates.append((candidate, mid, line))
+                        try await recorder?.record(event: "ice_candidate_remote_queued")
+                    }
 
                 case let .sendCandidate(candidate, mid, line):
                     try await signaling?.send(.iceCandidate(candidate: candidate, sdpMid: mid, sdpMLineIndex: line))
@@ -298,7 +320,12 @@ final class SessionCoordinator: NSObject, ObservableObject {
                     try await recorder?.record(event: "ice_gathering_complete")
 
                 case .startCapture:
-                    try await startCapture()
+                    do {
+                        try await startCapture()
+                    } catch {
+                        await apply(try requireFlow(.captureFailed(error.localizedDescription)))
+                        return
+                    }
 
                 case let .reportFailure(code, message):
                     failureDuringTeardown = true
@@ -329,7 +356,10 @@ final class SessionCoordinator: NSObject, ObservableObject {
                     peer = nil
 
                 case .stopVirtualDisplay:
-                    try? await virtualDisplay?.stop()
+                    if virtualDisplay != nil {
+                        try? await virtualDisplay?.stop()
+                        try? await recorder?.record(event: "virtual_display_removed")
+                    }
                     virtualDisplay = nil
 
                 case .closeMetrics:
@@ -370,27 +400,69 @@ final class SessionCoordinator: NSObject, ObservableObject {
         try await recorder?.record(event: "capture_started", fields: ["display_id": .integer(Int(displayID))])
     }
 
+    private func addRemoteCandidate(candidate: String, mid: String, line: Int32) async throws {
+        try await peer?.addRemoteICECandidate(candidate: candidate, sdpMid: mid, sdpMLineIndex: line)
+        try await recorder?.record(event: "ice_candidate_remote", fields: ["candidate": .string(candidate)])
+    }
+
+    private func flushPendingRemoteCandidates() async throws {
+        let candidates = pendingRemoteCandidates
+        pendingRemoteCandidates.removeAll(keepingCapacity: true)
+        for value in candidates {
+            try await addRemoteCandidate(candidate: value.candidate, mid: value.mid, line: value.line)
+        }
+    }
+
+    private func recordImmediateSelectedPath(for session: WebRTCSession) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .milliseconds(500))
+        var evidence = SelectedPathEvidence(
+            status: .unknown,
+            selectedPairID: nil,
+            localCandidateType: nil,
+            remoteCandidateType: nil,
+            protocolValue: nil
+        )
+        repeat {
+            let batch = await session.collectStatistics()
+            evidence = SelectedPathVerifier.verify(profile: selectedProfile, statistics: batch.statistics)
+            if evidence.status != .unknown || clock.now >= deadline { break }
+            try? await Task.sleep(for: .milliseconds(25))
+        } while !Task.isCancelled
+        metrics.selectedPath = evidence
+        try? await recorder?.record(event: "selected_path", fields: [
+            "status": .string(evidence.status.rawValue),
+            "pair_id": evidence.selectedPairID.map(JSONValue.string) ?? .null,
+            "local_candidate_type": evidence.localCandidateType.map(JSONValue.string) ?? .null,
+            "remote_candidate_type": evidence.remoteCandidateType.map(JSONValue.string) ?? .null,
+            "protocol": evidence.protocolValue.map(JSONValue.string) ?? .null,
+        ])
+        if evidence.status == .violation {
+            await profileViolation(evidence)
+        }
+    }
+
     private func handleSignaling(_ event: SignalingEvent) async {
         guard case let .message(envelope) = event else { return }
         do {
             switch envelope.payload {
             case let .receiverRegistered(_, code, _):
-                try await apply(try requireFlow(.receiverRegistered(code: code)))
+                await apply(try requireFlow(.receiverRegistered(code: code)))
             case .sessionPaired:
                 state = .negotiating(role: selectedRole)
                 try await recorder?.record(event: "peer_paired")
-                try await apply(try requireFlow(.peerPaired))
+                await apply(try requireFlow(.peerPaired))
             case .sdpOffer(let sdp):
-                try await apply(try requireFlow(.remoteOffer(sdp)))
+                await apply(try requireFlow(.remoteOffer(sdp)))
             case .sdpAnswer(let sdp):
-                try await apply(try requireFlow(.remoteAnswer(sdp)))
+                await apply(try requireFlow(.remoteAnswer(sdp)))
             case let .iceCandidate(candidate, mid, line):
-                try await apply(try requireFlow(.remoteCandidate(candidate: candidate, mid: mid, line: line)))
+                await apply(try requireFlow(.remoteCandidate(candidate: candidate, mid: mid, line: line)))
             case .iceComplete:
                 try await recorder?.record(event: "remote_ice_complete")
             case .sessionHangup:
                 state = .ending
-                try await apply(try requireFlow(.remoteHangup))
+                await apply(try requireFlow(.remoteHangup))
             case let .serverError(code, message, _):
                 await fail(code: code, message: message)
             default:
@@ -431,7 +503,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private func profileViolation(_ evidence: SelectedPathEvidence) async {
         let description = "selected path \(evidence.localCandidateType ?? "unknown")/\(evidence.protocolValue ?? "unknown")"
         do {
-            try await apply(try requireFlow(.profileViolated(description)))
+            await apply(try requireFlow(.profileViolated(description)))
         } catch {
             await fail(code: "profile_violation", error: error)
         }
@@ -466,6 +538,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
         exportMessage = nil
         sessionDirectory = nil
         failureDuringTeardown = false
+        remoteDescriptionReady = false
+        pendingRemoteCandidates.removeAll(keepingCapacity: true)
     }
 }
 
@@ -473,18 +547,23 @@ extension SessionCoordinator: WebRTCSessionDelegate {
     nonisolated func webRTCSession(_ session: WebRTCSession, didGenerate candidate: RTCIceCandidate) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            try? await self.apply(try self.requireFlow(.localCandidate(
-                candidate: candidate.sdp,
-                mid: candidate.sdpMid ?? "0",
-                line: candidate.sdpMLineIndex
-            )))
+            do {
+                await self.apply(try self.requireFlow(.localCandidate(
+                    candidate: candidate.sdp,
+                    mid: candidate.sdpMid ?? "0",
+                    line: candidate.sdpMLineIndex
+                )))
+            } catch {
+                await self.fail(code: "local_ice_failed", error: error)
+            }
         }
     }
 
     nonisolated func webRTCSessionDidCompleteICEGathering(_ session: WebRTCSession) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            try? await self.apply(try self.requireFlow(.localICEComplete))
+            do { await self.apply(try self.requireFlow(.localICEComplete)) }
+            catch { await self.fail(code: "local_ice_failed", error: error) }
         }
     }
 
@@ -495,7 +574,9 @@ extension SessionCoordinator: WebRTCSessionDelegate {
             switch state {
             case .connected:
                 self.state = .connected(role: self.selectedRole)
-                try? await self.apply(try self.requireFlow(.peerConnected))
+                await self.recordImmediateSelectedPath(for: session)
+                do { await self.apply(try self.requireFlow(.peerConnected)) }
+                catch { await self.fail(code: "peer_connection_failed", error: error) }
             case .failed:
                 await self.fail(code: "peer_connection_failed", message: "WebRTC connection failed")
             default:
@@ -514,7 +595,7 @@ extension SessionCoordinator: WebRTCSessionDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             if session.role == .sender {
-                do { try await self.apply(try self.requireFlow(.captureFailed(error.localizedDescription))) }
+                do { await self.apply(try self.requireFlow(.captureFailed(error.localizedDescription))) }
                 catch { await self.fail(code: "capture_failed", error: error) }
             } else {
                 await self.fail(code: "peer_session_failed", error: error)
