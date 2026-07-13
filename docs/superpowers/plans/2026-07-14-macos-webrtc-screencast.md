@@ -24,7 +24,7 @@
 - Generate: `apps/macos/WebRTCScreencast.xcodeproj`
 - Create: `apps/macos/WebRTCScreencast/Resources/Info.plist`
 
-- [ ] **Step 1: Add generated/vendor exclusions**
+- [x] **Step 1: Add generated/vendor exclusions**
 
 Add these exact entries to `.gitignore`:
 
@@ -37,7 +37,7 @@ runtime.json
 diagnostics/
 ```
 
-- [ ] **Step 2: Add verified framework bootstrap**
+- [x] **Step 2: Add verified framework bootstrap**
 
 Create `scripts/bootstrap-webrtc.sh` with `set -euo pipefail`, derive the repository root from the script location, run:
 
@@ -50,7 +50,7 @@ ditto -x -k WebRTC-m150-macos-universal.xcframework.zip "$ROOT/Vendor"
 test -f "$ROOT/Vendor/WebRTC.xcframework/Info.plist"
 ```
 
-- [ ] **Step 3: Add non-secret runtime and CastTuning config**
+- [x] **Step 3: Add non-secret runtime and CastTuning config**
 
 `config/runtime.example.json` must contain signaling URL, profile, TURN URL with empty username/password, metrics directory and optional receiver PID exclusion. `config/cast-tuning.default.json` must be valid CastTuning schema v1:
 
@@ -93,11 +93,11 @@ test -f "$ROOT/Vendor/WebRTC.xcframework/Info.plist"
 }
 ```
 
-- [ ] **Step 4: Add the XcodeGen project source**
+- [x] **Step 4: Add the XcodeGen project source**
 
 Define one macOS application target and one unit-test target, deployment target 14.0, Swift 6, bridging header, framework search path `../../Vendor`, embed/sign `WebRTC.xcframework`, and link AppKit, SwiftUI, ScreenCaptureKit, CoreMedia, CoreVideo, CoreGraphics, MetalKit and VideoToolbox. Keep App Sandbox disabled and set a unique bundle ID under `cn.aweffr`.
 
-- [ ] **Step 5: Bootstrap and generate the project**
+- [x] **Step 5: Bootstrap and generate the project**
 
 Run:
 
@@ -109,7 +109,7 @@ xcodebuild -project WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -showBui
 
 Expected: checksum lines end in `OK`, XcodeGen succeeds, and Xcode can resolve the app target.
 
-- [ ] **Step 6: Add Makefile entry points and commit**
+- [x] **Step 6: Add Makefile entry points and commit**
 
 Provide `make bootstrap`, `make generate`, `make test-go`, `make test-macos`, `make build-macos`, `make verify`, and commit:
 

@@ -11,3 +11,13 @@ DerivedData/
 build/
 *.xcuserstate
 xcuserdata/
+
+# Generated dependencies and language build state.
+Vendor/
+.swiftpm/
+.build/
+server/signaling-server
+
+# Local runtime configuration and collected diagnostics.
+runtime.json
+diagnostics/
