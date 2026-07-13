@@ -6,11 +6,24 @@ struct WebRTCScreencastApp: App {
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
-        let options = try? LaunchOptions.parse(arguments)
-        let configuration = try? RuntimeConfiguration.load(arguments: arguments)
+        var options: LaunchOptions?
+        var startupFailure: String?
+        do {
+            options = try LaunchOptions.parse(arguments)
+        } catch {
+            startupFailure = error.localizedDescription
+        }
+        let explicitConfiguration = arguments.contains("--config")
+        var configuration: RuntimeConfiguration?
+        do {
+            configuration = try RuntimeConfiguration.load(arguments: arguments)
+        } catch {
+            if explicitConfiguration, startupFailure == nil { startupFailure = error.localizedDescription }
+        }
         _coordinator = StateObject(wrappedValue: SessionCoordinator(
             configuration: configuration,
-            launchOptions: options
+            launchOptions: options,
+            startupFailure: startupFailure
         ))
     }
 

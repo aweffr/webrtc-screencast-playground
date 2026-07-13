@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,28 +26,36 @@ type realClock struct{}
 func (realClock) Now() time.Time { return time.Now() }
 
 type Config struct {
-	Clock             session.Clock
-	CodeGenerator     session.CodeGenerator
-	PairingTTL        time.Duration
-	MaxPending        int
-	MaxActive         int
-	WriteQueueSize    int
-	ReadLimit         int64
-	PingInterval      time.Duration
-	ExpireInterval    time.Duration
-	RateLimitBurst    int
-	RateLimitInterval time.Duration
+	Clock                       session.Clock
+	CodeGenerator               session.CodeGenerator
+	PairingTTL                  time.Duration
+	MaxPending                  int
+	MaxActive                   int
+	WriteQueueSize              int
+	ReadLimit                   int64
+	PingInterval                time.Duration
+	ExpireInterval              time.Duration
+	RateLimitBurst              int
+	RateLimitInterval           time.Duration
+	MaxConnections              int
+	ConnectionRateLimitBurst    int
+	ConnectionRateLimitInterval time.Duration
+	TrustedProxyCIDRs           []netip.Prefix
+	afterConnectionReserved     func()
 }
 
 type Server struct {
 	mu sync.Mutex
 
-	config   Config
-	logger   *slog.Logger
-	registry *session.Registry
-	metrics  *observability.Metrics
-	limiter  *sourceLimiter
-	peers    map[string]*peer
+	config            Config
+	logger            *slog.Logger
+	registry          *session.Registry
+	metrics           *observability.Metrics
+	limiter           *sourceLimiter
+	connectionLimiter *sourceLimiter
+	peers             map[string]*peer
+	connectionSlots   int
+	closing           bool
 
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -84,6 +94,15 @@ func NewServer(config Config, logger *slog.Logger) *Server {
 	if config.RateLimitInterval <= 0 {
 		config.RateLimitInterval = time.Second
 	}
+	if config.MaxConnections <= 0 {
+		config.MaxConnections = 2000
+	}
+	if config.ConnectionRateLimitBurst <= 0 {
+		config.ConnectionRateLimitBurst = 40
+	}
+	if config.ConnectionRateLimitInterval <= 0 {
+		config.ConnectionRateLimitInterval = time.Second
+	}
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -96,11 +115,12 @@ func NewServer(config Config, logger *slog.Logger) *Server {
 			MaxPending: config.MaxPending,
 			MaxActive:  config.MaxActive,
 		}),
-		metrics: observability.NewMetrics(),
-		limiter: newSourceLimiter(config.Clock, config.RateLimitBurst, config.RateLimitInterval),
-		peers:   make(map[string]*peer),
-		ctx:     ctx,
-		cancel:  cancel,
+		metrics:           observability.NewMetrics(),
+		limiter:           newSourceLimiter(config.Clock, config.RateLimitBurst, config.RateLimitInterval),
+		connectionLimiter: newSourceLimiter(config.Clock, config.ConnectionRateLimitBurst, config.ConnectionRateLimitInterval),
+		peers:             make(map[string]*peer),
+		ctx:               ctx,
+		cancel:            cancel,
 	}
 	server.waitGroup.Add(1)
 	go server.maintenanceLoop()
@@ -124,13 +144,14 @@ func (server *Server) RegistrySnapshot() session.Snapshot {
 }
 
 func (server *Server) Shutdown(ctx context.Context) error {
-	server.cancel()
 	server.mu.Lock()
+	server.closing = true
 	peers := make([]*peer, 0, len(server.peers))
 	for _, connectedPeer := range server.peers {
 		peers = append(peers, connectedPeer)
 	}
 	server.mu.Unlock()
+	server.cancel()
 	for _, connectedPeer := range peers {
 		connectedPeer.stop()
 	}
@@ -149,6 +170,22 @@ func (server *Server) Shutdown(ctx context.Context) error {
 }
 
 func (server *Server) handleWebSocket(writer http.ResponseWriter, request *http.Request) {
+	source := clientSource(request, server.config.TrustedProxyCIDRs)
+	if !server.connectionLimiter.Allow(source) {
+		server.metrics.Rejection("rate_limited")
+		http.Error(writer, "too many connection attempts", http.StatusTooManyRequests)
+		return
+	}
+	if !server.reserveConnection() {
+		server.metrics.Rejection("capacity")
+		http.Error(writer, "connection capacity reached", http.StatusServiceUnavailable)
+		return
+	}
+	defer server.releaseConnection()
+	if server.config.afterConnectionReserved != nil {
+		server.config.afterConnectionReserved()
+	}
+
 	connection, err := websocket.Accept(writer, request, &websocket.AcceptOptions{
 		CompressionMode: websocket.CompressionDisabled,
 	})
@@ -162,15 +199,13 @@ func (server *Server) handleWebSocket(writer http.ResponseWriter, request *http.
 		connection.CloseNow()
 		return
 	}
-	connectedPeer := newPeer(server.ctx, peerID, sourceHost(request.RemoteAddr), connection, server.config.WriteQueueSize)
+	connectedPeer := newPeer(server.ctx, peerID, source, connection, server.config.WriteQueueSize)
 	server.mu.Lock()
 	server.peers[peerID] = connectedPeer
 	server.mu.Unlock()
 	server.metrics.ConnectionOpened()
 	server.logger.Info("peer_connected", "peer_id", shortID(peerID))
 
-	server.waitGroup.Add(1)
-	defer server.waitGroup.Done()
 	defer func() {
 		server.cleanupPeer(connectedPeer, true, "peer_disconnected")
 		connectedPeer.stop()
@@ -193,6 +228,26 @@ func (server *Server) handleWebSocket(writer http.ResponseWriter, request *http.
 			return
 		}
 	}
+}
+
+func (server *Server) reserveConnection() bool {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	if server.closing || server.connectionSlots >= server.config.MaxConnections {
+		return false
+	}
+	server.connectionSlots++
+	server.waitGroup.Add(1)
+	return true
+}
+
+func (server *Server) releaseConnection() {
+	server.mu.Lock()
+	if server.connectionSlots > 0 {
+		server.connectionSlots--
+	}
+	server.mu.Unlock()
+	server.waitGroup.Done()
 }
 
 func (server *Server) handleMessage(connectedPeer *peer, data []byte) bool {
@@ -249,7 +304,7 @@ func (server *Server) handleRegister(connectedPeer *peer, relatedMessageID strin
 		PairingCode: pending.Code,
 		ExpiresAt:   pending.ExpiresAt,
 	}, false)
-	server.logger.Info("receiver_registered", "session_id", shortID(pending.SessionID))
+	server.logger.Info("receiver_registered", "session_id", pending.SessionID)
 	return true
 }
 
@@ -296,7 +351,7 @@ func (server *Server) handleJoin(connectedPeer *peer, relatedMessageID string, p
 	server.updateRegistryMetrics()
 	server.send(receiver, protocol.TypeSessionPaired, protocol.SessionPairedPayload{SessionID: pair.SessionID, Role: protocol.RoleReceiver}, false)
 	server.send(connectedPeer, protocol.TypeSessionPaired, protocol.SessionPairedPayload{SessionID: pair.SessionID, Role: protocol.RoleSender}, false)
-	server.logger.Info("session_paired", "session_id", shortID(pair.SessionID))
+	server.logger.Info("session_paired", "session_id", pair.SessionID)
 	return true
 }
 
@@ -422,6 +477,7 @@ func (server *Server) maintenanceLoop() {
 			return
 		case <-ticker.C:
 			server.limiter.Prune()
+			server.connectionLimiter.Prune()
 			expired := server.registry.Expire()
 			if len(expired) == 0 {
 				continue
@@ -478,4 +534,43 @@ func sourceHost(remoteAddress string) string {
 		return remoteAddress
 	}
 	return host
+}
+
+func clientSource(request *http.Request, trustedProxyCIDRs []netip.Prefix) string {
+	remoteText := sourceHost(request.RemoteAddr)
+	remote, err := netip.ParseAddr(remoteText)
+	if err != nil {
+		return remoteText
+	}
+	remote = remote.Unmap()
+	if !addressInPrefixes(remote, trustedProxyCIDRs) {
+		return remote.String()
+	}
+
+	forwarded := strings.Split(request.Header.Get("X-Forwarded-For"), ",")
+	candidate := remote
+	for index := len(forwarded) - 1; index >= 0; index-- {
+		if !addressInPrefixes(candidate, trustedProxyCIDRs) {
+			return candidate.String()
+		}
+		value := strings.TrimSpace(forwarded[index])
+		if value == "" {
+			continue
+		}
+		address, parseErr := netip.ParseAddr(value)
+		if parseErr != nil {
+			return candidate.String()
+		}
+		candidate = address.Unmap()
+	}
+	return candidate.String()
+}
+
+func addressInPrefixes(address netip.Addr, prefixes []netip.Prefix) bool {
+	for _, prefix := range prefixes {
+		if prefix.Contains(address) {
+			return true
+		}
+	}
+	return false
 }

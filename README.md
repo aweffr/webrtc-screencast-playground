@@ -8,7 +8,7 @@ Minimal native macOS screen casting over WebRTC M150. One app binary runs as eit
 - Receiver: native Metal video rendering.
 - Production network profile: relay-only TURN/UDP with fixed credentials supplied by an ignored runtime file.
 - Development comparison profile: direct UDP, including two independent processes on one Mac.
-- Observability: capture, WebRTC stats, selected path, RTC event log, file log and secret-checked diagnostic export.
+- Observability: capture/render telemetry, normalized WebRTC stats, selected path, canonical signaling session ID and fail-closed diagnostic export.
 
 Input forwarding, TURN/TCP, App Store distribution, dynamic ScreenCaptureKit cadence and `EnableLowLatencyRateControl` are intentionally outside phase one. Static content can use M150 zero-hertz behavior, including its approximately one-frame-per-second idle resend.
 

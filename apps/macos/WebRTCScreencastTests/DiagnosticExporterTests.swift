@@ -3,6 +3,34 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class DiagnosticExporterTests: XCTestCase {
+    func testBindingCanonicalSessionIDRewritesBufferedRecords() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let recorder = try MetricsRecorder(
+            directory: directory,
+            context: MetricsContext(
+                schemaVersion: 1,
+                sessionID: "local-provisional-id",
+                role: .sender,
+                profile: .directBaseline,
+                effectiveConfigHash: "hash-1",
+                tuningRevision: 1
+            )
+        )
+
+        try await recorder.record(event: "signaling_connected")
+        try await recorder.bindSessionID("server-session-id")
+        try await recorder.record(event: "peer_paired")
+        try await recorder.close()
+
+        let data = try Data(contentsOf: directory.appending(path: "metrics.jsonl"))
+        let records = try String(decoding: data, as: UTF8.self).split(separator: "\n").map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any])
+        }
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(Set(records.compactMap { $0["session_id"] as? String }), ["server-session-id"])
+    }
+
     func testConcurrentRecorderWritesOneSanitizedJSONObjectPerLine() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -91,6 +119,66 @@ final class DiagnosticExporterTests: XCTestCase {
                 sessionDirectory: directory,
                 outputURL: directory.appending(path: "out.zip"),
                 forbiddenSecrets: ["injected-turn-password"]
+            )
+        }
+    }
+
+    func testExporterRejectsRawLibWebRTCArtifactsEvenWithoutKnownTURNSecrets() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("binary event data".utf8).write(to: directory.appending(path: "rtc-event.log"))
+
+        do {
+            _ = try await DiagnosticExporter.export(
+                sessionDirectory: directory,
+                outputURL: directory.appending(path: "out.zip"),
+                forbiddenSecrets: []
+            )
+            XCTFail("Expected raw libwebrtc artifact rejection")
+        } catch {
+            XCTAssertEqual(
+                error as? DiagnosticExporterError,
+                .unsupportedSensitiveArtifact(path: "rtc-event.log")
+            )
+        }
+    }
+
+    func testExporterDoesNotSkipHiddenSensitiveArtifacts() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("raw log".utf8).write(to: directory.appending(path: ".webrtc_log_0"))
+
+        do {
+            _ = try await DiagnosticExporter.export(
+                sessionDirectory: directory,
+                outputURL: directory.appending(path: "out.zip"),
+                forbiddenSecrets: []
+            )
+            XCTFail("Expected hidden raw artifact rejection")
+        } catch {
+            XCTAssertEqual(
+                error as? DiagnosticExporterError,
+                .unsupportedSensitiveArtifact(path: ".webrtc_log_0")
+            )
+        }
+    }
+
+    func testExporterScansHiddenFilesForConfiguredSecrets() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("hidden-turn-secret".utf8).write(to: directory.appending(path: ".diagnostic-cache"))
+
+        do {
+            _ = try await DiagnosticExporter.export(
+                sessionDirectory: directory,
+                outputURL: directory.appending(path: "out.zip"),
+                forbiddenSecrets: ["hidden-turn-secret"]
+            )
+            XCTFail("Expected hidden secret rejection")
+        } catch {
+            XCTAssertEqual(
+                error as? DiagnosticExporterError,
+                .secretFound(path: ".diagnostic-cache")
             )
         }
     }

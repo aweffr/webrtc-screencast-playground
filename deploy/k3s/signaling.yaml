@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,6 +36,16 @@ spec:
               value: "1000"
             - name: MAX_ACTIVE
               value: "1000"
+            - name: MAX_CONNECTIONS
+              value: "2000"
+            - name: CONNECTION_RATE_LIMIT_BURST
+              value: "40"
+            - name: CONNECTION_RATE_LIMIT_INTERVAL
+              value: "1s"
+            # Trust forwarded client chains only from the cluster pod network
+            # used by Traefik.
+            - name: TRUSTED_PROXY_CIDRS
+              value: "10.42.0.0/16"
           ports:
             - name: http
               containerPort: 8080

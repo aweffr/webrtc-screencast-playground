@@ -72,3 +72,22 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadParsesConnectionAdmissionAndTrustedProxies(t *testing.T) {
+	values := map[string]string{
+		"MAX_CONNECTIONS":                "123",
+		"CONNECTION_RATE_LIMIT_BURST":    "7",
+		"CONNECTION_RATE_LIMIT_INTERVAL": "2s",
+		"TRUSTED_PROXY_CIDRS":            "10.42.0.0/16, 127.0.0.1/32",
+	}
+	config, err := Load(func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.MaxConnections != 123 || config.ConnectionRateLimitBurst != 7 || config.ConnectionRateLimitInterval != 2*time.Second {
+		t.Fatalf("unexpected admission config: %#v", config)
+	}
+	if len(config.TrustedProxyCIDRs) != 2 || config.TrustedProxyCIDRs[0].String() != "10.42.0.0/16" {
+		t.Fatalf("unexpected trusted proxies: %#v", config.TrustedProxyCIDRs)
+	}
+}

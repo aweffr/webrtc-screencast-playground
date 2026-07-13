@@ -20,9 +20,32 @@ sender="$SENDER_DIR/metrics.jsonl"
 [[ -s "$receiver" ]] || { print -u2 "missing receiver metrics: $receiver"; exit 1; }
 [[ -s "$sender" ]] || { print -u2 "missing sender metrics: $sender"; exit 1; }
 
+if find "$RECEIVER_DIR" "$SENDER_DIR" -type f \
+  \( -name 'rtc-event.log' -o -name 'webrtc_log*' -o -name '.*rtc-event.log' -o -name '.*webrtc_log*' \) \
+  -print -quit | grep -q .; then
+  print -u2 "diagnostics contain unsupported raw libwebrtc logs"
+  exit 1
+fi
+
 for file in "$receiver" "$sender"; do
   jq -e -c . "$file" >/dev/null || { print -u2 "invalid JSONL: $file"; exit 1; }
 done
+
+canonical_session_id() {
+  jq -sr '
+    if length > 0
+      and all(.[]; (.session_id | type == "string") and (.session_id | length > 0))
+      and ([.[].session_id] | unique | length == 1)
+    then .[0].session_id
+    else empty
+    end
+  ' "$1"
+}
+
+receiver_session_id="$(canonical_session_id "$receiver")"
+sender_session_id="$(canonical_session_id "$sender")"
+[[ -n "$receiver_session_id" && "$receiver_session_id" == "$sender_session_id" ]] \
+  || { print -u2 "sender and receiver metrics do not share one canonical session_id"; exit 1; }
 
 require_event() {
   local file="$1" event="$2" label="$3"

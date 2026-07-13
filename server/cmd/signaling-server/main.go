@@ -23,12 +23,16 @@ func main() {
 	}
 
 	signalingServer := signaling.NewServer(signaling.Config{
-		PairingTTL:        config.PairingTTL,
-		MaxPending:        config.MaxPending,
-		MaxActive:         config.MaxActive,
-		RateLimitBurst:    config.RateLimitBurst,
-		RateLimitInterval: config.RateLimitInterval,
-		PingInterval:      30 * time.Second,
+		PairingTTL:                  config.PairingTTL,
+		MaxPending:                  config.MaxPending,
+		MaxActive:                   config.MaxActive,
+		RateLimitBurst:              config.RateLimitBurst,
+		RateLimitInterval:           config.RateLimitInterval,
+		MaxConnections:              config.MaxConnections,
+		ConnectionRateLimitBurst:    config.ConnectionRateLimitBurst,
+		ConnectionRateLimitInterval: config.ConnectionRateLimitInterval,
+		TrustedProxyCIDRs:           config.TrustedProxyCIDRs,
+		PingInterval:                30 * time.Second,
 	}, logger)
 	httpServer := &http.Server{
 		Addr:              config.ListenAddr,

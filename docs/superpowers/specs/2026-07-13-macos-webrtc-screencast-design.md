@@ -155,7 +155,7 @@ error             ← stable code, safe message, related_message_id
 
 Receiver register 后 server 生成 8 位 Crockford Base32 code 和 opaque session ID。Code 只使用 `0123456789ABCDEFGHJKMNPQRSTVWXYZ`，未配对 10 分钟过期；Sender 成功 join 后立即从 pending-code index 删除，因此不能被第二个 Sender 重用。Session 只存在内存；任何一端断开都会通知另一端并删除 session，一期不 resume。
 
-同一 connection 只能声明一个 role。未配对前只能发送与当前阶段相符的消息；配对后 SDP/ICE/hangup 只转发给绑定 peer。Server 验证 envelope、消息大小、SDP/candidate 字段长度和顺序，但不解析或改写 SDP。默认 message limit 为 256 KiB，pending code 上限 1,000，active session 上限 1,000；HTTP server 有 read-header、idle 和 graceful-shutdown deadline。Register/join 按来源 IP token-bucket 限流，join code 错误不泄露“存在但已占用”等可枚举状态。
+同一 connection 只能声明一个 role。未配对前只能发送与当前阶段相符的消息；配对后 SDP/ICE/hangup 只转发给绑定 peer。Server 验证 envelope、消息大小、SDP/candidate 字段长度和顺序，但不解析或改写 SDP。默认 message limit 为 256 KiB，WebSocket 总连接上限 2,000，pending code 上限 1,000，active session 上限 1,000；HTTP server 有 read-header、idle 和 graceful-shutdown deadline。WebSocket upgrade 前先执行全局连接容量和按来源建连 token-bucket；register/join 使用独立的来源 bucket。只有 immediate peer 位于显式 `TRUSTED_PROXY_CIDRS` 时，来源解析才从 `X-Forwarded-For` 右向左跳过可信代理，直连请求不能伪造 header。Join code 错误不泄露“存在但已占用”等可枚举状态。
 
 每个 peer 只有一个 reader loop 和一个 bounded writer queue；慢消费者导致该 session 明确关闭，不能阻塞 registry。Ping/pong 用于发现 dead peer。Registry 的 create/join/remove/expire 是单一 owner goroutine 或 mutex 下的原子操作，保证 code 只能消费一次。
 
@@ -176,9 +176,9 @@ Receiver register 后 server 生成 8 位 Crockford Base32 code 和 opaque sessi
 
 RTCStats values 是动态字典，`RTCStatsNormalizer` 负责类型安全提取并在字段缺失时输出 null + capability event，而不是 crash 或伪造 0。UI 只显示连接状态、selected path、capture/encode/render fps、bitrate、RTT、loss、QP 和 Frame Gate state 的小型现场面板；完整证据以 JSONL 为准。
 
-`DiagnosticExporter` 生成一个目录后 zip，包含 sanitized effective config、client JSONL、CastTuning snapshot/log、WebRTC log、server metrics snapshot（若可达）和 manifest/checksum。导出前运行 secret redaction scan；发现 runtime credential 原文时中止导出并报告错误。
+`DiagnosticExporter` 生成结构化诊断 zip，包含 client JSONL、可安全导出的 CastTuning telemetry、server metrics snapshot（若可达）和 manifest/checksum。原始 `RTCFileLogger` 与 RTC event log 会包含无法可靠脱敏的 ICE candidate、ufrag/password，因此一期禁用且 exporter 发现这类历史文件时 fail closed。导出前还运行 runtime credential scan，发现原文时中止并报告错误。
 
-Go server 使用 JSON structured event log 和 Prometheus counters/gauges/histograms。日志只包含 session ID 前缀、role、event、result、duration、message type 和不可逆来源 hash，不包含 pairing code、SDP、candidate 或 credential。
+Go server 使用 JSON structured event log 和 Prometheus counters/gauges/histograms。配对/会话日志包含 server 分配的完整 opaque session ID，客户端 JSONL 使用同一个 ID，三方证据可可靠关联；日志不包含 pairing code、SDP、candidate 或 credential。
 
 ## UI
 

@@ -23,6 +23,8 @@ make build-macos
 
 `make verify` runs all three plus `git diff --check`.
 
+The signaling service bounds all WebSocket connections before upgrade (`MAX_CONNECTIONS`) and applies a separate per-source connection-attempt bucket. `TRUSTED_PROXY_CIDRS` is empty for direct local use. The K3s manifest trusts the cluster pod CIDR used by the Traefik hop; requests whose immediate peer is outside that CIDR ignore forwarded headers. Never configure a public/untrusted CIDR.
+
 ## Manual two-window workflow
 
 Start signaling:
@@ -41,10 +43,8 @@ If the Sender reports that capture is unavailable, follow the [capture permissio
 
 ## Diagnostics
 
-Each process writes a distinct `<session-id>-sender` or `<session-id>-receiver` directory containing:
+Each process writes a distinct `<local-run-id>-sender` or `<local-run-id>-receiver` directory containing:
 
-- `metrics.jsonl` with immediate lifecycle events and one-second RTC/capture/render samples;
-- rotated WebRTC file logs;
-- `rtc-event.log` when supported by the framework.
+- `metrics.jsonl` with immediate lifecycle events and one-second RTC/capture/render samples. Records buffered before pairing are committed with the canonical server-assigned `session_id`, so Sender, Receiver and server evidence share one join key.
 
-The UI can export a SHA-256-manifested zip. Export fails closed if configured TURN credentials appear in any included file.
+Raw `RTCFileLogger` and RTC event logs are intentionally disabled because they can contain ICE candidates and transient ICE ufrag/password values that cannot be reliably redacted. The UI first copies a private snapshot, then scans, hashes and archives that exact snapshot as a SHA-256-manifested zip of structured diagnostics. Export fails closed if configured TURN credentials or known raw libwebrtc artifacts, including hidden files, appear in the snapshot.

@@ -33,8 +33,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
     private let videoCapturer: RTCVideoCapturer?
     private let displayRenderer: (any RTCVideoRenderer)?
     private var remoteVideoTrack: RTCVideoTrack?
-    private var fileLogger: RTCFileLogger?
-    private var eventLogStarted = false
 
     init(
         role: CastingRole,
@@ -165,26 +163,9 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
 
     func startDiagnostics(in directory: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let logger = RTCFileLogger(
-            dirPath: directory.path,
-            maxFileSize: 5 * 1_024 * 1_024,
-            rotationType: .typeCall
-        )
-        logger.severity = .info
-        logger.start()
-        fileLogger = logger
-        eventLogStarted = peerConnection.startRtcEventLog(
-            withFilePath: directory.appending(path: "rtc-event.log").path,
-            maxSizeInBytes: 10 * 1_024 * 1_024
-        )
     }
 
-    func stopDiagnostics() {
-        if eventLogStarted { peerConnection.stopRtcEventLog() }
-        eventLogStarted = false
-        fileLogger?.stop()
-        fileLogger = nil
-    }
+    func stopDiagnostics() {}
 
     func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame) {
         guard role == .sender, let videoCapturer, let delegate = videoCapturer.delegate else { return }

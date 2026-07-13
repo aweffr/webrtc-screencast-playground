@@ -605,7 +605,7 @@ Use one actor as the file writer, sanitized config only, `ditto -c -k` or `FileM
 
 - [x] **Step 5: Wire one-second RTCStats and capture/render samples**
 
-Start sampling only after PeerConnection creation, record state changes immediately, and stop/flush before teardown. Store CastTuning telemetry and WebRTC logs in the same session directory with non-secret paths supplied in generated tuning JSON.
+Start sampling only after PeerConnection creation, record state changes immediately, and stop/flush before teardown. Store structured CastTuning/WebRTC telemetry in the same session directory. Raw libwebrtc file/event logs are prohibited because they contain unredactable ICE material.
 
 - [x] **Step 6: Run tests and commit**
 
@@ -717,19 +717,19 @@ git commit -m "test: verify single-mac screencast flows"
 - Modify: files identified by review
 - Modify: `docs/superpowers/plans/2026-07-14-macos-webrtc-screencast.md`
 
-- [ ] **Step 1: Prepare the clean-context review package**
+- [x] **Step 1: Prepare the clean-context review package**
 
 Include original user requirements, design, plan, `git diff main~N..HEAD`, commit list, tests/build/E2E commands, diagnostic evidence, known limits and follow-ups. Ask reviewer only for requirement mismatches and Critical/High correctness, security, concurrency, lifecycle, compatibility, observability or validation gaps.
 
-- [ ] **Step 2: Fix accepted findings with TDD**
+- [x] **Step 2: Fix accepted findings with TDD**
 
 For every real defect, reproduce with a failing test or E2E check, observe RED, implement the smallest correct fix, rerun affected and full verification, and send the same reviewer the updated evidence. Stop after no mandatory issue or three rounds.
 
-- [ ] **Step 3: Audit every requirement against authoritative evidence**
+- [x] **Step 3: Audit every requirement against authoritative evidence**
 
 Build a table in Execution findings covering: two release assets/checksums; native single app supporting both roles; main mirror and app-created 1920×1080 virtual display; H.264 only; Go WS signaling; receiver-first code; WS/WSS; direct baseline; relay-only TURN/UDP; no TURN/TCP; sender/receiver/server metrics; dual-process E2E; secret hygiene; follow-up docs. Mark any missing evidence incomplete and continue implementation.
 
-- [ ] **Step 4: Final verification and commit**
+- [x] **Step 4: Final verification and commit**
 
 Run `make verify`, E2E evidence verifiers, `git status --short`, `git log --oneline`, and commit accepted review fixes using conventional commit messages. Completion requires a clean worktree except ignored local runtime/artifacts.
 
@@ -749,4 +749,29 @@ Run `make verify`, E2E evidence verifiers, `git status --short`, `git log --onel
 - 2026-07-14: Direct virtual evidence is preserved at `/var/folders/yf/__fg7fbd5ss0mf8g_gncd2l80000gn/T/webrtc-screencast-e2e.tg50iB`: both selected paths were verified `host/udp`; display ID 7 was created, `SCStream.startCapture` succeeded, and the display was removed during teardown. Capture callback count remained zero for the bounded run, so the verifier correctly failed on missing H.264 encode evidence.
 - 2026-07-14: Production relay evidence is preserved at `/var/folders/yf/__fg7fbd5ss0mf8g_gncd2l80000gn/T/webrtc-screencast-e2e.edaAIc`: both Sender and Receiver RTCStats selected paths were verified `relay/udp` through the deployed coturn service with no TCP/direct fallback. Sender then hit the same Screen Recording blocker before `capture_started`; relay network policy is proven, media E2E is not.
 - 2026-07-14: Existing coturn `KEY=VALUE` material was converted without executing or printing it into ignored mode-0600 `secrets/runtime.json`. `verify-no-secret-leaks.sh` found no configured credential in tracked files, and direct scans found none in production diagnostic directories. Script-verifier positive/negative self-tests pass.
-- 2026-07-14: `make verify` passes: Go race tests, asset checksum/bootstrap, Xcode project generation, all 72 macOS tests, signed arm64 build and `git diff --check`. UI app launch succeeded as an independent PID, but host screenshot capture returned an all-black image under the same denied Screen Recording state; UI source inspection found no requirement text, mock data, TURN credentials, SDP or candidate values.
+- 2026-07-14: The pre-review `make verify` passed Go race tests, asset checksum/bootstrap, Xcode project generation, all 72 then-existing macOS tests, signed arm64 build and `git diff --check`. UI app launch succeeded as an independent PID, but host screenshot capture returned an all-black image under the same denied Screen Recording state; UI source inspection found no requirement text, mock data, TURN credentials, SDP or candidate values.
+- 2026-07-14: Clean-context review found five initial High issues. Regression tests reproduced each contract gap: explicit config failures could fall back silently; raw libwebrtc logs exposed ICE candidates/ufrag/password; idle WebSockets bypassed registry capacity; Traefik collapsed source rate limiting onto one proxy bucket; and clients discarded the server session ID. Fixes now propagate startup errors, explicitly preflight/request Screen Recording, disable and reject raw libwebrtc artifacts, enforce pre-upgrade connection capacity/rate limits, parse forwarded chains only from `TRUSTED_PROXY_CIDRS`, and buffer early client metrics until the canonical server `session_id` is bound.
+- 2026-07-14: Review round two found and reproduced follow-on hardening gaps: connection limiter buckets were not pruned; malformed left-side XFF data could collapse an established client back to the proxy bucket; the exporter scanned live/non-hidden files but copied a different snapshot; the shell verifier accepted hidden raw logs and partial session IDs; and the async log test buffer raced. Fixes prune both limiters, resolve XFF right-to-left, scan/hash/archive one private snapshot including hidden files, require every record to share one canonical ID, reject leading-dot raw artifacts, and use a locked test writer. Focused race, exporter and script negative tests pass.
+- 2026-07-14: The same review then found a post-upgrade/pre-accounting shutdown race. Connection reservation, closing-state check and `WaitGroup.Add` now share one mutex critical section before upgrade; a barrier test holds that exact window and proves shutdown waits. Final clean-context re-review reports no remaining Critical/High mandatory finding; repeated race tests, focused Swift security tests, script negatives and `git diff --check` pass.
+- 2026-07-14: Post-review `make verify` passes end to end: Go race suite, both M150 archive checksums/bootstrap, generated Xcode project, all 81 macOS tests, verifier negative tests, signed arm64 app build and diff validation. `yamllint deploy/k3s/signaling.yaml` also passes; `kubeconform` is not currently installed on this host, so the earlier 3/3 schema result remains the latest schema evidence.
+
+### Requirement evidence audit
+
+| Requirement | Status | Authoritative evidence |
+| --- | --- | --- |
+| Two supplied M150 release assets | Complete | `artifacts/SHA256SUMS`; bootstrap reports both archives `OK`. |
+| One native app supports Sender and Receiver roles | Complete | `SessionCoordinator`, role-specific SwiftUI, flow tests, and dual-process PID/metrics evidence. |
+| Main-display mirror at 1920×1080 | Incomplete externally | Fixed capture configuration tests pass; real main capture stops at `capture_failed` because the host exposes no permitted display. |
+| App-created 1920×1080 1× 60Hz virtual extended display | Complete for lifecycle; media incomplete | Configuration tests plus `webrtc-screencast-e2e.tg50iB`: created display ID 7, started SCStream and removed display; callback count remained zero under current Screen Recording authorization. |
+| H.264-only WebRTC negotiation | Complete | Offer construction test excludes VP8/VP9/AV1; both real dual-process runs completed offer/answer. Encode/decode frame evidence remains externally blocked. |
+| Go WebSocket signaling | Complete | Go race/integration tests, health/metrics endpoints, and real local server logs. |
+| Receiver-first one-time pairing code | Complete | Registry/TTL/concurrency tests and real mode-0600 pairing file followed by successful join. |
+| WS and WSS accepted; TLS not forced | Complete | Runtime URL validation and transport tests; real WS E2E. WSS is compatibility-tested rather than deployed in local E2E. |
+| Direct UDP development baseline | Complete for network path | `nFzESt` and `tg50iB` prove both peers selected verified host/UDP paths. |
+| Production relay-only TURN/UDP | Complete for network path | `edaAIc` proves both peers selected verified relay/UDP via deployed coturn. |
+| No TURN/TCP and no production direct fallback | Complete | ICE configuration tests plus production RTCStats evidence; TCP candidates disabled. |
+| Sender/Receiver/server observability | Complete structurally | Canonically correlated JSONL, RTCStats, capture/render samples, Prometheus signaling metrics and fail-closed diagnostic exporter tests; raw libwebrtc logs are prohibited because they expose ICE material. Current media samples accurately show zero frames. |
+| Two independent app processes and real PeerConnections | Complete | All preserved E2E roots show distinct PIDs, real WS pairing, SDP, trickle ICE and connected selected pairs. |
+| End-to-end captured H.264 frames rendered on Receiver | Incomplete externally | Verifier fails closed on missing encode/render evidence; macOS Screen Recording must be granted and all four profile/source runs repeated. |
+| Secret hygiene | Complete | Ignored mode-0600 runtime config, tracked-file scan, diagnostic scan and exporter fail-closed tests pass. |
+| Deferred input control, low-latency rate control and capture-cadence work | Complete | Dedicated follow-up documents preserve these boundaries without adding phase-one complexity. |

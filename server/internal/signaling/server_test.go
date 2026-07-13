@@ -1,12 +1,15 @@
 package signaling
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -47,16 +50,35 @@ func (codes *testCodes) Generate() (string, error) {
 	return code, nil
 }
 
+type lockedBuffer struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (buffer *lockedBuffer) Write(data []byte) (int, error) {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return buffer.buffer.Write(data)
+}
+
+func (buffer *lockedBuffer) String() string {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return buffer.buffer.String()
+}
+
 type serverFixture struct {
 	server     *Server
 	httpServer *httptest.Server
 	wsURL      string
+	logs       *lockedBuffer
 }
 
 func newServerFixture(t *testing.T, queueSize int, codes ...string) *serverFixture {
 	t.Helper()
 	clock := &testClock{now: time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC)}
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	logs := &lockedBuffer{}
+	logger := slog.New(slog.NewJSONHandler(logs, nil))
 	server := NewServer(Config{
 		Clock:          clock,
 		CodeGenerator:  &testCodes{codes: codes},
@@ -78,6 +100,7 @@ func newServerFixture(t *testing.T, queueSize int, codes ...string) *serverFixtu
 		server:     server,
 		httpServer: httpServer,
 		wsURL:      "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws",
+		logs:       logs,
 	}
 }
 
@@ -213,6 +236,16 @@ func TestWebSocketPairsAndRelaysNegotiationMessages(t *testing.T) {
 	}
 	if snapshot := fixture.server.RegistrySnapshot(); snapshot.Active != 0 || snapshot.Pending != 0 {
 		t.Fatalf("registry not cleaned after hangup: %#v", snapshot)
+	}
+}
+
+func TestSessionLogsUseCanonicalSessionID(t *testing.T) {
+	t.Parallel()
+	fixture := newServerFixture(t, 8, "01ABCD23")
+	_, _, sessionID := registerAndPair(t, fixture)
+
+	if !strings.Contains(fixture.logs.String(), `"session_id":"`+sessionID+`"`) {
+		t.Fatalf("logs do not contain canonical session id")
 	}
 }
 
@@ -399,6 +432,184 @@ func TestRegisterIsRateLimitedBySource(t *testing.T) {
 	_, payload, _ := readMessage(t, second)
 	if payload.(protocol.ErrorPayload).Code != "rate_limited" {
 		t.Fatalf("unexpected rate limit response: %#v", payload)
+	}
+}
+
+func TestIdleWebSocketConnectionsAreAdmissionLimited(t *testing.T) {
+	t.Parallel()
+	server := NewServer(Config{
+		MaxConnections:           1,
+		ConnectionRateLimitBurst: 100,
+		WriteQueueSize:           8,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	httpServer := httptest.NewServer(server.Handler())
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+		httpServer.Close()
+	})
+	url := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws"
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	first, _, err := websocket.Dial(ctx, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.CloseNow()
+
+	second, response, err := websocket.Dial(ctx, url, nil)
+	if second != nil {
+		second.CloseNow()
+	}
+	if err == nil || response == nil || response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("second dial error/status = %v/%v, want HTTP 503", err, response)
+	}
+}
+
+func TestWebSocketUpgradeIsRateLimitedBeforeAdmission(t *testing.T) {
+	t.Parallel()
+	server := NewServer(Config{
+		MaxConnections:              10,
+		ConnectionRateLimitBurst:    1,
+		ConnectionRateLimitInterval: time.Hour,
+		WriteQueueSize:              8,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	httpServer := httptest.NewServer(server.Handler())
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+		httpServer.Close()
+	})
+	url := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws"
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	first, _, err := websocket.Dial(ctx, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.CloseNow()
+
+	second, response, err := websocket.Dial(ctx, url, nil)
+	if second != nil {
+		second.CloseNow()
+	}
+	if err == nil || response == nil || response.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("second dial error/status = %v/%v, want HTTP 429", err, response)
+	}
+}
+
+func TestClientSourceUsesForwardingChainOnlyFromTrustedProxy(t *testing.T) {
+	t.Parallel()
+	trusted := []netip.Prefix{netip.MustParsePrefix("10.42.0.0/16")}
+
+	proxied := httptest.NewRequest(http.MethodGet, "http://example.test/ws", nil)
+	proxied.RemoteAddr = "10.42.3.4:12345"
+	proxied.Header.Set("X-Forwarded-For", "203.0.113.7, 10.42.2.9")
+	if got := clientSource(proxied, trusted); got != "203.0.113.7" {
+		t.Fatalf("trusted proxy source = %q", got)
+	}
+	proxied.Header.Set("X-Forwarded-For", "garbage, 203.0.113.7")
+	if got := clientSource(proxied, trusted); got != "203.0.113.7" {
+		t.Fatalf("nearest valid untrusted source = %q", got)
+	}
+
+	forged := httptest.NewRequest(http.MethodGet, "http://example.test/ws", nil)
+	forged.RemoteAddr = "198.51.100.12:54321"
+	forged.Header.Set("X-Forwarded-For", "203.0.113.99")
+	if got := clientSource(forged, trusted); got != "198.51.100.12" {
+		t.Fatalf("untrusted source = %q", got)
+	}
+}
+
+func TestMaintenancePrunesConnectionRateLimitSources(t *testing.T) {
+	t.Parallel()
+	clock := &testClock{now: time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC)}
+	server := NewServer(Config{
+		Clock:                       clock,
+		ExpireInterval:              time.Millisecond,
+		ConnectionRateLimitBurst:    1,
+		ConnectionRateLimitInterval: time.Hour,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	})
+
+	for index := 0; index < 100; index++ {
+		server.connectionLimiter.Allow(fmt.Sprintf("203.0.113.%d", index))
+	}
+	clock.Advance(3 * time.Hour)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		server.connectionLimiter.mu.Lock()
+		remaining := len(server.connectionLimiter.buckets)
+		server.connectionLimiter.mu.Unlock()
+		if remaining == 0 {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("connection limiter retained expired source buckets")
+}
+
+func TestShutdownWaitsForReservedWebSocketHandler(t *testing.T) {
+	reserved := make(chan struct{})
+	proceed := make(chan struct{})
+	server := NewServer(Config{
+		WriteQueueSize: 8,
+		afterConnectionReserved: func() {
+			close(reserved)
+			<-proceed
+		},
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	httpServer := httptest.NewServer(server.Handler())
+	t.Cleanup(func() {
+		closeIfOpen(proceed)
+		httpServer.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(ctx)
+	})
+
+	dialDone := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		connection, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(httpServer.URL, "http")+"/ws", nil)
+		if connection != nil {
+			connection.CloseNow()
+		}
+		dialDone <- err
+	}()
+	<-reserved
+
+	shutdownDone := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		shutdownDone <- server.Shutdown(ctx)
+	}()
+	select {
+	case err := <-shutdownDone:
+		t.Fatalf("shutdown returned before reserved handler completed: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(proceed)
+	_ = <-dialDone // Either an accepted socket or a shutdown-related dial error is valid.
+	if err := <-shutdownDone; err != nil {
+		t.Fatalf("shutdown failed: %v", err)
+	}
+}
+
+func closeIfOpen(channel chan struct{}) {
+	select {
+	case <-channel:
+	default:
+		close(channel)
 	}
 }
 

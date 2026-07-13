@@ -2,6 +2,19 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class SessionCoordinatorTests: XCTestCase {
+    @MainActor
+    func testExplicitRuntimeConfigurationFailureIsNotSilentlyReplaced() async {
+        let coordinator = SessionCoordinator(startupFailure: "runtime file is unreadable")
+
+        await coordinator.start()
+
+        guard case .failed(let failure) = coordinator.state else {
+            return XCTFail("Expected a visible startup failure")
+        }
+        XCTAssertEqual(failure.code, "session_start_failed")
+        XCTAssertEqual(failure.message, "runtime file is unreadable")
+    }
+
     func testReceiverRegistersPublishesCodeAndAnswersOffer() throws {
         var flow = SessionFlow(role: .receiver, senderCode: nil)
 

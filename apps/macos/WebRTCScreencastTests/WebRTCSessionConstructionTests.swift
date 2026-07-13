@@ -37,6 +37,22 @@ final class WebRTCSessionConstructionTests: XCTestCase {
         XCTAssertFalse(offer.contains(" AV1/90000"))
     }
 
+    func testDiagnosticsDoNotCreateRawLibWebRTCLogs() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let tuningData = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
+        let ice = try IceServerProvider.make(profile: .directBaseline, turn: nil)
+        let session = try WebRTCSession(role: .sender, ice: ice, castTuningJSON: tuningData)
+        defer { session.close() }
+
+        try session.startDiagnostics(in: directory)
+
+        let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        XCTAssertFalse(names.contains("rtc-event.log"))
+        XCTAssertFalse(names.contains { $0.hasPrefix("webrtc_log") })
+    }
+
     private func repositoryRoot() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

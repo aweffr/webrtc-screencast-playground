@@ -36,6 +36,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
     let videoViewStore = RemoteVideoViewStore()
 
     private var baseConfiguration: RuntimeConfiguration?
+    private let startupFailure: String?
     private var launchOptions: LaunchOptions?
     private var flow: SessionFlow?
     private var signaling: SignalingClient?
@@ -53,9 +54,14 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private var remoteDescriptionReady = false
     private var pendingRemoteCandidates: [(candidate: String, mid: String, line: Int32)] = []
 
-    init(configuration: RuntimeConfiguration? = nil, launchOptions: LaunchOptions? = nil) {
+    init(
+        configuration: RuntimeConfiguration? = nil,
+        launchOptions: LaunchOptions? = nil,
+        startupFailure: String? = nil
+    ) {
         baseConfiguration = configuration
         self.launchOptions = launchOptions
+        self.startupFailure = startupFailure
         if let configuration {
             selectedProfile = configuration.iceProfile
             signalingURLText = configuration.signalingURL.absoluteString
@@ -76,14 +82,19 @@ final class SessionCoordinator: NSObject, ObservableObject {
     }
 
     func runLaunchOptionsIfNeeded() async {
-        guard let options = launchOptions, let role = options.role, state == .idle else { return }
+        guard state == .idle else { return }
+        if startupFailure != nil, launchOptions == nil {
+            await start()
+            return
+        }
+        guard let options = launchOptions, let role = options.role else { return }
         do {
-            if role == .sender, let path = options.pairingCodeFile {
+            if startupFailure == nil, role == .sender, let path = options.pairingCodeFile {
                 senderPairingCode = try await PairingCodeFile.waitForCode(at: URL(filePath: path))
             }
             await start()
-            if let seconds = options.runSeconds, isActive {
-                try await Task.sleep(for: .seconds(seconds))
+            if let seconds = options.runSeconds {
+                if isActive { try await Task.sleep(for: .seconds(seconds)) }
                 await stop()
                 NSApplication.shared.terminate(nil)
             }
@@ -103,6 +114,9 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private func beginSession() async throws {
         guard state == .idle || isFailed else { return }
         resetPresentation()
+        if let startupFailure {
+            throw SessionCoordinatorStartupError.configuration(startupFailure)
+        }
 
         guard let signalingURL = URL(string: signalingURLText),
               ["ws", "wss"].contains(signalingURL.scheme?.lowercased() ?? "") else {
@@ -446,9 +460,11 @@ final class SessionCoordinator: NSObject, ObservableObject {
         guard case let .message(envelope) = event else { return }
         do {
             switch envelope.payload {
-            case let .receiverRegistered(_, code, _):
+            case let .receiverRegistered(sessionID, code, _):
+                try await bindCanonicalSessionID(sessionID)
                 await apply(try requireFlow(.receiverRegistered(code: code)))
-            case .sessionPaired:
+            case let .sessionPaired(sessionID, _):
+                try await bindCanonicalSessionID(sessionID)
                 state = .negotiating(role: selectedRole)
                 try await recorder?.record(event: "peer_paired")
                 await apply(try requireFlow(.peerPaired))
@@ -471,6 +487,11 @@ final class SessionCoordinator: NSObject, ObservableObject {
         } catch {
             await fail(code: "signaling_message_failed", error: error)
         }
+    }
+
+    private func bindCanonicalSessionID(_ sessionID: String) async throws {
+        try await recorder?.bindSessionID(sessionID)
+        currentSessionID = sessionID
     }
 
     private func startMetricsPresentation(peer: WebRTCSession, profile: ICEProfile) {
@@ -540,6 +561,16 @@ final class SessionCoordinator: NSObject, ObservableObject {
         failureDuringTeardown = false
         remoteDescriptionReady = false
         pendingRemoteCandidates.removeAll(keepingCapacity: true)
+    }
+}
+
+private enum SessionCoordinatorStartupError: Error, LocalizedError {
+    case configuration(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .configuration(let message): message
+        }
     }
 }
 

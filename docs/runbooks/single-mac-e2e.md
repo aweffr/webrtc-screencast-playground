@@ -49,7 +49,7 @@ Re-run verification for preserved artifacts with:
   direct-baseline
 ```
 
-The verifier fails on missing pairing, negotiation, capture, H.264 encode, H.264 decode, render or selected-path evidence. For a virtual source it also requires creation and removal events. When a runtime config is passed as the fourth argument, both directories are scanned for the configured TURN values without printing them.
+The verifier fails on missing pairing, negotiation, capture, H.264 encode, H.264 decode, render or selected-path evidence. It also requires both processes to contain exactly one identical canonical `session_id` and rejects raw libwebrtc log artifacts. For a virtual source it requires creation and removal events. When a runtime config is passed as the fourth argument, both directories are scanned for the configured TURN values without printing them.
 
 ## Expected permission blocker
 

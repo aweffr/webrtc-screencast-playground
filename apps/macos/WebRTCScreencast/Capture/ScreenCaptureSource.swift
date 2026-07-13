@@ -63,6 +63,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         excludedReceiverPID: pid_t?
     ) async throws {
         guard stream == nil else { throw ScreenCaptureSourceError.alreadyRunning }
+        try ScreenCaptureAuthorization.ensureAuthorized()
         let resolved = try await ScreenSourceProvider.resolve(
             displayID: displayID,
             source: source,
