@@ -397,7 +397,7 @@ git commit -m "feat(macos): add session configuration model"
 - Create: `apps/macos/WebRTCScreencastTests/FrameGateTests.swift`
 - Create: `apps/macos/WebRTCScreencastTests/LetterboxGeometryTests.swift`
 
-- [ ] **Step 1: Write failing geometry tests**
+- [x] **Step 1: Write failing geometry tests**
 
 Cover clipped disjoint/overlapping/nested/out-of-bounds dirty rectangles and exact union ratios; cover 16:9 fill, ultrawide letterbox and portrait letterbox destination rectangles.
 
@@ -412,11 +412,11 @@ enum LetterboxGeometry {
 }
 ```
 
-- [ ] **Step 2: Verify RED, implement sweep-line geometry, verify GREEN**
+- [x] **Step 2: Verify RED, implement sweep-line geometry, verify GREEN**
 
 Run the two focused suites, implement x-coordinate segmentation plus merged y-intervals, and rerun until PASS. Do not use a bounding rectangle.
 
-- [ ] **Step 3: Write failing Frame Gate tests**
+- [x] **Step 3: Write failing Frame Gate tests**
 
 With a manual monotonic clock, prove 0.5%+ enters 30 fps, non-zero small change enters at least 15 fps, downshift dwell times are 500/800/300 ms, idle change wakes immediately, per-state send intervals are enforced and only the latest pending frame token is emitted.
 
@@ -427,11 +427,11 @@ struct FrameGate {
 }
 ```
 
-- [ ] **Step 4: Verify RED, implement state machine, verify GREEN**
+- [x] **Step 4: Verify RED, implement state machine, verify GREEN**
 
 Run the focused suite before/after and then all macOS unit tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/macos
