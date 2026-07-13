@@ -14,6 +14,16 @@ struct CapturedScreenFrame {
     let gateState: FrameGateState
 }
 
+struct CaptureTelemetrySnapshot: Equatable, Sendable {
+    let callbackFrames: UInt64
+    let submittedFrames: UInt64
+    let droppedFrames: UInt64
+    let lastTimestampNs: Int64?
+    let lastDirtyRectCount: Int?
+    let lastDirtyRatio: Double?
+    let gateState: FrameGateState
+}
+
 protocol ScreenCaptureFrameSink: AnyObject {
     /// Called synchronously on the serial capture queue. Implementations must not block.
     func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame)
@@ -33,6 +43,14 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private weak var sink: ScreenCaptureFrameSink?
     private var stream: SCStream?
     private var frameGate = FrameGate()
+    private let telemetryLock = NSLock()
+    private var callbackFrames: UInt64 = 0
+    private var submittedFrames: UInt64 = 0
+    private var droppedFrames: UInt64 = 0
+    private var lastTimestampNs: Int64?
+    private var lastDirtyRectCount: Int?
+    private var lastDirtyRatio: Double?
+    private var lastGateState: FrameGateState = .idle
 
     init(sink: ScreenCaptureFrameSink) {
         self.sink = sink
@@ -109,6 +127,15 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             dirtyRatio: dirtyRatio,
             timestamp: .nanoseconds(scaledTime.value)
         )
+        telemetryLock.withLock {
+            callbackFrames += 1
+            lastTimestampNs = scaledTime.value
+            lastDirtyRectCount = metadata.dirtyRects.count
+            lastDirtyRatio = dirtyRatio
+            lastGateState = decision.state
+            if decision.shouldSubmit { submittedFrames += 1 }
+            else { droppedFrames += 1 }
+        }
         guard decision.shouldSubmit else { return }
 
         sink?.screenCaptureSource(
@@ -128,6 +155,20 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         sink?.screenCaptureSource(self, didStopWithError: error)
+    }
+
+    func telemetrySnapshot() -> CaptureTelemetrySnapshot {
+        telemetryLock.withLock {
+            CaptureTelemetrySnapshot(
+                callbackFrames: callbackFrames,
+                submittedFrames: submittedFrames,
+                droppedFrames: droppedFrames,
+                lastTimestampNs: lastTimestampNs,
+                lastDirtyRectCount: lastDirtyRectCount,
+                lastDirtyRatio: lastDirtyRatio,
+                gateState: lastGateState
+            )
+        }
     }
 
     private func frameMetadata(from sampleBuffer: CMSampleBuffer) -> FrameMetadata? {

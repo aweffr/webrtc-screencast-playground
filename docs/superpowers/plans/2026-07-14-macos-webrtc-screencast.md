@@ -587,27 +587,27 @@ git commit -m "feat(macos): negotiate H264 WebRTC sessions"
 - Create: `apps/macos/WebRTCScreencastTests/RTCStatsNormalizerTests.swift`
 - Create: `apps/macos/WebRTCScreencastTests/DiagnosticExporterTests.swift`
 
-- [ ] **Step 1: Write failing stats normalization tests**
+- [x] **Step 1: Write failing stats normalization tests**
 
 Use captured/synthetic `type`, `id`, `timestamp_us`, `values` dictionaries for outbound-rtp, remote-inbound-rtp, candidate-pair, local/remote-candidate, inbound-rtp and codec. Assert safe numeric coercion, derived averages/deltas, selected path linkage and null capability fields when absent; never interpret absent counters as zero.
 
-- [ ] **Step 2: Verify RED, implement normalizer, verify GREEN**
+- [x] **Step 2: Verify RED, implement normalizer, verify GREEN**
 
 Keep dynamic WebRTC dictionaries at the adapter boundary and output typed sample structs. Run focused tests until PASS.
 
-- [ ] **Step 3: Write failing recorder/export tests**
+- [x] **Step 3: Write failing recorder/export tests**
 
 Prove JSONL includes schema/session/role/profile/hash/revision/wall/monotonic fields; concurrent event/sample writes remain one JSON object per line; pairing code, TURN username/password, SDP and candidate values are redacted. Export must abort if an injected secret appears in any file.
 
-- [ ] **Step 4: Verify RED, implement recorder/exporter, verify GREEN**
+- [x] **Step 4: Verify RED, implement recorder/exporter, verify GREEN**
 
 Use one actor as the file writer, sanitized config only, `ditto -c -k` or `FileManager.zipItem` availability fallback for bundle creation, and a manifest with SHA-256 per file. Do not include runtime config.
 
-- [ ] **Step 5: Wire one-second RTCStats and capture/render samples**
+- [x] **Step 5: Wire one-second RTCStats and capture/render samples**
 
 Start sampling only after PeerConnection creation, record state changes immediately, and stop/flush before teardown. Store CastTuning telemetry and WebRTC logs in the same session directory with non-secret paths supplied in generated tuning JSON.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 ```bash
 xcodebuild test -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -destination 'platform=macOS'

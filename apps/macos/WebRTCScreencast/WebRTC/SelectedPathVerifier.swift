@@ -15,6 +15,12 @@ struct RTCStatisticSnapshot: Equatable, Sendable {
     let id: String
     let type: String
     let values: [String: RTCStatisticValue]
+
+    init(id: String, type: String, values: [String: RTCStatisticValue]) {
+        self.id = id
+        self.type = type
+        self.values = values
+    }
 }
 
 enum SelectedPathVerificationStatus: String, Equatable, Sendable {
