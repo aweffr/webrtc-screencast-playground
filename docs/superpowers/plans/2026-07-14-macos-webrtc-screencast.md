@@ -446,15 +446,15 @@ git commit -m "feat(macos): add content-aware frame gate"
 - Create: `apps/macos/WebRTCScreencastTests/SignalingMessageTests.swift`
 - Create: `apps/macos/WebRTCScreencastTests/SignalingClientTests.swift`
 
-- [ ] **Step 1: Write failing Codable parity tests**
+- [x] **Step 1: Write failing Codable parity tests**
 
 Use JSON fixtures copied from Go integration-test outputs. Assert exact version/type/payload field names, pairing code normalization, SDP/ICE round trips and stable error decoding. Unknown message type must fail.
 
-- [ ] **Step 2: Verify RED, implement typed messages, verify GREEN**
+- [x] **Step 2: Verify RED, implement typed messages, verify GREEN**
 
 Use an envelope plus enum payload, not `[String: Any]`. Run the focused suite until PASS.
 
-- [ ] **Step 3: Write failing client lifecycle tests**
+- [x] **Step 3: Write failing client lifecycle tests**
 
 Inject a `WebSocketTransport` protocol implemented by a deterministic in-memory actor. Cover connect/register/join/send/receive/close, one reader task, serialized sends, cancellation and no automatic session resume.
 
@@ -475,11 +475,11 @@ actor SignalingClient {
 }
 ```
 
-- [ ] **Step 4: Verify RED, implement URLSession transport, verify GREEN**
+- [x] **Step 4: Verify RED, implement URLSession transport, verify GREEN**
 
 The production adapter uses `URLSessionWebSocketTask` and accepts both WS and WSS. Do not send TURN credentials. Run all tests.
 
-- [ ] **Step 5: Add cross-language fixture verification and commit**
+- [x] **Step 5: Add cross-language fixture verification and commit**
 
 Have Go tests write/check `server/testdata/protocol-v1/*.json` and Swift tests load the same repository fixtures. Commit:
 
