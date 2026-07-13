@@ -1,0 +1,13 @@
+# Downloaded release assets are verified by artifacts/SHA256SUMS and remain local.
+artifacts/*.tar.gz
+artifacts/*.zip
+
+# Runtime credentials and machine-local configuration must never be committed.
+secrets/
+Config/Local.xcconfig
+
+# Xcode local state and build output.
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
