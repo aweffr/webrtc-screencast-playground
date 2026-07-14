@@ -32,6 +32,29 @@ run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "$ROOT" rev-parse --short HEAD)"
 artifact_root="$ROOT/artifacts/media-baseline/$run_id"
 mkdir -p "$artifact_root"
 chmod 700 "$artifact_root"
+versioned_json=""
+versioned_markdown=""
+
+scan_complete_outputs() {
+  typeset -a scan_targets
+  scan_targets=("$artifact_root")
+  [[ -n "$versioned_json" && -f "$versioned_json" ]] && scan_targets+=("$versioned_json")
+  [[ -n "$versioned_markdown" && -f "$versioned_markdown" ]] && scan_targets+=("$versioned_markdown")
+  "$ROOT/scripts/scan-artifacts-for-configured-secrets.sh" \
+    --config "$RUNTIME_CONFIG" "${scan_targets[@]}"
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  if ! scan_complete_outputs >/dev/null; then
+    status=1
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 jq -n \
   --arg recorded_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -101,6 +124,9 @@ baseline_slug="$(date -u +%Y-%m-%d)-$(git -C "$ROOT" rev-parse --short HEAD)"
   --output-markdown "$artifact_root/baseline.md" \
   "${reports[@]}"
 mkdir -p "$ROOT/baselines"
-cp "$artifact_root/baseline.json" "$ROOT/baselines/$baseline_slug.json"
-cp "$artifact_root/baseline.md" "$ROOT/baselines/$baseline_slug.md"
+versioned_json="$ROOT/baselines/$baseline_slug.json"
+versioned_markdown="$ROOT/baselines/$baseline_slug.md"
+cp "$artifact_root/baseline.json" "$versioned_json"
+cp "$artifact_root/baseline.md" "$versioned_markdown"
+scan_complete_outputs
 print "media baseline artifacts: $artifact_root"

@@ -69,4 +69,25 @@ password="test-password-$(uuidgen)"
 jq -n --arg username "$username" --arg password "$password" '{turn:{username:$username,password:$password}}' >"$WORK/runtime.json"
 "$ROOT/scripts/verify-no-secret-leaks.sh" --config "$WORK/runtime.json" >/dev/null
 
+mkdir -p "$WORK/artifacts" "$WORK/versioned"
+print "safe log output" >"$WORK/artifacts/receiver.log"
+print '{"summary":"safe"}' >"$WORK/versioned/baseline.json"
+"$ROOT/scripts/scan-artifacts-for-configured-secrets.sh" \
+  --config "$WORK/runtime.json" "$WORK/artifacts" "$WORK/versioned" >/dev/null
+
+print "unexpected credential: $password" >"$WORK/artifacts/sender.log"
+if "$ROOT/scripts/scan-artifacts-for-configured-secrets.sh" \
+  --config "$WORK/runtime.json" "$WORK/artifacts" "$WORK/versioned" >/dev/null 2>&1; then
+  print -u2 "artifact scanner accepted a configured TURN password"
+  exit 1
+fi
+rm "$WORK/artifacts/sender.log"
+
+print "unexpected credential: $username" >"$WORK/versioned/baseline.md"
+if "$ROOT/scripts/scan-artifacts-for-configured-secrets.sh" \
+  --config "$WORK/runtime.json" "$WORK/artifacts" "$WORK/versioned" >/dev/null 2>&1; then
+  print -u2 "artifact scanner accepted a configured TURN username in versioned output"
+  exit 1
+fi
+
 print "script verifier tests passed"

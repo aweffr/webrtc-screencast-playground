@@ -78,6 +78,8 @@ The existing dual-process automation is extended with a baseline runner. Frame e
 
 Raw PNGs, heatmaps, JSONL and diagnostic archives remain under the ignored `artifacts/media-baseline/<run-id>/` tree and may be exported as a diagnostic bundle. A small versioned `baselines/<date>-<git-commit>.json` preserves aggregate values, tool versions, effective configuration identity and source artifact checksums; a matching Markdown report presents the Direct and TURN/UDP comparison. These files record facts without defining thresholds.
 
+Baseline execution fails closed if the configured TURN username or password occurs anywhere in the complete retained artifact tree, including Sender, Receiver and signaling stdout/stderr, analysis outputs and versioned JSON/Markdown. Both the inner dual-process runner and the outer baseline runner scan from `EXIT` cleanup so abnormal process or analysis termination cannot bypass rejection. The versioned aggregate preserves no runtime configuration and no credentials.
+
 ## Verification entry points
 
 `make verify` covers the marker codec and detector, image extraction, sequence correlation, percentile/report logic, build and the existing test suites. It does not access the public TURN service.

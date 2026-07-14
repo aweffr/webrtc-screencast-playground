@@ -97,12 +97,23 @@ server_pid=""
 receiver_pid=""
 sender_pid=""
 cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
   for pid in "$sender_pid" "$receiver_pid" "$server_pid"; do
     [[ -n "$pid" ]] && kill "$pid" >/dev/null 2>&1 || true
   done
   [[ -n "${CONFIG_FILE:-}" ]] && rm -f "$CONFIG_FILE"
+  if [[ "$PROFILE" == production-relay && -n "$RUNTIME_CONFIG" ]]; then
+    if ! "$ROOT/scripts/scan-artifacts-for-configured-secrets.sh" \
+      --config "$RUNTIME_CONFIG" "$RUN_ROOT"; then
+      status=1
+    fi
+  fi
+  exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 (cd "$ROOT/server" && go build -o "$RUN_ROOT/signaling-server" ./cmd/signaling-server)
 LISTEN_ADDR="127.0.0.1:$PORT" "$RUN_ROOT/signaling-server" >"$RUN_ROOT/signaling.log" 2>&1 &
