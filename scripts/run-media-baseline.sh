@@ -82,7 +82,7 @@ for round in $(seq 1 "$ROUNDS"); do
     fi
     (( run_status == 0 )) || exit "$run_status"
     (( display_status == 0 )) || exit "$display_status"
-    run_root="${${(M)${(f)output}:#run artifacts:*}#run artifacts: }"
+    run_root="$(find "$run_parent" -mindepth 1 -maxdepth 1 -type d -name 'run.*' -print -quit)"
     [[ -d "$run_root" ]] || { print -u2 "unable to locate run artifact directory"; exit 1; }
     sender_dir="$(find "$run_root/diagnostics" -mindepth 1 -maxdepth 1 -type d -name '*-sender' -print -quit)"
     receiver_dir="$(find "$run_root/diagnostics" -mindepth 1 -maxdepth 1 -type d -name '*-receiver' -print -quit)"
