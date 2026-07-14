@@ -16,7 +16,7 @@
 
 Commit `c3eadf6` implements the marker codec, chart, Sender/Receiver probes, three PNG boundaries, monotonic analysis, image metrics, alternating runner and aggregate report. `make verify` passes with 92 macOS tests and no failures. One earlier Direct run and one earlier forced TURN/UDP run proved real H.264 media and selected-path verification, but they predate the final callback-boundary and absolute-deadline corrections and therefore are reference evidence rather than the versioned main baseline.
 
-The current host has three orphaned displays named `WebRTC Screencast Extended Display`. Chromium's current macOS virtual-display utility documents a first-removal workaround: create a companion display and release both display objects in the same removal operation. The baseline must implement that lifecycle and refuse to start or finish with an unexpected named display count before the six-run execution can be trusted.
+The current host has three orphaned displays named `WebRTC Screencast Extended Display`. Chromium's current macOS virtual-display utility documents a first-removal workaround: create a companion display and release both display objects in the same removal operation. The baseline must implement that lifecycle and refuse to start or finish with an unexpected managed display count, covering both the owned-display and removal-companion names, before the six-run execution can be trusted.
 
 ### Task 1: Harden virtual-display removal
 
@@ -103,7 +103,7 @@ Create tests that feed representative `system_profiler -json SPDisplaysDataType`
 count_named_displays(payload, "WebRTC Screencast Extended Display")
 ```
 
-Cover zero, one and three matching `_name` values nested under `SPDisplaysDataType`. Assert that `main(["--expect", "0", "--input", fixture])` returns zero only for the zero-display fixture and reports the observed count otherwise.
+Cover zero, one and three matching `_name` values nested under `SPDisplaysDataType`, including the removal-companion name. Assert that `main(["--expect", "0", "--input", fixture])` returns zero only for the zero-display fixture and reports the observed count otherwise.
 
 - [ ] **Step 2: Verify RED**
 
@@ -123,7 +123,7 @@ The checker must use only the Python standard library. Without `--input`, execut
 system_profiler -json SPDisplaysDataType
 ```
 
-Recursively count objects whose `_name` exactly equals `WebRTC Screencast Extended Display`. Exit non-zero with an actionable message when the count differs from `--expect`; never create, remove, wake or reconfigure a display.
+Recursively count objects whose `_name` exactly equals either `WebRTC Screencast Extended Display` or `WebRTC Screencast Removal Companion`. Exit non-zero with an actionable message when their total differs from `--expect`; never create, remove, wake or reconfigure a display.
 
 - [ ] **Step 4: Gate each run before and after execution**
 

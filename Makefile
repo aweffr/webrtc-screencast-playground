@@ -16,6 +16,7 @@ test-macos: generate
 
 test-scripts:
 	./scripts/test-verifiers.sh
+	python3 -m unittest scripts/test_virtual_display_state.py
 	python3 -m unittest scripts/test_media_baseline_analyzer.py
 	python3 -m unittest scripts/test_media_baseline_aggregate.py
 

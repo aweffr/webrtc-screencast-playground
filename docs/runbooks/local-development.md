@@ -29,7 +29,15 @@ The environment-dependent automated media baseline is deliberately separate:
 RUNTIME_CONFIG="$PWD/secrets/runtime.json" make media-baseline
 ```
 
-It requires Screen Recording permission, FFmpeg with `libvmaf`, and a runtime file whose TURN URL explicitly selects UDP. The runner alternates Direct and forced TURN/UDP three times with fresh processes and writes raw evidence to `artifacts/media-baseline/<run-id>/`. High latency or low image scores are data, not failure thresholds; missing H.264 media, an invalid selected path, missing marker correlation, or report-generation failure returns non-zero.
+It requires Screen Recording permission, FFmpeg with `libvmaf`, and a runtime file whose TURN URL explicitly selects UDP. The runner alternates Direct and forced TURN/UDP three times with fresh processes and writes raw evidence to `artifacts/media-baseline/<run-id>/`. It refuses to start or continue when either managed virtual-display name remains online, so one failed cleanup cannot contaminate later rounds. High latency or low image scores are data, not failure thresholds; missing H.264 media, an invalid selected path, missing marker correlation, virtual-display residue, or report-generation failure returns non-zero.
+
+Inspect the lifecycle invariant without changing display or power state:
+
+```bash
+./scripts/check-virtual-display-state.py --expect 0
+```
+
+A pre-existing orphaned `CGVirtualDisplay` belongs to the process that created it and cannot be released by a new process. Log out and back in, or reboot once, then wake and unlock the Mac before retrying. The checker and baseline runner never wake, remove or reconfigure displays themselves.
 
 The signaling service bounds all WebSocket connections before upgrade (`MAX_CONNECTIONS`) and applies a separate per-source connection-attempt bucket. `TRUSTED_PROXY_CIDRS` is empty for direct local use. The K3s manifest trusts the cluster pod CIDR used by the Traefik hop; requests whose immediate peer is outside that CIDR ignore forwarded headers. Never configure a public/untrusted CIDR.
 

@@ -25,6 +25,7 @@ done
 [[ "$RUN_SECONDS" == <-> && "$RUN_SECONDS" -ge 85 ]] || { print -u2 "--run-seconds must be >= 85 to preserve the post-path 10s warm-up and 60s measurement window"; exit 2; }
 for tool in ffmpeg jq python3; do command -v "$tool" >/dev/null || { print -u2 "$tool is required"; exit 2; }; done
 [[ "$(ffmpeg -hide_banner -filters 2>/dev/null)" == *libvmaf* ]] || { print -u2 "ffmpeg libvmaf filter is required"; exit 2; }
+"$ROOT/scripts/check-virtual-display-state.py" --expect 0
 
 make -C "$ROOT" build-macos
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "$ROOT" rev-parse --short HEAD)"
@@ -67,9 +68,20 @@ for round in $(seq 1 "$ROUNDS"); do
     )
     [[ "$profile" == production-relay ]] && args+=(--runtime-config "$RUNTIME_CONFIG")
     run_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    output="$($ROOT/scripts/run-dual-client.sh "${args[@]}")"
+    if output="$($ROOT/scripts/run-dual-client.sh "${args[@]}")"; then
+      run_status=0
+    else
+      run_status=$?
+    fi
     run_ended_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     print "$output"
+    if "$ROOT/scripts/check-virtual-display-state.py" --expect 0; then
+      display_status=0
+    else
+      display_status=$?
+    fi
+    (( run_status == 0 )) || exit "$run_status"
+    (( display_status == 0 )) || exit "$display_status"
     run_root="${${(M)${(f)output}:#run artifacts:*}#run artifacts: }"
     [[ -d "$run_root" ]] || { print -u2 "unable to locate run artifact directory"; exit 1; }
     sender_dir="$(find "$run_root/diagnostics" -mindepth 1 -maxdepth 1 -type d -name '*-sender' -print -quit)"
