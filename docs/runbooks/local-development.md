@@ -23,6 +23,14 @@ make build-macos
 
 `make verify` runs all three plus `git diff --check`.
 
+The environment-dependent automated media baseline is deliberately separate:
+
+```bash
+RUNTIME_CONFIG="$PWD/secrets/runtime.json" make media-baseline
+```
+
+It requires Screen Recording permission, FFmpeg with `libvmaf`, and a runtime file whose TURN URL explicitly selects UDP. The runner alternates Direct and forced TURN/UDP three times with fresh processes and writes raw evidence to `artifacts/media-baseline/<run-id>/`. High latency or low image scores are data, not failure thresholds; missing H.264 media, an invalid selected path, missing marker correlation, or report-generation failure returns non-zero.
+
 The signaling service bounds all WebSocket connections before upgrade (`MAX_CONNECTIONS`) and applies a separate per-source connection-attempt bucket. `TRUSTED_PROXY_CIDRS` is empty for direct local use. The K3s manifest trusts the cluster pod CIDR used by the Traefik hop; requests whose immediate peer is outside that CIDR ignore forwarded headers. Never configure a public/untrusted CIDR.
 
 ## Manual two-window workflow

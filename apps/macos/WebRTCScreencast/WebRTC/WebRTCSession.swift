@@ -31,6 +31,7 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
     private let videoSource: RTCVideoSource?
     private let videoCapturer: RTCVideoCapturer?
     private let displayRenderer: (any RTCVideoRenderer)?
+    private let baselineProbe: MediaBaselineFrameProbe?
     private var remoteVideoTrack: RTCVideoTrack?
 
     init(
@@ -38,13 +39,15 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         ice: IceConfigurationResult,
         castTuningJSON: Data,
         displayRenderer: (any RTCVideoRenderer)? = nil,
+        baselineProbe: MediaBaselineFrameProbe? = nil,
         delegate: WebRTCSessionDelegate? = nil
     ) throws {
         self.role = role
         iceEvidence = ice.evidence
         sessionDelegate = delegate
         self.displayRenderer = displayRenderer
-        metricsRenderer = MetricsVideoRenderer()
+        self.baselineProbe = baselineProbe
+        metricsRenderer = MetricsVideoRenderer(baselineProbe: role == .receiver ? baselineProbe : nil)
 
         let tuningConfiguration = try RTCCastTuningConfiguration(jsonData: castTuningJSON)
         tuningConfiguration.apply(to: ice.configuration)
@@ -72,7 +75,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         transceiverInit.direction = role == .sender ? .sendOnly : .recvOnly
         transceiverInit.streamIds = ["screencast"]
 
-        let transceiver: RTCRtpTransceiver
         if role == .sender {
             let source = factory.videoSource(forScreenCast: true)
             let track = factory.videoTrack(with: source, trackId: "screen-video")
@@ -81,7 +83,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             }
             videoSource = source
             videoCapturer = RTCVideoCapturer(delegate: source)
-            transceiver = created
             tuningController.attach(created.sender, track: track, source: source)
         } else {
             guard let created = peerConnection.addTransceiver(of: RTCRtpMediaType.video, init: transceiverInit) else {
@@ -89,7 +90,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             }
             videoSource = nil
             videoCapturer = nil
-            transceiver = created
             tuningController.attach(created.receiver)
         }
 
@@ -161,6 +161,11 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         let buffer = RTCCVPixelBuffer(pixelBuffer: frame.pixelBuffer)
         let videoFrame = RTCVideoFrame(buffer: buffer, rotation: ._0, timeStampNs: frame.timestampNs)
         delegate.capturer(videoCapturer, didCapture: videoFrame)
+        baselineProbe?.observe(
+            pixelBuffer: frame.pixelBuffer,
+            frameTimestampNs: frame.timestampNs,
+            callbackNs: frame.callbackMonotonicNs
+        )
     }
 
     func screenCaptureSource(_ source: ScreenCaptureSource, didStopWithError error: Error) {

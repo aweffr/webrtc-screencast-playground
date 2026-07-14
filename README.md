@@ -44,3 +44,11 @@ For relay-only validation, pass an ignored runtime configuration containing the 
 ```
 
 See [local development](docs/runbooks/local-development.md), [runtime configuration](docs/runbooks/runtime-configuration.md), and [single-Mac E2E](docs/runbooks/single-mac-e2e.md).
+
+Run the automated single-Mac media baseline separately from `make verify`:
+
+```bash
+RUNTIME_CONFIG="$PWD/secrets/runtime.json" make media-baseline
+```
+
+This alternates three Direct/TURN-UDP pairs. Each fresh session records signaling and negotiation timing, 120 marker-correlated latency samples after warm-up, three matched source/capture/decoded PNG triplets, PSNR/SSIM/VMAF reference values, ROI metrics and difference heatmaps under ignored `artifacts/media-baseline/`.

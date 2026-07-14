@@ -1,6 +1,7 @@
 # Downloaded release assets are verified by artifacts/SHA256SUMS and remain local.
 artifacts/*.tar.gz
 artifacts/*.zip
+artifacts/media-baseline/
 
 # Runtime credentials and machine-local configuration must never be committed.
 secrets/
@@ -16,6 +17,7 @@ xcuserdata/
 Vendor/
 .swiftpm/
 .build/
+__pycache__/
 server/signaling-server
 
 # Local runtime configuration and collected diagnostics.

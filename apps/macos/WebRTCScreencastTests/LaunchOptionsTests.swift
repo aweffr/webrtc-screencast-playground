@@ -8,6 +8,7 @@ final class LaunchOptionsTests: XCTestCase {
             "app", "--role", "sender", "--profile", "direct-baseline",
             "--config", "/tmp/runtime.json", "--pairing-code-file", "/tmp/code",
             "--source", "virtual", "--exclude-receiver-pid", "123", "--run-seconds", "20",
+            "--media-baseline",
         ])
 
         XCTAssertEqual(options.role, .sender)
@@ -15,6 +16,7 @@ final class LaunchOptionsTests: XCTestCase {
         XCTAssertEqual(options.source, .virtualExtendedDisplay)
         XCTAssertEqual(options.excludedReceiverPID, 123)
         XCTAssertEqual(options.runSeconds, 20)
+        XCTAssertTrue(options.mediaBaseline)
     }
 
     func testPairingCodeFileIsMode0600AndReadable() async throws {

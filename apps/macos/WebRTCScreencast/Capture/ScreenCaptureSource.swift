@@ -5,6 +5,7 @@ import ScreenCaptureKit
 
 struct CapturedScreenFrame {
     let pixelBuffer: CVPixelBuffer
+    let callbackMonotonicNs: UInt64
     let timestampNs: Int64
     let status: SCFrameStatus
     let contentRect: CGRect
@@ -97,6 +98,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
         of outputType: SCStreamOutputType
     ) {
+        let callbackMonotonicNs = MediaBaselineClock.nowNs
         guard outputType == .screen,
               let metadata = frameMetadata(from: sampleBuffer),
               metadata.status == .complete || metadata.status == .started,
@@ -144,6 +146,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             self,
             didCapture: CapturedScreenFrame(
                 pixelBuffer: pixelBuffer,
+                callbackMonotonicNs: callbackMonotonicNs,
                 timestampNs: scaledTime.value,
                 status: metadata.status,
                 contentRect: metadata.contentRect,

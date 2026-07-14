@@ -7,9 +7,11 @@ SOURCE="main"
 RUNTIME_CONFIG="${RUNTIME_CONFIG:-}"
 RUN_SECONDS=20
 SKIP_BUILD=0
+MEDIA_BASELINE=0
+OUTPUT_ROOT=""
 
 usage() {
-  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--run-seconds n] [--skip-build]"
+  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--run-seconds n] [--output-root path] [--media-baseline] [--skip-build]"
   exit 2
 }
 
@@ -19,6 +21,8 @@ while (( $# )); do
     --source) [[ $# -ge 2 ]] || usage; SOURCE="$2"; shift 2 ;;
     --runtime-config) [[ $# -ge 2 ]] || usage; RUNTIME_CONFIG="$2"; shift 2 ;;
     --run-seconds) [[ $# -ge 2 ]] || usage; RUN_SECONDS="$2"; shift 2 ;;
+    --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
+    --media-baseline) MEDIA_BASELINE=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     *) usage ;;
   esac
@@ -26,6 +30,7 @@ done
 
 [[ "$PROFILE" == direct-baseline || "$PROFILE" == production-relay ]] || usage
 [[ "$SOURCE" == main || "$SOURCE" == virtual ]] || usage
+(( ! MEDIA_BASELINE )) || [[ "$SOURCE" == virtual ]] || { print -u2 "--media-baseline requires --source virtual"; exit 2; }
 [[ "$RUN_SECONDS" == <-> && "$RUN_SECONDS" -ge 5 ]] || { print -u2 "--run-seconds must be an integer >= 5"; exit 2; }
 command -v jq >/dev/null || { print -u2 "jq is required"; exit 2; }
 
@@ -47,7 +52,13 @@ APP="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app"
 EXECUTABLE="$APP/Contents/MacOS/WebRTCScreencast"
 [[ -x "$EXECUTABLE" ]] || { print -u2 "app executable not found: $EXECUTABLE"; exit 1; }
 
-RUN_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/webrtc-screencast-e2e.XXXXXX")"
+if [[ -n "$OUTPUT_ROOT" ]]; then
+  mkdir -p "$OUTPUT_ROOT"
+  OUTPUT_ROOT="$(cd "$OUTPUT_ROOT" && pwd -P)"
+  RUN_ROOT="$(mktemp -d "$OUTPUT_ROOT/run.XXXXXX")"
+else
+  RUN_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/webrtc-screencast-e2e.XXXXXX")"
+fi
 METRICS_ROOT="$RUN_ROOT/diagnostics"
 PAIRING_FILE="$RUN_ROOT/pairing-code"
 CONFIG_FILE="$RUN_ROOT/runtime.json"
@@ -89,6 +100,7 @@ cleanup() {
   for pid in "$sender_pid" "$receiver_pid" "$server_pid"; do
     [[ -n "$pid" ]] && kill "$pid" >/dev/null 2>&1 || true
   done
+  [[ -n "${CONFIG_FILE:-}" ]] && rm -f "$CONFIG_FILE"
 }
 trap cleanup EXIT INT TERM
 
@@ -103,13 +115,16 @@ for _ in {1..100}; do
 done
 curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null || { print -u2 "signaling health check timed out"; exit 1; }
 
-"$EXECUTABLE" \
-  --role receiver \
-  --profile "$PROFILE" \
-  --config "$CONFIG_FILE" \
-  --pairing-code-file "$PAIRING_FILE" \
-  --run-seconds "$(( RUN_SECONDS + 8 ))" \
-  >"$RUN_ROOT/receiver.log" 2>&1 &
+typeset -a receiver_args
+receiver_args=(
+  --role receiver
+  --profile "$PROFILE"
+  --config "$CONFIG_FILE"
+  --pairing-code-file "$PAIRING_FILE"
+  --run-seconds "$(( RUN_SECONDS + 8 ))"
+)
+(( MEDIA_BASELINE )) && receiver_args+=(--media-baseline)
+"$EXECUTABLE" "${receiver_args[@]}" >"$RUN_ROOT/receiver.log" 2>&1 &
 receiver_pid=$!
 
 for _ in {1..300}; do
@@ -129,6 +144,7 @@ sender_args=(
   --source "$SOURCE"
   --run-seconds "$RUN_SECONDS"
 )
+(( MEDIA_BASELINE )) && sender_args+=(--media-baseline)
 if [[ "$PROFILE" == direct-baseline && "$SOURCE" == main ]]; then
   sender_args+=(--exclude-receiver-pid "$receiver_pid")
 fi

@@ -21,6 +21,7 @@ struct LaunchOptions: Equatable, Sendable {
     var source: CaptureSourceKind?
     var excludedReceiverPID: pid_t?
     var runSeconds: Double?
+    var mediaBaseline = false
 
     static func parse(_ arguments: [String]) throws -> LaunchOptions {
         var result = LaunchOptions()
@@ -28,6 +29,11 @@ struct LaunchOptions: Equatable, Sendable {
         while index < arguments.count {
             let option = arguments[index]
             guard option.hasPrefix("--") else { index += 1; continue }
+            if option == "--media-baseline" {
+                result.mediaBaseline = true
+                index += 1
+                continue
+            }
             guard arguments.indices.contains(index + 1) else { throw LaunchOptionsError.missingValue(option) }
             let value = arguments[index + 1]
             switch option {

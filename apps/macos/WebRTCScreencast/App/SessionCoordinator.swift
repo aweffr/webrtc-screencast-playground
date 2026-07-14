@@ -43,6 +43,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private var peer: WebRTCSession?
     private var captureSource: ScreenCaptureSource?
     private var displaySleepActivity: DisplaySleepActivity?
+    private var baselineChart: MediaBaselineChartController?
     private var virtualDisplay: VirtualExtendedDisplayProvider?
     private var recorder: MetricsRecorder?
     private var sampler: SessionMetricsSampler?
@@ -125,6 +126,11 @@ final class SessionCoordinator: NSObject, ObservableObject {
         }
         let role = selectedRole
         let source = role == .sender ? selectedSource : nil
+        if launchOptions?.mediaBaseline == true,
+           role == .sender,
+           source != .virtualExtendedDisplay {
+            throw SessionCoordinatorStartupError.configuration("Media baseline requires the virtual display source")
+        }
         let senderCode = role == .sender ? try PairingCode.normalize(senderPairingCode) : nil
         var configuration = baseConfiguration ?? fallbackConfiguration(signalingURL: signalingURL)
         configuration = configuration.overriding(
@@ -164,11 +170,19 @@ final class SessionCoordinator: NSObject, ObservableObject {
         do {
             let ice = try IceServerProvider.make(profile: selectedProfile, turn: configuration.turn)
             let tuningData = try loadCastTuning()
+            let baselineProbe = launchOptions?.mediaBaseline == true
+                ? MediaBaselineFrameProbe(
+                    stage: role == .sender ? .capture : .decode,
+                    recorder: recorder,
+                    directory: directory
+                )
+                : nil
             let peer = try WebRTCSession(
                 role: role,
                 ice: ice,
                 castTuningJSON: tuningData,
                 displayRenderer: role == .receiver ? videoViewStore.renderer : nil,
+                baselineProbe: baselineProbe,
                 delegate: self
             )
             self.peer = peer
@@ -275,15 +289,18 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 switch command {
                 case .connectSignaling:
                     guard let effectiveConfiguration, let signaling else { continue }
+                    try await recorder?.record(event: "signaling_connect_started")
                     try await signaling.connect(url: effectiveConfiguration.signalingURL, role: selectedRole)
                     try await recorder?.record(event: "signaling_connected")
                     state = .waitingForPeer(role: selectedRole)
                     await apply(try requireFlow(.signalingConnected))
 
                 case .registerReceiver:
+                    try await recorder?.record(event: "receiver_register_started")
                     try await signaling?.registerReceiver()
 
                 case .join(let code):
+                    try await recorder?.record(event: "sender_join_started")
                     try await signaling?.join(code: code)
                     try await recorder?.record(event: "sender_join_requested")
 
@@ -359,6 +376,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 case .stopCapture:
                     try? await captureSource?.stop()
                     captureSource = nil
+                    baselineChart?.stop()
+                    baselineChart = nil
                     displaySleepActivity?.stop()
                     displaySleepActivity = nil
 
@@ -410,6 +429,11 @@ final class SessionCoordinator: NSObject, ObservableObject {
             virtualDisplay = provider
             displayID = try await provider.start()
             try await recorder?.record(event: "virtual_display_created", fields: ["display_id": .integer(Int(displayID))])
+            if launchOptions?.mediaBaseline == true, let recorder, let sessionDirectory {
+                let chart = MediaBaselineChartController(recorder: recorder, directory: sessionDirectory)
+                try chart.start(displayID: displayID)
+                baselineChart = chart
+            }
         }
         try await captureSource.start(
             displayID: displayID,
@@ -610,6 +634,7 @@ extension SessionCoordinator: WebRTCSessionDelegate {
             try? await self.recorder?.record(event: "peer_connection_state", fields: ["state": .string(String(describing: state))])
             switch state {
             case .connected:
+                try? await self.recorder?.record(event: "peer_connection_connected")
                 self.state = .connected(role: self.selectedRole)
                 await self.recordImmediateSelectedPath(for: session)
                 do { await self.apply(try self.requireFlow(.peerConnected)) }

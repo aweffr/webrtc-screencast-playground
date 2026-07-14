@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: bootstrap generate test-go test-macos test-scripts build-macos verify
+.PHONY: bootstrap generate test-go test-macos test-scripts build-macos verify media-baseline
 
 bootstrap:
 	./scripts/bootstrap-webrtc.sh
@@ -16,9 +16,14 @@ test-macos: generate
 
 test-scripts:
 	./scripts/test-verifiers.sh
+	python3 -m unittest scripts/test_media_baseline_analyzer.py
+	python3 -m unittest scripts/test_media_baseline_aggregate.py
 
 build-macos: generate
 	xcodebuild build -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -configuration Debug -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData
 
 verify: test-go test-macos test-scripts build-macos
 	git diff --check
+
+media-baseline:
+	./scripts/run-media-baseline.sh --runtime-config "$${RUNTIME_CONFIG}"
