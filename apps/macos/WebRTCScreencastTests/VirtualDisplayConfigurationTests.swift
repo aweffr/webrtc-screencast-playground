@@ -11,4 +11,28 @@ final class VirtualDisplayConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.scale, 1)
         XCTAssertFalse(configuration.hiDPI)
     }
+
+    @MainActor
+    func testRemovalCompanionUsesMatchingBoundsAndDistinctIdentity() {
+        let configuration = VirtualDisplayConfiguration.extended1080p
+        let owned = VirtualExtendedDisplayProvider.makeDescriptor(
+            configuration: configuration,
+            name: "WebRTC Screencast Extended Display",
+            serialNumber: 101
+        )
+        let companion = VirtualExtendedDisplayProvider.makeDescriptor(
+            configuration: configuration,
+            name: "WebRTC Screencast Removal Companion",
+            serialNumber: 202
+        )
+
+        XCTAssertEqual(owned.maxPixelsWide, 1_920)
+        XCTAssertEqual(owned.maxPixelsHigh, 1_080)
+        XCTAssertEqual(companion.maxPixelsWide, owned.maxPixelsWide)
+        XCTAssertEqual(companion.maxPixelsHigh, owned.maxPixelsHigh)
+        XCTAssertEqual(companion.vendorID, owned.vendorID)
+        XCTAssertEqual(companion.productID, owned.productID)
+        XCTAssertNotEqual(companion.serialNum, owned.serialNum)
+        XCTAssertNotEqual(companion.name, owned.name)
+    }
 }

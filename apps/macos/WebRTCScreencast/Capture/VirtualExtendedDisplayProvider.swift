@@ -12,8 +12,12 @@ enum VirtualExtendedDisplayError: Error, Equatable {
 
 @MainActor
 final class VirtualExtendedDisplayProvider {
+    static let displayName = "WebRTC Screencast Extended Display"
+    static let removalCompanionName = "WebRTC Screencast Removal Companion"
+
     private let configuration: VirtualDisplayConfiguration
     private var display: CGVirtualDisplay?
+    private var displaySerialNumber: UInt32?
     private(set) var displayID: CGDirectDisplayID?
 
     init(configuration: VirtualDisplayConfiguration = .extended1080p) {
@@ -24,17 +28,93 @@ final class VirtualExtendedDisplayProvider {
         if let displayID { return displayID }
         guard Self.privateAPIIsAvailable else { throw VirtualExtendedDisplayError.unsupported }
 
+        let serialNumber = Self.makeSerialNumber()
+        let display = try Self.makeDisplay(
+            configuration: configuration,
+            name: Self.displayName,
+            serialNumber: serialNumber
+        )
+
+        self.display = display
+        displaySerialNumber = serialNumber
+        let identifier = display.displayID
+        displayID = identifier
+        do {
+            try await waitForDisplay(identifier, online: true, timeout: timeout)
+        } catch {
+            do {
+                try await stop(timeout: timeout)
+            } catch {
+                throw VirtualExtendedDisplayError.removalTimedOut
+            }
+            throw VirtualExtendedDisplayError.appearanceTimedOut
+        }
+        return identifier
+    }
+
+    func stop(timeout: Duration = .seconds(3)) async throws {
+        guard display != nil else {
+            displayID = nil
+            displaySerialNumber = nil
+            return
+        }
+
+        var removalPair: [CGVirtualDisplay] = {
+            guard let display else { return [] }
+            return [display]
+        }()
+        if let companion = try? Self.makeDisplay(
+            configuration: configuration,
+            name: Self.removalCompanionName,
+            serialNumber: Self.makeSerialNumber(excluding: displaySerialNumber)
+        ) {
+            removalPair.append(companion)
+            try? await waitForDisplay(companion.displayID, online: true, timeout: timeout)
+        }
+
+        let removedIDs = removalPair.map(\.displayID)
+        displayID = nil
+        displaySerialNumber = nil
+        display = nil
+        // The first CGVirtualDisplay removal in a process is known to time out
+        // when performed alone. Releasing an online companion in the same
+        // ownership operation follows Chromium's macOS test utility workaround.
+        removalPair.removeAll(keepingCapacity: false)
+        do {
+            try await waitForDisplays(removedIDs, online: false, timeout: timeout)
+        } catch {
+            throw VirtualExtendedDisplayError.removalTimedOut
+        }
+    }
+
+    static func makeDescriptor(
+        configuration: VirtualDisplayConfiguration,
+        name: String,
+        serialNumber: UInt32
+    ) -> CGVirtualDisplayDescriptor {
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.queue = .main
-        descriptor.name = "WebRTC Screencast Extended Display"
+        descriptor.name = name
         descriptor.maxPixelsWide = UInt32(configuration.width)
         descriptor.maxPixelsHigh = UInt32(configuration.height)
         descriptor.sizeInMillimeters = CGSize(width: 508, height: 285.75)
         descriptor.vendorID = 0x0AFF
         descriptor.productID = 0x150
-        descriptor.serialNum = UInt32.random(in: 1...UInt32.max)
+        descriptor.serialNum = serialNumber
         descriptor.terminationHandler = { _, _ in }
+        return descriptor
+    }
 
+    private static func makeDisplay(
+        configuration: VirtualDisplayConfiguration,
+        name: String,
+        serialNumber: UInt32
+    ) throws -> CGVirtualDisplay {
+        let descriptor = makeDescriptor(
+            configuration: configuration,
+            name: name,
+            serialNumber: serialNumber
+        )
         guard let display = CGVirtualDisplay(descriptor: descriptor) else {
             throw VirtualExtendedDisplayError.creationFailed
         }
@@ -49,28 +129,15 @@ final class VirtualExtendedDisplayProvider {
         guard display.apply(settings) else {
             throw VirtualExtendedDisplayError.settingsRejected
         }
-
-        self.display = display
-        let identifier = display.displayID
-        do {
-            try await waitForDisplay(identifier, online: true, timeout: timeout)
-        } catch {
-            self.display = nil
-            throw VirtualExtendedDisplayError.appearanceTimedOut
-        }
-        displayID = identifier
-        return identifier
+        return display
     }
 
-    func stop(timeout: Duration = .seconds(3)) async throws {
-        guard let identifier = displayID ?? display?.displayID else { return }
-        displayID = nil
-        display = nil
-        do {
-            try await waitForDisplay(identifier, online: false, timeout: timeout)
-        } catch {
-            throw VirtualExtendedDisplayError.removalTimedOut
+    private static func makeSerialNumber(excluding excluded: UInt32? = nil) -> UInt32 {
+        var serialNumber = UInt32.random(in: 1...UInt32.max)
+        while serialNumber == excluded {
+            serialNumber = UInt32.random(in: 1...UInt32.max)
         }
+        return serialNumber
     }
 
     private func waitForDisplay(
@@ -78,11 +145,20 @@ final class VirtualExtendedDisplayProvider {
         online expectedOnline: Bool,
         timeout: Duration
     ) async throws {
+        try await waitForDisplays([identifier], online: expectedOnline, timeout: timeout)
+    }
+
+    private func waitForDisplays(
+        _ identifiers: [CGDirectDisplayID],
+        online expectedOnline: Bool,
+        timeout: Duration
+    ) async throws {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: timeout)
         while clock.now < deadline {
-            let isOnline = CGDisplayIsOnline(identifier) != 0
-            if isOnline == expectedOnline { return }
+            if identifiers.allSatisfy({ (CGDisplayIsOnline($0) != 0) == expectedOnline }) {
+                return
+            }
             // WindowServer updates the online display list when AppKit posts
             // didChangeScreenParametersNotification. Polling that authoritative list
             // also covers a notification delivered between apply() and this waiter.

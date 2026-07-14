@@ -392,9 +392,22 @@ final class SessionCoordinator: NSObject, ObservableObject {
                     peer = nil
 
                 case .stopVirtualDisplay:
-                    if virtualDisplay != nil {
-                        try? await virtualDisplay?.stop()
-                        try? await recorder?.record(event: "virtual_display_removed")
+                    if let virtualDisplay {
+                        do {
+                            try await virtualDisplay.stop()
+                            try? await recorder?.record(event: "virtual_display_removed")
+                        } catch {
+                            failureDuringTeardown = true
+                            let message = "Virtual display cleanup failed: \(String(describing: error))"
+                            state = .failed(SessionFailure(
+                                code: "virtual_display_removal_failed",
+                                message: message
+                            ))
+                            try? await recorder?.record(event: "virtual_display_removal_failed", fields: [
+                                "error_code": .string("virtual_display_removal_failed"),
+                                "message": .string(message),
+                            ])
+                        }
                     }
                     virtualDisplay = nil
 
