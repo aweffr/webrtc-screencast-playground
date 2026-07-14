@@ -35,4 +35,18 @@ final class VirtualDisplayConfigurationTests: XCTestCase {
         XCTAssertNotEqual(companion.serialNum, owned.serialNum)
         XCTAssertNotEqual(companion.name, owned.name)
     }
+
+    @MainActor
+    func testRemovalTreatsIDsAbsentFromOnlineListAsOffline() {
+        XCTAssertTrue(VirtualExtendedDisplayProvider.displays(
+            [8, 9],
+            matchExpectedOnlineState: false,
+            onlineDisplayIDs: [1]
+        ))
+        XCTAssertFalse(VirtualExtendedDisplayProvider.displays(
+            [8, 9],
+            matchExpectedOnlineState: false,
+            onlineDisplayIDs: [1, 8]
+        ))
+    }
 }

@@ -156,15 +156,36 @@ final class VirtualExtendedDisplayProvider {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: timeout)
         while clock.now < deadline {
-            if identifiers.allSatisfy({ (CGDisplayIsOnline($0) != 0) == expectedOnline }) {
+            if let onlineDisplayIDs = Self.onlineDisplayIDs(),
+               Self.displays(
+                   identifiers,
+                   matchExpectedOnlineState: expectedOnline,
+                   onlineDisplayIDs: onlineDisplayIDs
+               ) {
                 return
             }
-            // WindowServer updates the online display list when AppKit posts
-            // didChangeScreenParametersNotification. Polling that authoritative list
-            // also covers a notification delivered between apply() and this waiter.
+            // CGDisplayIsOnline returns -1 for an invalid display ID, which is
+            // truthy in Swift. Membership in CGGetOnlineDisplayList avoids
+            // misclassifying a successfully removed display as still online.
             try await Task.sleep(for: .milliseconds(100))
         }
         throw expectedOnline ? VirtualExtendedDisplayError.appearanceTimedOut : VirtualExtendedDisplayError.removalTimedOut
+    }
+
+    static func displays(
+        _ identifiers: [CGDirectDisplayID],
+        matchExpectedOnlineState expectedOnline: Bool,
+        onlineDisplayIDs: Set<CGDirectDisplayID>
+    ) -> Bool {
+        identifiers.allSatisfy { onlineDisplayIDs.contains($0) == expectedOnline }
+    }
+
+    private static func onlineDisplayIDs() -> Set<CGDirectDisplayID>? {
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(0, nil, &count) == .success else { return nil }
+        var identifiers = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetOnlineDisplayList(count, &identifiers, &count) == .success else { return nil }
+        return Set(identifiers.prefix(Int(count)))
     }
 
     private static var privateAPIIsAvailable: Bool {
