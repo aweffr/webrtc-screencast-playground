@@ -132,13 +132,13 @@ Commit: `build: scaffold Android TV receiver app`
 - Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/session/ReceiverStateMachine.java`
 - Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/observability/ClockCalibration.java`
 - Create: `apps/android-tv/app/src/main/res/values/reference_runtime.xml`
-- Create: `apps/android-tv/app/src/debug/res/values/reference_runtime.local.xml.example`
+- Create: `apps/android-tv/app/reference_runtime.local.xml.example`
 - Test: `apps/android-tv/app/src/test/java/cn/aweffr/webrtcscreencast/tv/config/ReferenceRuntimeConfigTest.java`
 - Test: `apps/android-tv/app/src/test/java/cn/aweffr/webrtcscreencast/tv/signaling/SignalingCodecTest.java`
 - Test: `apps/android-tv/app/src/test/java/cn/aweffr/webrtcscreencast/tv/session/ReceiverStateMachineTest.java`
 - Test: `apps/android-tv/app/src/test/java/cn/aweffr/webrtcscreencast/tv/observability/ClockCalibrationTest.java`
 
-- [ ] **Step 1: Write RED unit tests**
+- [x] **Step 1: Write RED unit tests**
 
 Cover relay placeholder rejection, TURN/UDP validation, direct-without-credential, redacted hash,
 strict version/type/payload handling, one-time pairing lifecycle, expiry reconnect, bounded backoff
@@ -155,30 +155,30 @@ assertEquals(9_000L, result.offsetNs());
 assertEquals(50L, result.uncertaintyNs());
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run both `:app:testDirectBaselineDebugUnitTest` and
 `:app:testProductionRelayDebugUnitTest`; expect missing contract compilation failures.
 
-- [ ] **Step 3: Implement XML-backed config**
+- [x] **Step 3: Implement XML-backed config**
 
 `ReferenceRuntimeConfig.load(Resources)` reads only `R.string.reference_*`; `validate()` emits
 stable typed errors and `redactedHash()` excludes username/password. Commit schema 2 JSON with
 explicit `CONSTRAINED_BASELINE`, `video_toolbox_low_latency_rate_control=true`,
 `android_decoder_low_latency=true`, `prerender_smoothing=false` and `render_lead_ms=10`.
 
-- [ ] **Step 4: Implement protocol and state machine**
+- [x] **Step 4: Implement protocol and state machine**
 
 Use `org.json`. Reject unknown protocol fields/types and redact raw SDP/candidate from object text.
 `ReceiverStateMachine.reduce(Event)` emits `CONNECT`, `REGISTER`, `CREATE_PEER`, `APPLY_OFFER`,
 `SEND_ANSWER`, `ADD_ICE`, `CLEANUP`, `SCHEDULE_RETRY` or `SHOW_ERROR` commands.
 
-- [ ] **Step 5: Implement calibration math**
+- [x] **Step 5: Implement calibration math**
 
 Compute midpoint, RTT, offset and RTT/2 uncertainty with overflow checks; choose smallest RTT and
 expose `toCommonTimeNs(localMonotonicNs)`.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run both unit suites and `git diff --check`.
 
@@ -531,3 +531,10 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
   after APK packaging (`e8fe64a1097141f440e0f354895ee2827bc28a210a50502b17774134ca143a49`),
   Gradle/AGP configure both ICE variants, and the provisioned `WebRTCScreencast_TV_API_31` is an
   Android 12 TV `arm64-v8a` AVD with the `tv_1080p` 1920×1080 device definition.
+- 2026-07-16: Task 2's config, protocol, lifecycle and clock contracts pass both ICE-flavor unit
+  suites and lint. Android resource merging treats arbitrary files inside `res/values` as XML
+  resources even with an `.example` suffix, so the credential-free override example lives at the
+  app module root and documents the ignored `src/debug/res/values` destination.
+- 2026-07-16: Android API 26 does not provide `java.util.HexFormat`; the redacted config identity
+  uses a local lowercase SHA-256 hex encoder instead of raising the minimum SDK or hiding the issue
+  with a lint baseline.

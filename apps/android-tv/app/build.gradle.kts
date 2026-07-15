@@ -70,6 +70,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test:core:1.7.0")
+    testImplementation("org.json:json:20250517")
 
     androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
