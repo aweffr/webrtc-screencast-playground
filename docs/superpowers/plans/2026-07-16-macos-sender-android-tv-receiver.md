@@ -445,29 +445,29 @@ Commit: `test: add macOS to Android TV E2E`
 - Generate ignored: `artifacts/android-tv-e2e/<run-id>/functional/`
 - Modify: this plan's `Execution findings`
 
-- [ ] **Step 1: Preflight the exact environment**
+- [x] **Step 1: Preflight the exact environment**
 
 Require preview hashes, API 31 arm64 TV AVD at 1920×1080, Screen Recording permission, zero managed
 virtual displays and valid ignored TURN/UDP configuration.
 
-- [ ] **Step 2: Run four fresh sessions**
+- [x] **Step 2: Run four fresh sessions**
 
 Run direct/main, direct/virtual, relay/main and relay/virtual. Use new pairing code and
 PeerConnection each time; `showsCursor` remains true.
 
-- [ ] **Step 3: Audit each run**
+- [x] **Step 3: Audit each run**
 
 Require receiver-first pairing, H.264-only evidence, 1920×1080 Android render, requested selected
 path, both metrics sets, decoder/CastTuning evidence, signaling timings, normal teardown and
 fresh-code recovery. Relay must be relay/relay+UDP and never TCP; direct must be non-relay UDP. Virtual runs
 must prove display removal.
 
-- [ ] **Step 4: Inspect TV screenshots**
+- [x] **Step 4: Inspect TV screenshots**
 
 Open waiting and playing screenshots from both profiles. Confirm TV-safe layout, visible cursor in
 main capture, full-frame video, no engineering/secret text and no phone UI.
 
-- [ ] **Step 5: Record evidence**
+- [x] **Step 5: Record evidence**
 
 Fix only reproduced failures, rerun affected entries, then append immutable run IDs, artifact roots
 and summaries. Commit findings as `docs: record Android TV functional E2E`.
@@ -480,32 +480,32 @@ and summaries. Commit findings as `docs: record Android TV functional E2E`.
 - Create generated: `baselines/<date>-<commit>-android-tv.md`
 - Modify: this plan's `Execution findings`
 
-- [ ] **Step 1: Run alternating sessions**
+- [x] **Step 1: Run alternating sessions**
 
 Run Direct 1, TURN 1, Direct 2, TURN 2, Direct 3, TURN 3 with virtual chart, 10-second warm-up,
 60-second measurement, 500ms markers and three PNG triplets per run.
 
-- [ ] **Step 2: Audit calibrated timing**
+- [x] **Step 2: Audit calibrated timing**
 
 Require five clock samples per side, selected minimum RTT, offset/uncertainty and no raw cross-epoch
 subtraction. Report signaling-ready and WebRTC-negotiation timing separately.
 
-- [ ] **Step 3: Audit quality and counts**
+- [x] **Step 3: Audit quality and counts**
 
 Require six reports, 18 source, 18 capture and 18 Android decoded PNGs, heatmaps and all
 PSNR/SSIM/VMAF results. VMAF stays reference-only; no latency/quality threshold is introduced.
 
-- [ ] **Step 4: Inspect representative evidence**
+- [x] **Step 4: Inspect representative evidence**
 
 Open beginning/middle/end decoded PNG and a TV screenshot for one Direct and one TURN run; confirm
 marker, Chinese/Latin text, fine lines, grayscale/color patches and 1920×1080 dimensions.
 
-- [ ] **Step 5: Audit security and version aggregate**
+- [x] **Step 5: Audit security and version aggregate**
 
 Recompute checksums; scan raw/versioned artifacts for configured TURN credentials and full pairing
 codes. Version only aggregates, tool versions, config identities and safe checksums.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run `make verify`, Android lint/unit/connected tests, both APK builds and `git diff --check`.
 Commit reports/findings as `docs: record Android TV media baseline`.
@@ -589,3 +589,26 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
   existing network before clock calibration. Script tests cover recovery, already-ready and bounded
   failure paths. Formal baseline supports `--skip-macos-build` so the already authorized app is not
   rebuilt or re-signed between Screen Recording grant and E2E execution.
+- 2026-07-16: Formal functional artifact root
+  `artifacts/android-tv-e2e/20260715T233910Z-3bc825c-android-tv.5lNrht` passed all four fresh
+  sessions: Direct/main `run.muOEZG`, Direct/virtual `run.fR1j2A`, TURN/main `run.6SikBN` and
+  TURN/virtual `run.1wykmX`. Every run proved H.264 1920x1080 render, the requested UDP selected
+  path, sender/receiver telemetry, fresh-code recovery and zero managed virtual displays. Visual
+  inspection confirmed a TV-safe waiting-code screen and full-frame playback for both profiles;
+  `showsCursor` remained true.
+- 2026-07-16: The same root completed six alternating 80-second quantitative sessions:
+  Direct `run.X01gzk`, TURN `run.LQgISi`, Direct `run.gYDIR6`, TURN `run.2nUz1G`, Direct
+  `run.pigJMN`, TURN `run.HZxVyF`. The aggregate contains 360 Direct and 359 TURN calibrated marker
+  samples; one measurement-edge TURN marker lacked a complete triplet and was excluded rather than
+  synthesized. Direct software-marker E2E is p50 62.24 ms / p95 77.39 ms; TURN/UDP is p50 70.58 ms
+  / p95 84.69 ms. TURN minus Direct paired p50 deltas are +8.01, +5.95 and +11.89 ms.
+- 2026-07-16: The quantitative tree contains six reports, 18 source/capture/decoded 1920x1080 PNGs,
+  54 heatmaps and 54 VMAF JSON outputs. Median capture-to-Android quality is Direct PSNR-Y 38.41 dB,
+  SSIM-Y 0.99797 and VMAF reference 96.50; TURN is 38.38 dB, 0.99786 and 96.38. Versioned reports
+  are `baselines/2026-07-15-3bc825c-android-tv.{json,md}`; their recorded input hashes match the
+  pinned AAR/XCFramework, `git_dirty=false`, and the complete raw/versioned secret scan passed.
+- 2026-07-16: Post-baseline verification passed `make verify`, including Go race tests, macOS tests
+  and build, Android dual-flavor unit/lint/build, script/analyzer/aggregate suites and artifact
+  verification. The API 31 arm64 TV emulator also passed all five
+  `connectedDirectBaselineDebugAndroidTest` tests; emulator shutdown and managed-display count zero
+  were verified afterward.
