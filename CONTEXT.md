@@ -44,6 +44,10 @@ _Avoid_: 已有第二屏、外接屏采集、扩展屏
 在同一台 Mac 上用两个独立客户端进程和确定性画面，重复测量媒体链路延迟并保存接收画面质量证据的基线。它不包含物理显示器 scan-out，也不代表双机或跨设备性能。
 _Avoid_: Glass-to-glass latency、光学延迟、双机性能基线
 
+**Android TV 模拟接收端基线（Android TV Emulator Receiver Baseline）**:
+在单台 Mac 上以 1080p arm64 Android TV 模拟设备作为 Receiver、macOS 客户端作为 Sender 的跨平台验收环境。它证明 TV 应用形态和跨平台媒体闭环，不代表真实 TV 硬件解码能力或性能。
+_Avoid_: 真实 TV 验收、Android 手机基线、TV 硬件性能基线
+
 **源提交到采集延迟（Marker Commit-to-Capture Latency）**:
 测量画面 marker 提交后，发送端首次从采集结果识别出同一 marker 所经过的时间。
 _Avoid_: Capture callback latency、Glass-to-glass latency
@@ -55,3 +59,7 @@ _Avoid_: Network latency、RTT、Glass-to-glass latency
 **软件端到端延迟（Software End-to-End Latency）**:
 测量同一 marker 从源画面提交到接收端解码结果所经过的时间，是自动化媒体基线的主延迟指标；不包含接收端物理显示器 scan-out。
 _Avoid_: Glass-to-glass latency、Photon-to-photon latency
+
+**Android Render 软件端到端延迟（Android Render Software End-to-End Latency）**:
+经时钟校准后，测量同一 marker 从 macOS 源画面提交到 Android Receiver renderer callback 所经过的时间。它覆盖跨端软件媒体管线，但不包含 Android display compositor 或真实显示面板 scan-out。
+_Avoid_: Glass-to-glass latency、光学延迟、真实 TV 显示延迟

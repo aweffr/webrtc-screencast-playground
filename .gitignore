@@ -8,6 +8,7 @@ secrets/
 Config/Local.xcconfig
 
 # Xcode local state and build output.
+.DS_Store
 DerivedData/
 build/
 *.xcuserstate
