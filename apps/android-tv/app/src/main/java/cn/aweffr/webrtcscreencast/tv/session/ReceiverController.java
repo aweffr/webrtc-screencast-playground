@@ -15,6 +15,7 @@ import cn.aweffr.webrtcscreencast.tv.signaling.SignalingMessage;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,7 +38,22 @@ import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
 /** Serializes receiver registration, one-cast WebRTC ownership, retries, and safe evidence. */
-public final class ReceiverController implements AutoCloseable {
+public final class ReceiverController implements ReceiverSessionController {
+  record Registration(String sessionId, String pairingCode, Instant expiresAt) {}
+
+  static final class ProtocolHandlingException extends RuntimeException {
+    private final String code;
+
+    ProtocolHandlingException(String code, RuntimeException cause) {
+      super(code, cause);
+      this.code = code;
+    }
+
+    String code() {
+      return code;
+    }
+  }
+
   public record Presentation(
       ReceiverStateMachine.State state,
       String pairingCode,
@@ -96,9 +112,18 @@ public final class ReceiverController implements AutoCloseable {
       return thread;
     });
     metrics = new ReceiverMetricsRecorder(appContext);
+    metrics.record("receiver_runtime_initializing", Map.of(
+        "config_hash", config.redactedHash(),
+        "ice_profile", config.iceProfile().wireValue()));
     try {
       runtime = new ReceiverRuntime(appContext, config);
     } catch (RuntimeException error) {
+      Map<String, Object> failure = new LinkedHashMap<>();
+      failure.put("error_type", error.getClass().getSimpleName());
+      if (error instanceof ReceiverRuntime.InitializationException initialization) {
+        failure.put("stage", initialization.stage());
+      }
+      metrics.record("receiver_runtime_initialization_failed", failure);
       metrics.close();
       executor.shutdownNow();
       throw error;
@@ -247,6 +272,8 @@ public final class ReceiverController implements AutoCloseable {
         case ERROR -> recover("signaling_error");
         default -> recover("unexpected_signaling_message");
       }
+    } catch (ProtocolHandlingException error) {
+      recover(error.code());
     } catch (RuntimeException error) {
       recover("invalid_signaling_message");
     }
@@ -254,23 +281,49 @@ public final class ReceiverController implements AutoCloseable {
 
   private void onRegistered(SignalingMessage message) {
     if (stateMachine.state() != ReceiverStateMachine.State.REGISTERING) {
-      throw new IllegalStateException("receiver_registered_in_wrong_state");
+      throw new ProtocolHandlingException(
+          "receiver_registration_state_invalid",
+          new IllegalStateException("receiver_registered_in_wrong_state"));
     }
-    sessionId = message.payloadString("session_id");
-    pairingCode = message.payloadString("pairing_code");
-    Instant expiresAt = Instant.parse(message.payloadString("expires_at"));
-    apply(stateMachine.reduce(ReceiverStateMachine.Event.registered()));
-    metrics.record("receiver_registered", Map.of(
-        "session_id", sessionId,
-        "duration_ms", elapsedMs(signalingStartedNs)));
-    long delayMs = Math.max(0L, Duration.between(Instant.now(), expiresAt).toMillis());
-    int timerGeneration = generation;
-    expiryTimer = executor.schedule(() -> {
-      if (timerGeneration == generation) {
-        recoverWith(ReceiverStateMachine.Event.expired(), "pairing_expired");
-      }
-    }, delayMs, TimeUnit.MILLISECONDS);
-    publish();
+    Registration registration = parseRegistration(message);
+    sessionId = registration.sessionId();
+    pairingCode = registration.pairingCode();
+    try {
+      apply(stateMachine.reduce(ReceiverStateMachine.Event.registered()));
+      metrics.record("receiver_registered", Map.of(
+          "session_id", sessionId,
+          "duration_ms", elapsedMs(signalingStartedNs)));
+      long delayMs = Math.max(
+          0L, Duration.between(Instant.now(), registration.expiresAt()).toMillis());
+      int timerGeneration = generation;
+      expiryTimer = executor.schedule(() -> {
+        if (timerGeneration == generation) {
+          recoverWith(ReceiverStateMachine.Event.expired(), "pairing_expired");
+        }
+      }, delayMs, TimeUnit.MILLISECONDS);
+      publish();
+    } catch (RuntimeException error) {
+      throw new ProtocolHandlingException("receiver_registration_commit_failed", error);
+    }
+  }
+
+  static Registration parseRegistration(SignalingMessage message) {
+    String parsedSessionId;
+    String parsedPairingCode;
+    try {
+      parsedSessionId = message.payloadString("session_id");
+      parsedPairingCode = message.payloadString("pairing_code");
+    } catch (RuntimeException error) {
+      throw new ProtocolHandlingException("receiver_registration_payload_invalid", error);
+    }
+    try {
+      return new Registration(
+          parsedSessionId,
+          parsedPairingCode,
+          OffsetDateTime.parse(message.payloadString("expires_at")).toInstant());
+    } catch (RuntimeException error) {
+      throw new ProtocolHandlingException("receiver_registration_expiry_invalid", error);
+    }
   }
 
   private void onPaired(SignalingMessage message) {

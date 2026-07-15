@@ -306,38 +306,46 @@ must replace the local artifact before the formal JDK 17 and emulator gates.
 - Test: `apps/android-tv/app/src/androidTest/java/cn/aweffr/webrtcscreencast/tv/ui/ReceiverActivityTest.java`
 - Create: `scripts/smoke-android-tv-app.sh`
 
-- [ ] **Step 1: Write RED TV behavior tests**
+- [x] **Step 1: Write RED TV behavior tests**
 
 Assert Leanback launcher resolution, landscape, focusable retry action, pairing-code presentation,
 WAITING→PLAYING visibility, Back cleanup and D-pad-only operation using a fake controller.
 
-- [ ] **Step 2: Confirm RED instrumentation compile**
+- [x] **Step 2: Confirm RED instrumentation compile**
 
 Run `:app:compileDirectBaselineDebugAndroidTestJavaWithJavac`; expect missing Activity/resources.
 
-- [ ] **Step 3: Implement TV-only manifest and layout**
+- [x] **Step 3: Implement TV-only manifest and layout**
 
 Declare Internet, required Leanback, touchscreen false, banner/icon, landscape exported Activity
 and `LEANBACK_LAUNCHER`. Permit cleartext only for `10.0.2.2`, `127.0.0.1` and `localhost`.
 Use 5% safe-area padding, at least 32sp primary text, 48dp D-pad targets, visible focus and a 16:9
 `SurfaceViewRenderer` filling PLAYING state.
 
-- [ ] **Step 4: Implement Activity lifecycle**
+- [x] **Step 4: Implement Activity lifecycle**
 
 Render only WAITING/PLAYING/ERROR, keep screen on only while playing, and forward
 start/stop/destroy to controller. Do not expose a settings screen, credential or engineering text.
 
-- [ ] **Step 5: Run real TV emulator smoke**
+- [x] **Step 5: Run real TV emulator smoke**
 
 Provision and boot the AVD, install direct APK, launch Leanback Activity, verify API/ABI/1920×1080,
 exercise D-pad retry, capture a screenshot, pull app-private evidence with `run-as`, and require the
 JNI/WebRTC initialization event.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run unit/lint/assemble/connected tests and `scripts/smoke-android-tv-app.sh`.
 
 Commit: `feat(android-tv): add TV receiver experience`
+
+Execution evidence: API 31 Android TV arm64 AVD reported `1920x1080`; five connected tests and
+the lifecycle smoke passed. The smoke requires `receiver_runtime_initialized` and
+`receiver_registered`, verifies the pairing-code shape without exporting its value, and writes a
+screenshot plus app-private JSONL under ignored `diagnostics/android-tv-smoke/`. During the first
+real registration, the Go server's RFC 3339 timestamp with a local `+08:00` offset exposed an
+Android `Instant.parse` incompatibility; the Receiver now parses it through `OffsetDateTime` and
+keeps safe stage-specific protocol error codes.
 
 ### Task 6: Upgrade macOS runtime and direct CLI pairing
 

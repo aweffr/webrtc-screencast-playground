@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/tv_background">
+
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/video_renderer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/waiting_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/tv_safe_horizontal"
+        android:paddingVertical="@dimen/tv_safe_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/waiting_title"
+            android:textColor="@color/tv_text_primary"
+            android:textSize="@dimen/tv_title_text" />
+
+        <TextView
+            android:id="@+id/waiting_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_gap_medium"
+            android:text="@string/connecting"
+            android:textColor="@color/tv_text_secondary"
+            android:textSize="@dimen/tv_body_text" />
+
+        <TextView
+            android:id="@+id/pairing_code"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_gap_large"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.12"
+            android:textColor="@color/tv_accent"
+            android:textSize="@dimen/tv_code_text"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/error_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/tv_safe_horizontal"
+        android:paddingVertical="@dimen/tv_safe_vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/error_title"
+            android:textColor="@color/tv_text_primary"
+            android:textSize="@dimen/tv_title_text" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/tv_gap_medium"
+            android:text="@string/error_body"
+            android:textColor="@color/tv_text_secondary"
+            android:textSize="@dimen/tv_body_text" />
+
+        <Button
+            android:id="@+id/retry_button"
+            android:layout_width="@dimen/tv_button_width"
+            android:layout_height="@dimen/tv_button_height"
+            android:layout_marginTop="@dimen/tv_gap_large"
+            android:background="@drawable/tv_button_background"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:text="@string/retry"
+            android:textAllCaps="false"
+            android:textColor="@color/tv_button_text"
+            android:textSize="@dimen/tv_button_text" />
+    </LinearLayout>
+
+</FrameLayout>
