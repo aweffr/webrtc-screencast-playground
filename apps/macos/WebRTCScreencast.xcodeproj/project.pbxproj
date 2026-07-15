@@ -53,6 +53,7 @@
 		94AC16B05AC8CB70F8C3B9D3 /* WebRTCSessionConstructionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8F413A0035413C363A91C5 /* WebRTCSessionConstructionTests.swift */; };
 		97E473CF3B506F11E2F1B501 /* EffectiveConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80E94F60847FEB70C2FF79BA /* EffectiveConfiguration.swift */; };
 		99597D67D722C961DF6415D7 /* SessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CFE7949066A009DC7B4F711 /* SessionState.swift */; };
+		9C0F6403DCC5559893A123C8 /* ClockCalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6FC21389FA0CB33CA42D6BF /* ClockCalibrationTests.swift */; };
 		9D1E7D8A5A656C7C2AD2D26A /* MetricsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 854A60DECBF874A79D09745A /* MetricsRecord.swift */; };
 		9E3C1C757A67E2ED0C1A5278 /* VirtualDisplayConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E8D33632E06947B54F1858D /* VirtualDisplayConfigurationTests.swift */; };
 		A28D13CD57D43A2F2B3B2E8B /* DirtyRegionAnalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D04BBB91C4D5D01FBAEADD3C /* DirtyRegionAnalyzerTests.swift */; };
@@ -67,6 +68,7 @@
 		DA936E883D991244D50292AF /* FrameGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27851B501F6A9DB7486A8928 /* FrameGate.swift */; };
 		DBB035B874E168FC9D3B8DF3 /* LaunchOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6198A182F0897D3A14ACF1F4 /* LaunchOptionsTests.swift */; };
 		DF37B9B997754488DDF3F2CA /* LetterboxGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9015C9F96988DA957F59E7D5 /* LetterboxGeometryTests.swift */; };
+		DF499F47217299CD496CA872 /* ClockCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4485F3C123B5197B3C4A51E3 /* ClockCalibration.swift */; };
 		ECC06D0E502220C7E8D4BB9D /* H264OnlyVideoCodecFactories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BFA3E57FBB5E611BCB5B0AE /* H264OnlyVideoCodecFactories.swift */; };
 		F0339DB12B38189DF59B45EB /* SignalingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D4BD6EA97D793C536F35B9A /* SignalingClient.swift */; };
 		F11D41C4FE0A7A751511ECA1 /* ScreenCaptureAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDFCD2EFA94B57439D3BADA0 /* ScreenCaptureAuthorizationTests.swift */; };
@@ -114,6 +116,7 @@
 		3D4BD6EA97D793C536F35B9A /* SignalingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalingClient.swift; sourceTree = "<group>"; };
 		3EF7579BC68F70FB6A27FFC2 /* FrameGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameGateTests.swift; sourceTree = "<group>"; };
 		3F9306D7A79C0E067C50D7CC /* SenderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenderView.swift; sourceTree = "<group>"; };
+		4485F3C123B5197B3C4A51E3 /* ClockCalibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockCalibration.swift; sourceTree = "<group>"; };
 		44C1DBB5F3C875682DC65D52 /* ReceiverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiverView.swift; sourceTree = "<group>"; };
 		458F2177C3CE669B920BA368 /* SessionFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFlow.swift; sourceTree = "<group>"; };
 		465478D3E71EFA0B2E9C06F0 /* MediaBaselineMarker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaBaselineMarker.swift; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 		E42B0F7752AD313E5442371A /* MediaBaselineChartController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaBaselineChartController.swift; sourceTree = "<group>"; };
 		F3287FBCFE72AC8842A96775 /* MetricsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsRecorder.swift; sourceTree = "<group>"; };
 		F50A42CBFCD0DA67018BD97B /* SessionCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCoordinatorTests.swift; sourceTree = "<group>"; };
+		F6FC21389FA0CB33CA42D6BF /* ClockCalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockCalibrationTests.swift; sourceTree = "<group>"; };
 		F8B2466A791ECB86B0ACB594 /* DiagnosticExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticExporterTests.swift; sourceTree = "<group>"; };
 		F8B81A4DB75859D8079F63E4 /* ScreenCaptureConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCaptureConfigurationTests.swift; sourceTree = "<group>"; };
 		FDFCD2EFA94B57439D3BADA0 /* ScreenCaptureAuthorizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCaptureAuthorizationTests.swift; sourceTree = "<group>"; };
@@ -187,6 +191,7 @@
 			isa = PBXGroup;
 			children = (
 				D762CF2A6D8310C84C71C8A3 /* .gitkeep */,
+				F6FC21389FA0CB33CA42D6BF /* ClockCalibrationTests.swift */,
 				F8B2466A791ECB86B0ACB594 /* DiagnosticExporterTests.swift */,
 				D04BBB91C4D5D01FBAEADD3C /* DirtyRegionAnalyzerTests.swift */,
 				9F786B5D12E627451F7568AB /* DisplaySleepActivityTests.swift */,
@@ -309,6 +314,7 @@
 		6ED33727DE3FD55DC3C1EFAB /* Observability */ = {
 			isa = PBXGroup;
 			children = (
+				4485F3C123B5197B3C4A51E3 /* ClockCalibration.swift */,
 				930A1EDA1C2956D4AD7F5247 /* DiagnosticExporter.swift */,
 				854A60DECBF874A79D09745A /* MetricsRecord.swift */,
 				F3287FBCFE72AC8842A96775 /* MetricsRecorder.swift */,
@@ -488,6 +494,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				054FB425CB009B89E7EA994D /* CastingRole.swift in Sources */,
+				DF499F47217299CD496CA872 /* ClockCalibration.swift in Sources */,
 				4EF2E81F566725C35310EF1D /* DiagnosticExporter.swift in Sources */,
 				315FABBF555069923AF10A2E /* DirtyRegionAnalyzer.swift in Sources */,
 				706770A8182518DD3836976C /* DisplaySleepActivity.swift in Sources */,
@@ -534,6 +541,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9C0F6403DCC5559893A123C8 /* ClockCalibrationTests.swift in Sources */,
 				608EF5B0253B911B9014C822 /* DiagnosticExporterTests.swift in Sources */,
 				A28D13CD57D43A2F2B3B2E8B /* DirtyRegionAnalyzerTests.swift in Sources */,
 				929176294C015241721FC0AB /* DisplaySleepActivityTests.swift in Sources */,
