@@ -194,17 +194,17 @@ Commit: `feat(android-tv): add receiver domain contracts`
 - Create: `apps/macos/WebRTCScreencastTests/ClockCalibrationTests.swift`
 - Modify: `apps/macos/WebRTCScreencast/App/SessionCoordinator.swift`
 
-- [ ] **Step 1: Write RED Go and Swift tests**
+- [x] **Step 1: Write RED Go and Swift tests**
 
 Require `GET /clock` JSON schema 1 with `server_unix_ns`, `Cache-Control: no-store`, method
 rejection and no session fields. Swift tests mirror Java vectors and invalid-sample handling.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run `(cd server && go test ./internal/clock ./internal/signaling)` and `make test-macos`; expect
 missing handler/type failures.
 
-- [ ] **Step 3: Implement `/clock`**
+- [x] **Step 3: Implement `/clock`**
 
 Use an injected `func() time.Time` and encode only:
 
@@ -215,13 +215,13 @@ struct {
 }{SchemaVersion: 1, ServerUnixNS: now().UnixNano()}
 ```
 
-- [ ] **Step 4: Implement five-sample Mac calibration**
+- [x] **Step 4: Implement five-sample Mac calibration**
 
 Derive `ws→http` or `wss→https` plus `/clock`, take five sequential samples, select minimum RTT,
 and record offset/RTT/uncertainty/sample count. Baseline mode fails without calibration; normal mode
 records unavailable and continues.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run `make test-go`, `make test-macos`, `git diff --check`.
 
@@ -538,3 +538,7 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
 - 2026-07-16: Android API 26 does not provide `java.util.HexFormat`; the redacted config identity
   uses a local lowercase SHA-256 hex encoder instead of raising the minimum SDK or hiding the issue
   with a lint baseline.
+- 2026-07-16: Task 3 adds a session-free `/clock` response and matching Java/Swift minimum-RTT
+  calibration math. macOS records five-sample offset, RTT and uncertainty; automated media-baseline
+  mode fails if calibration is unavailable, while normal interactive operation records the absence
+  and continues.

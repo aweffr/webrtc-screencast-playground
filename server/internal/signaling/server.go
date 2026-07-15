@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	commonclock "github.com/aweffr/webrtc-screencast-playground/server/internal/clock"
 	"github.com/aweffr/webrtc-screencast-playground/server/internal/observability"
 	"github.com/aweffr/webrtc-screencast-playground/server/internal/protocol"
 	"github.com/aweffr/webrtc-screencast-playground/server/internal/session"
@@ -134,6 +135,7 @@ func (server *Server) Handler() http.Handler {
 		writer.WriteHeader(http.StatusOK)
 		_, _ = writer.Write([]byte("ok\n"))
 	})
+	mux.Handle("/clock", commonclock.NewHandler(server.config.Clock.Now))
 	mux.Handle("GET /metrics", server.metrics)
 	mux.HandleFunc("GET /ws", server.handleWebSocket)
 	return mux

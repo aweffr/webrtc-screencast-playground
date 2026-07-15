@@ -51,6 +51,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
     private var metricsTask: Task<Void, Never>?
     private var effectiveConfiguration: EffectiveConfiguration?
     private var runtimeConfiguration: RuntimeConfiguration?
+    private var clockCalibration: ClockCalibration?
     private var currentSessionID: String?
     private var failureDuringTeardown = false
     private var remoteDescriptionReady = false
@@ -164,6 +165,27 @@ final class SessionCoordinator: NSObject, ObservableObject {
             "source": source.map { .string($0.rawValue) } ?? .null,
             "process_id": .integer(Int(ProcessInfo.processInfo.processIdentifier)),
         ])
+
+        do {
+            let calibration = try await ClockCalibrationClient().calibrate(signalingURL: signalingURL)
+            clockCalibration = calibration
+            try await recorder.record(event: "clock_calibrated", fields: [
+                "sample_count": .integer(calibration.sampleCount),
+                "offset_ns": .integer(Int(calibration.offsetNs)),
+                "round_trip_ns": .integer(Int(calibration.roundTripNs)),
+                "uncertainty_ns": .integer(Int(calibration.uncertaintyNs)),
+            ])
+        } catch {
+            clockCalibration = nil
+            try await recorder.record(event: "clock_calibration_unavailable", fields: [
+                "error": .string(String(describing: error)),
+            ])
+            if launchOptions?.mediaBaseline == true {
+                throw SessionCoordinatorStartupError.configuration(
+                    "Media baseline requires server clock calibration"
+                )
+            }
+        }
 
         flow = SessionFlow(role: role, senderCode: senderCode)
         state = .connectingSignaling(role: role)
@@ -418,6 +440,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
                     flow = nil
                     effectiveConfiguration = nil
                     runtimeConfiguration = nil
+                    clockCalibration = nil
                     if !failureDuringTeardown { state = .idle }
                     failureDuringTeardown = false
                 }
