@@ -92,8 +92,12 @@ final class SessionCoordinator: NSObject, ObservableObject {
         }
         guard let options = launchOptions, let role = options.role else { return }
         do {
-            if startupFailure == nil, role == .sender, let path = options.pairingCodeFile {
-                senderPairingCode = try await PairingCodeFile.waitForCode(at: URL(filePath: path))
+            if startupFailure == nil, role == .sender {
+                if let code = options.pairingCode {
+                    senderPairingCode = code
+                } else if let path = options.pairingCodeFile {
+                    senderPairingCode = try await PairingCodeFile.waitForCode(at: URL(filePath: path))
+                }
             }
             await start()
             if let seconds = options.runSeconds {

@@ -1,8 +1,23 @@
 import Foundation
 import XCTest
+@preconcurrency import WebRTC
 @testable import WebRTCScreencast
 
 final class RuntimeConfigurationTests: XCTestCase {
+    func testBundledCastTuningUsesSchema2BaselineAndCrossPlatformLowLatency() throws {
+        let data = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let encoder = try XCTUnwrap(root["encoder"] as? [String: Any])
+        let receiver = try XCTUnwrap(root["receiver"] as? [String: Any])
+
+        XCTAssertEqual(root["schema_version"] as? Int, 2)
+        XCTAssertEqual(encoder["h264_profile"] as? String, "CONSTRAINED_BASELINE")
+        XCTAssertEqual(encoder["video_toolbox_low_latency_rate_control"] as? Bool, true)
+        XCTAssertEqual(receiver["android_decoder_low_latency"] as? Bool, true)
+        XCTAssertEqual(receiver["prerender_smoothing"] as? Bool, false)
+        XCTAssertNoThrow(try RTCCastTuningConfiguration(jsonData: data))
+    }
+
     func testDirectBaselineDoesNotRequireTURN() throws {
         let configuration = try RuntimeConfiguration.decode(Data(#"""
         {
@@ -112,5 +127,13 @@ final class RuntimeConfigurationTests: XCTestCase {
             "excluded_receiver_pid": NSNull(),
         ]
         return try RuntimeConfiguration.decode(JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]))
+    }
+
+    private func repositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

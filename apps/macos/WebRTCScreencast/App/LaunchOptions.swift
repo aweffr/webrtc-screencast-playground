@@ -4,11 +4,13 @@ import Foundation
 enum LaunchOptionsError: Error, LocalizedError, Equatable {
     case missingValue(String)
     case invalidValue(option: String, value: String)
+    case conflictingOptions(String, String)
 
     var errorDescription: String? {
         switch self {
         case .missingValue(let option): "Missing value for \(option)"
         case let .invalidValue(option, value): "Invalid value '\(value)' for \(option)"
+        case let .conflictingOptions(first, second): "Conflicting options: \(first) and \(second)"
         }
     }
 }
@@ -17,6 +19,7 @@ struct LaunchOptions: Equatable, Sendable {
     var role: CastingRole?
     var profile: ICEProfile?
     var configPath: String?
+    var pairingCode: String?
     var pairingCodeFile: String?
     var source: CaptureSourceKind?
     var excludedReceiverPID: pid_t?
@@ -47,6 +50,12 @@ struct LaunchOptions: Equatable, Sendable {
                 result.configPath = value
             case "--pairing-code-file":
                 result.pairingCodeFile = value
+            case "--pairing-code":
+                do {
+                    result.pairingCode = try PairingCode.normalize(value)
+                } catch {
+                    throw LaunchOptionsError.invalidValue(option: option, value: value)
+                }
             case "--source":
                 switch value {
                 case "main", CaptureSourceKind.mainDisplayMirror.rawValue:
@@ -66,6 +75,9 @@ struct LaunchOptions: Equatable, Sendable {
                 throw LaunchOptionsError.invalidValue(option: option, value: value)
             }
             index += 2
+        }
+        if result.pairingCode != nil, result.pairingCodeFile != nil {
+            throw LaunchOptionsError.conflictingOptions("--pairing-code", "--pairing-code-file")
         }
         return result
     }

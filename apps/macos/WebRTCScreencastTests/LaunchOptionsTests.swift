@@ -3,6 +3,36 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class LaunchOptionsTests: XCTestCase {
+    func testDirectPairingCodeIsNormalizedEagerly() throws {
+        let options = try LaunchOptions.parse([
+            "app", "--role", "sender", "--pairing-code", "AB12-CD34", "--source", "main",
+        ])
+
+        XCTAssertEqual(options.pairingCode, "AB12CD34")
+        XCTAssertNil(options.pairingCodeFile)
+        XCTAssertEqual(options.source, .mainDisplayMirror)
+    }
+
+    func testDirectPairingCodeRejectsMissingInvalidAndConflictingValues() throws {
+        XCTAssertThrowsError(try LaunchOptions.parse(["app", "--pairing-code"])) { error in
+            XCTAssertEqual(error as? LaunchOptionsError, .missingValue("--pairing-code"))
+        }
+        XCTAssertThrowsError(try LaunchOptions.parse(["app", "--pairing-code", "not-a-code"])) { error in
+            XCTAssertEqual(
+                error as? LaunchOptionsError,
+                .invalidValue(option: "--pairing-code", value: "not-a-code")
+            )
+        }
+        XCTAssertThrowsError(try LaunchOptions.parse([
+            "app", "--pairing-code", "AB12CD34", "--pairing-code-file", "/tmp/code",
+        ])) { error in
+            XCTAssertEqual(
+                error as? LaunchOptionsError,
+                .conflictingOptions("--pairing-code", "--pairing-code-file")
+            )
+        }
+    }
+
     func testParsesDualProcessAutomationArguments() throws {
         let options = try LaunchOptions.parse([
             "app", "--role", "sender", "--profile", "direct-baseline",

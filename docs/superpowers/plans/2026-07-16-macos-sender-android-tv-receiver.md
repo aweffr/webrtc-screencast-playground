@@ -357,33 +357,39 @@ keeps safe stage-specific protocol error codes.
 - Modify: `apps/macos/WebRTCScreencastTests/RuntimeConfigurationTests.swift`
 - Modify: `docs/runbooks/local-development.md`
 
-- [ ] **Step 1: Write RED CLI/schema tests**
+- [x] **Step 1: Write RED CLI/schema tests**
 
 Cover `--pairing-code AB12-CD34` normalization, missing/invalid values and mutual exclusion with
 `--pairing-code-file`. Assert schema 2 loads with Constrained Baseline and Apple low latency.
 
-- [ ] **Step 2: Run focused RED**
+- [x] **Step 2: Run focused RED**
 
 Run LaunchOptions and RuntimeConfiguration suites; expect missing field/schema mismatch.
 
-- [ ] **Step 3: Implement direct pairing code**
+- [x] **Step 3: Implement direct pairing code**
 
 Add `pairingCode: String?`, normalize eagerly, and throw a stable conflicting-options error when
 both code sources occur. Complete launch arguments still use the same `.app`, window, permission
 identity and coordinator cleanup path.
 
-- [ ] **Step 4: Migrate to schema 2**
+- [x] **Step 4: Migrate to schema 2**
 
 Keep current bitrate, screen-content, NACK/RTX and 30fps values; explicitly use Baseline plus Apple
 low-latency rate control and Android receiver fields. Verify the linked framework metadata/hash is
 the preview input, not the old `eeca1bc` asset.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run focused/full Mac tests, build the app, and launch its executable with `--pairing-code` against a
 local signaling fixture.
 
 Commit: `feat(macos): support Android TV sender launch`
+
+Execution evidence: the complete Mac test suite and signed Debug build passed against the pinned
+preview XCFramework (`builder_commit=0ff0e8c…`, archive SHA-256 `8ae44b7c…`). The same app
+executable was launched twice with an Android TV one-time code and `--source main`; both runs
+reached server `session_paired`, Android `sdp_offer_received`/`remote_video_playing`, periodic
+RTCStats, timed Sender cleanup, and Receiver re-registration with a fresh code.
 
 ### Task 7: Implement one-run cross-platform E2E and calibrated analysis
 

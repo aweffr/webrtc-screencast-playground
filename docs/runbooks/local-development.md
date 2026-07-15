@@ -53,6 +53,34 @@ Launch two independent instances of the app from Xcode or with `open -n`. In the
 
 For a local direct comparison, both processes use `direct-baseline`. Production validation must use `production-relay`; its selected path is rejected unless RTCStats proves a relay candidate over UDP.
 
+## Sender CLI launch mode
+
+The CLI mode is the same signed `.app`, window, Screen Recording permission identity and cleanup
+path as the interactive client; there is no separate headless target. Build once, then invoke the
+bundle executable with the Android TV pairing code:
+
+```bash
+APP="$PWD/DerivedData/Build/Products/Debug/WebRTCScreencast.app/Contents/MacOS/WebRTCScreencast"
+
+"$APP" \
+  --role sender \
+  --profile direct-baseline \
+  --pairing-code AB12-CD34 \
+  --source main \
+  --run-seconds 30
+```
+
+Use `--source virtual` for the managed 1920×1080 extended display. Automation that receives its
+code asynchronously may keep using `--pairing-code-file`; the two pairing-code options are
+mutually exclusive. A direct `--pairing-code` value is normalized before the session starts, and
+invalid or missing values fail with a launch error rather than opening a partially configured
+Sender.
+
+The bundled CastTuning config uses schema 2, requests H.264 Constrained Baseline, and explicitly
+enables Apple VideoToolbox low-latency rate control. The current compatibility policy permits the
+encoder to produce High profile under that Apple setting only when the WebRTC runtime emits the
+corresponding structured profile-mismatch warning.
+
 ## Screen capture permission
 
 If the Sender reports that capture is unavailable, follow the [capture permission runbook](macos-capture-permission.md). The permission helper and app must see at least one shareable display; a result such as `displays=0` means media E2E evidence cannot be claimed even when signaling and PeerConnection negotiation succeed.
