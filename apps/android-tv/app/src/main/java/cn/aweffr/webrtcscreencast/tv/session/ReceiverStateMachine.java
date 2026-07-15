@@ -201,7 +201,10 @@ public final class ReceiverStateMachine {
         case REMOTE_TRACK -> transition(State.PLAYING);
         default -> illegal(event);
       };
-      case PLAYING -> illegal(event);
+      case PLAYING -> switch (event.type) {
+        case REMOTE_ICE -> transition(State.PLAYING, Command.ADD_ICE);
+        default -> illegal(event);
+      };
       case BACKING_OFF -> switch (event.type) {
         case RETRY_TIMER -> transition(State.CONNECTING, Command.CONNECT);
         default -> illegal(event);

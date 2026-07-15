@@ -231,6 +231,7 @@ Commit: `feat: add cross-platform clock calibration`
 
 **Files:**
 - Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/observability/ReceiverMetricsRecorder.java`
+- Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/observability/ClockCalibrationHttpClient.java`
 - Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/observability/RtcStatsNormalizer.java`
 - Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/observability/AndroidMarkerProbe.java`
 - Create: `apps/android-tv/app/src/main/java/cn/aweffr/webrtcscreencast/tv/signaling/SignalingClient.java`
@@ -241,45 +242,52 @@ Commit: `feat: add cross-platform clock calibration`
 - Test: `apps/android-tv/app/src/test/java/cn/aweffr/webrtcscreencast/tv/observability/AndroidMarkerProbeTest.java`
 - Test: `apps/android-tv/app/src/test/java/cn/aweffr/webrtcscreencast/tv/session/H264CodecPolicyTest.java`
 
-- [ ] **Step 1: Write RED stats, marker and codec tests**
+- [x] **Step 1: Write RED stats, marker and codec tests**
 
 Fixture maps cover inbound RTP, candidate pair and candidates. Missing stats stay null; relay/UDP
 verification is explicit; candidate strings are discarded. Port 12×12 marker version/sequence/CRC
 vectors and one-bit corruption. H.264 filter keeps only H264 with `packetization-mode=1`.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run both variant unit-test tasks; expect missing types.
 
-- [ ] **Step 3: Implement app-lifetime WebRTC runtime**
+- [x] **Step 3: Implement app-lifetime WebRTC runtime**
 
 Initialize WebRTC/EGL once, parse schema 2, create `CastTuningController`, configure factory field
 trials and use `createVideoDecoderFactory`. Dispose session → factory → controller → EGL.
 
-- [ ] **Step 4: Implement per-cast Receiver session**
+- [x] **Step 4: Implement per-cast Receiver session**
 
 Use no ICE server for direct and exactly one TURN/UDP server plus RELAY policy for production;
 always disable TCP and use Unified Plan. Add one recv-only video transceiver, set H.264-only codec
 preferences, apply offer/answer and trickle ICE serially. Accept one remote video track, attach
 CastTuning receiver settings and renderer; a second track is a protocol error.
 
-- [ ] **Step 5: Implement JSONL and marker evidence**
+- [x] **Step 5: Implement JSONL and marker evidence**
 
 Write `files/evidence/<run-id>/receiver.jsonl` on one executor. Sample RTCStats each second.
 Baseline mode alone attaches a renderer frame listener, records
 `baseline_android_render_detected` at callback entry and writes the three agreed decoded PNGs.
 
-- [ ] **Step 6: Implement retry-safe orchestration**
+- [x] **Step 6: Implement retry-safe orchestration**
 
 Expiry/hangup/transient disconnect performs idempotent cleanup then gets a fresh code. Config/H.264
 errors require manual retry. Every callback carries a generation token so an old session cannot
 mutate a replacement.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 Run Android unit tests, lint, both debug assembles, and inspect APK for the exact arm64 JNI library.
 
 Commit: `feat(android-tv): implement WebRTC receiver session`
+
+Execution finding (2026-07-16): both ICE flavors pass their full local unit
+suite, lint and debug assembly, and both APKs contain exactly
+`lib/arm64-v8a/libjingle_peerconnection_so.so`. These checks temporarily used
+JDK 25 only because the pinned preview AAR has Java 21 classfiles; the
+replacement Java 8 AAR is being built by GitHub Actions run `29435127085` and
+must replace the local artifact before the formal JDK 17 and emulator gates.
 
 ### Task 5: Build Android TV UX and lifecycle smoke
 

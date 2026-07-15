@@ -3,6 +3,7 @@ package cn.aweffr.webrtcscreencast.tv.observability;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
+import java.io.IOException;
 import java.util.List;
 import org.junit.Test;
 
@@ -35,5 +36,37 @@ public final class ClockCalibrationTest {
 
     assertThrows(ArithmeticException.class,
         () -> calibration.toCommonTimeNs(Long.MAX_VALUE));
+  }
+
+  @Test
+  public void clockEndpointFollowsSignalingSecurityScheme() {
+    assertEquals(
+        "http://10.0.2.2:8080/clock",
+        ClockCalibrationHttpClient.endpoint("ws://10.0.2.2:8080/ws"));
+    assertEquals(
+        "https://cast.example.test/clock",
+        ClockCalibrationHttpClient.endpoint("wss://cast.example.test/socket"));
+    assertThrows(IllegalArgumentException.class,
+        () -> ClockCalibrationHttpClient.endpoint("https://cast.example.test/ws"));
+  }
+
+  @Test
+  public void clockResponseRequiresTheExactPositiveSchemaOnePayload() throws Exception {
+    assertEquals(
+        1_234L,
+        ClockCalibrationHttpClient.parseServerUnixNs(
+            "{\"schema_version\":1,\"server_unix_ns\":1234}"));
+    assertThrows(
+        IOException.class,
+        () -> ClockCalibrationHttpClient.parseServerUnixNs(
+            "{\"schema_version\":2,\"server_unix_ns\":1234}"));
+    assertThrows(
+        IOException.class,
+        () -> ClockCalibrationHttpClient.parseServerUnixNs(
+            "{\"schema_version\":1,\"server_unix_ns\":0}"));
+    assertThrows(
+        IOException.class,
+        () -> ClockCalibrationHttpClient.parseServerUnixNs(
+            "{\"schema_version\":1,\"server_unix_ns\":1234,\"extra\":true}"));
   }
 }

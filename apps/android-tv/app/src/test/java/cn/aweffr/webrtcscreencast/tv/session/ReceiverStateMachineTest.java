@@ -36,6 +36,8 @@ public final class ReceiverStateMachineTest {
         ReceiverStateMachine.State.NEGOTIATING, ADD_ICE);
     assertTransition(machine.reduce(ReceiverStateMachine.Event.remoteTrack()),
         ReceiverStateMachine.State.PLAYING);
+    assertTransition(machine.reduce(ReceiverStateMachine.Event.remoteIce()),
+        ReceiverStateMachine.State.PLAYING, ADD_ICE);
   }
 
   @Test
