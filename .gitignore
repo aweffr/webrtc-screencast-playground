@@ -1,6 +1,7 @@
 # Downloaded release assets are verified by artifacts/SHA256SUMS and remain local.
 artifacts/*.tar.gz
 artifacts/*.zip
+artifacts/*.aar
 artifacts/media-baseline/
 
 # Runtime credentials and machine-local configuration must never be committed.
@@ -18,9 +19,13 @@ xcuserdata/
 Vendor/
 .swiftpm/
 .build/
+apps/android-tv/.gradle/
+apps/android-tv/local.properties
+apps/android-tv/**/build/
 __pycache__/
 server/signaling-server
 
 # Local runtime configuration and collected diagnostics.
 runtime.json
 diagnostics/
+apps/android-tv/app/src/debug/res/values/reference_runtime.local.xml

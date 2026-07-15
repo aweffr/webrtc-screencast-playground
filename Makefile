@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: bootstrap generate test-go test-macos test-scripts build-macos verify media-baseline
+.PHONY: bootstrap generate test-go test-macos test-android test-scripts build-macos build-android verify media-baseline
 
 bootstrap:
 	./scripts/bootstrap-webrtc.sh
@@ -14,6 +14,9 @@ test-go:
 test-macos: generate
 	xcodebuild test -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -destination 'platform=macOS' -derivedDataPath DerivedData
 
+test-android: bootstrap
+	./apps/android-tv/gradlew -p apps/android-tv test lint
+
 test-scripts:
 	./scripts/test-verifiers.sh
 	python3 -m unittest scripts/test_virtual_display_state.py
@@ -23,7 +26,10 @@ test-scripts:
 build-macos: generate
 	xcodebuild build -project apps/macos/WebRTCScreencast.xcodeproj -scheme WebRTCScreencast -configuration Debug -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData
 
-verify: test-go test-macos test-scripts build-macos
+build-android: bootstrap
+	./apps/android-tv/gradlew -p apps/android-tv assembleDirectBaselineDebug assembleProductionRelayDebug
+
+verify: test-go test-macos test-android test-scripts build-macos build-android
 	git diff --check
 
 media-baseline:

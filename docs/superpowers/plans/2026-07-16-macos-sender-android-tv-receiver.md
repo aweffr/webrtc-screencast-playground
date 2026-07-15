@@ -66,19 +66,19 @@ Android device: tv_1080p
 - Modify: `scripts/test-verifiers.sh`
 - Modify: `Makefile`
 
-- [ ] **Step 1: Write the failing artifact contract**
+- [x] **Step 1: Write the failing artifact contract**
 
 Extend `scripts/test-verifiers.sh` with a temp release directory. Invoke bootstrap with
 `ARTIFACTS_DIR`, `VENDOR_DIR` and `WEBRTC_RELEASE_BASE_URL=file://...`; assert corrupt AAR or
 XCFramework bytes fail before extraction and exact fixture bytes pass.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run `./scripts/test-verifiers.sh`.
 
 Expected: FAIL because bootstrap hard-codes one old archive and has no Android AAR contract.
 
-- [ ] **Step 3: Implement preview download and verification**
+- [x] **Step 3: Implement preview download and verification**
 
 Replace the manifest with exactly:
 
@@ -91,25 +91,25 @@ Bootstrap downloads only missing assets from the immutable tag, checks both hash
 XCFramework and requires AAR members `AndroidManifest.xml`, `classes.jar` and
 `jni/arm64-v8a/libjingle_peerconnection_so.so`.
 
-- [ ] **Step 4: Generate the Gradle 9.4.1 wrapper**
+- [x] **Step 4: Generate the Gradle 9.4.1 wrapper**
 
 Use a temporary Gradle 9.4.1 distribution to generate wrapper scripts/jar/properties. Commit the
 published `distributionSha256Sum`; do not commit the distribution or Gradle caches.
 
-- [ ] **Step 5: Add the application module**
+- [x] **Step 5: Add the application module**
 
 Use Android application plugin 9.2.1, Java 17, compile/target 36, min 26 and arm64-only packaging.
 Add `directBaseline` and `productionRelay` flavors; each defines only
 `R.string.reference_ice_profile`. Depend on the verified local AAR, OkHttp 5.3.0, JUnit 4.13.2,
 AndroidX Test 1.7.0 and Espresso 3.7.0. Do not add Kotlin or Compose plugins.
 
-- [ ] **Step 6: Add idempotent AVD provisioning**
+- [x] **Step 6: Add idempotent AVD provisioning**
 
 Install the exact API 31 TV arm64 image when absent and create
 `WebRTCScreencast_TV_API_31 --device tv_1080p`. Re-running must keep a compatible existing AVD and
 must not modify `Pixel_6_API_31`.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 Run:
 
@@ -527,3 +527,7 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
 - 2026-07-16: M150 AAR exposes CastTuning controller/decoder factory, recv-only transceivers, codec
   preferences, RTCStats and SurfaceViewRenderer. Decoder low-latency fallback has no public callback;
   evidence combines app JSONL requested state, RTCStats implementation and process-filtered logcat.
+- 2026-07-16: Task 1 pinned and locally verified both preview assets. The AAR JNI bytes are identical
+  after APK packaging (`e8fe64a1097141f440e0f354895ee2827bc28a210a50502b17774134ca143a49`),
+  Gradle/AGP configure both ICE variants, and the provisioned `WebRTCScreencast_TV_API_31` is an
+  Android 12 TV `arm64-v8a` AVD with the `tv_1080p` 1920×1080 device definition.

@@ -2,15 +2,47 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
-ARCHIVE="$ROOT/artifacts/WebRTC-m150-macos-universal.xcframework.zip"
-FRAMEWORK="$ROOT/Vendor/WebRTC.xcframework"
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-$ROOT/artifacts}"
+VENDOR_DIR="${VENDOR_DIR:-$ROOT/Vendor}"
+WEBRTC_RELEASE_BASE_URL="${WEBRTC_RELEASE_BASE_URL:-https://github.com/aweffr/my-webrtc-builds/releases/download/webrtc-m150.7871.3-0ff0e8c-20260714-macos-android-preview.1}"
+ARCHIVE="$ARTIFACTS_DIR/WebRTC-m150-macos-universal.xcframework.zip"
+AAR="$ARTIFACTS_DIR/webrtc-m150-android-arm64-v8a.aar"
+FRAMEWORK="$VENDOR_DIR/WebRTC.xcframework"
 
-cd "$ROOT/artifacts"
+download_if_missing() {
+  local destination="$1"
+  [[ -f "$destination" ]] && return
+  mkdir -p "${destination:h}"
+  local temporary="$destination.download.$$"
+  if ! curl --fail --location --retry 3 \
+      --output "$temporary" \
+      "$WEBRTC_RELEASE_BASE_URL/${destination:t}"; then
+    rm -f "$temporary"
+    return 1
+  fi
+  mv "$temporary" "$destination"
+}
+
+download_if_missing "$ARCHIVE"
+download_if_missing "$AAR"
+
+cd "$ARTIFACTS_DIR"
 shasum -a 256 -c SHA256SUMS
 
+expected_aar_members="$(print -l \
+  AndroidManifest.xml \
+  classes.jar \
+  jni/arm64-v8a/libjingle_peerconnection_so.so | sort)"
+actual_aar_members="$(unzip -Z1 "$AAR" | sort)"
+if [[ "$actual_aar_members" != "$expected_aar_members" ]]; then
+  print -u2 "Android AAR does not match the app-consumable package contract"
+  diff -u <(print -r -- "$expected_aar_members") <(print -r -- "$actual_aar_members") || true
+  exit 1
+fi
+
 rm -rf "$FRAMEWORK"
-mkdir -p "$ROOT/Vendor"
-ditto -x -k "$ARCHIVE" "$ROOT/Vendor"
+mkdir -p "$VENDOR_DIR"
+ditto -x -k "$ARCHIVE" "$VENDOR_DIR"
 test -f "$FRAMEWORK/Info.plist"
 
 FRAMEWORK_ROOT="$FRAMEWORK/macos-arm64_x86_64/WebRTC.framework"
