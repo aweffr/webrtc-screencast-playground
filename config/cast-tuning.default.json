@@ -29,7 +29,7 @@
     "h264_level": "4.1",
     "max_frame_delay_count": 1,
     "max_qp": 42,
-    "video_toolbox_low_latency_rate_control": true
+    "video_toolbox_low_latency_rate_control": false
   },
   "receiver": {
     "jitter_minimum_ms": 0,

@@ -30,7 +30,8 @@ public final class RtcStatsNormalizer {
       Double framesPerSecond,
       Integer frameWidth,
       Integer frameHeight,
-      String decoderImplementation) {}
+      String decoderImplementation,
+      String codecMimeType) {}
 
   public record SelectedPath(
       PathStatus status,
@@ -58,11 +59,14 @@ public final class RtcStatsNormalizer {
         .orElse(null);
     InboundVideo inbound = inboundStat == null
         ? null
-        : normalizeInbound(timestampUs, inboundStat.getMembers());
+        : normalizeInbound(timestampUs, inboundStat.getMembers(), stats);
     return new Sample(inbound, normalizePath(stats));
   }
 
-  private InboundVideo normalizeInbound(long timestampUs, Map<String, Object> members) {
+  private InboundVideo normalizeInbound(
+      long timestampUs,
+      Map<String, Object> members,
+      Map<String, RTCStats> stats) {
     Long bytesReceived = longValue(members, "bytesReceived");
     Double bitrateBps = null;
     if (bytesReceived != null
@@ -78,6 +82,8 @@ public final class RtcStatsNormalizer {
     Double jitter = doubleValue(members, "jitter");
     Double totalDecodeTime = doubleValue(members, "totalDecodeTime");
     Double totalInterFrameDelay = doubleValue(members, "totalInterFrameDelay");
+    RTCStats codec = statById(stats, string(members, "codecId"));
+    String codecMimeType = codec == null ? null : string(codec.getMembers(), "mimeType");
     return new InboundVideo(
         bytesReceived,
         longValue(members, "packetsReceived"),
@@ -94,7 +100,8 @@ public final class RtcStatsNormalizer {
         doubleValue(members, "framesPerSecond"),
         intValue(members, "frameWidth"),
         intValue(members, "frameHeight"),
-        string(members, "decoderImplementation"));
+        string(members, "decoderImplementation"),
+        codecMimeType);
   }
 
   private SelectedPath normalizePath(Map<String, RTCStats> stats) {
@@ -108,8 +115,8 @@ public final class RtcStatsNormalizer {
     if (pair == null || !"candidate-pair".equals(pair.getType())) {
       return new SelectedPath(PathStatus.UNKNOWN, null, null, null);
     }
-    RTCStats local = stats.get(string(pair.getMembers(), "localCandidateId"));
-    RTCStats remote = stats.get(string(pair.getMembers(), "remoteCandidateId"));
+    RTCStats local = statById(stats, string(pair.getMembers(), "localCandidateId"));
+    RTCStats remote = statById(stats, string(pair.getMembers(), "remoteCandidateId"));
     if (local == null || remote == null) {
       return new SelectedPath(PathStatus.UNKNOWN, null, null, null);
     }
@@ -123,7 +130,9 @@ public final class RtcStatsNormalizer {
     if (localType == null || remoteType == null || protocol == null) {
       status = PathStatus.UNKNOWN;
     } else if (profile == IceProfile.PRODUCTION_RELAY) {
-      status = "relay".equals(localType) && "udp".equals(protocol)
+      status = "relay".equals(localType)
+              && "relay".equals(remoteType)
+              && "udp".equals(protocol)
           ? PathStatus.ACCEPTED
           : PathStatus.VIOLATION;
     } else {
@@ -134,6 +143,10 @@ public final class RtcStatsNormalizer {
           : PathStatus.VIOLATION;
     }
     return new SelectedPath(status, localType, remoteType, protocol);
+  }
+
+  private static RTCStats statById(Map<String, RTCStats> stats, String id) {
+    return id == null ? null : stats.get(id);
   }
 
   private static String string(Map<String, Object> values, String key) {

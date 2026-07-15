@@ -34,6 +34,8 @@ public final class WebRtcReceiverSession implements AutoCloseable {
 
     void onConnectionState(PeerConnection.PeerConnectionState state);
 
+    void onNegotiationStage(String stage);
+
     void onFailure(String code, String message);
   }
 
@@ -101,18 +103,32 @@ public final class WebRtcReceiverSession implements AutoCloseable {
 
   public void applyOffer(String sdp) {
     checkOpen();
+    listener.onNegotiationStage("set_remote_offer_started");
     peerConnection.setRemoteDescription(new ChainedSdpObserver("set_remote_offer") {
       @Override
       public void onSetSuccess() {
+        listener.onNegotiationStage("set_remote_offer_succeeded");
         peerConnection.createAnswer(new ChainedSdpObserver("create_answer") {
           @Override
           public void onCreateSuccess(SessionDescription answer) {
+            listener.onNegotiationStage("create_answer_succeeded");
+            final String normalizedSdp;
+            try {
+              normalizedSdp = H264AnswerPolicy.normalizeFor1080p(answer.description);
+            } catch (IllegalArgumentException error) {
+              listener.onFailure("answer_h264_level_failed", error.getMessage());
+              return;
+            }
+            listener.onNegotiationStage("answer_h264_level_4_1_applied");
+            SessionDescription normalizedAnswer = new SessionDescription(
+                SessionDescription.Type.ANSWER, normalizedSdp);
             peerConnection.setLocalDescription(new ChainedSdpObserver("set_local_answer") {
               @Override
               public void onSetSuccess() {
-                listener.onLocalAnswer(answer.description);
+                listener.onNegotiationStage("set_local_answer_succeeded");
+                listener.onLocalAnswer(normalizedSdp);
               }
-            }, answer);
+            }, normalizedAnswer);
           }
         }, new MediaConstraints());
       }

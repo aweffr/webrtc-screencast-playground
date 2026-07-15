@@ -25,10 +25,22 @@ final class SelectedPathVerifierTests: XCTestCase {
         XCTAssertEqual(evidence.status, .violation)
     }
 
+    func testDirectBaselineRejectsNonUdpPath() {
+        let evidence = SelectedPathVerifier.verify(
+            profile: .directBaseline,
+            statistics: selectedPath(localType: "host", protocolValue: "tcp")
+        )
+        XCTAssertEqual(evidence.status, .violation)
+    }
+
     func testProductionRequiresRelayAndUDP() {
         XCTAssertEqual(SelectedPathVerifier.verify(
             profile: .productionRelay,
-            statistics: selectedPath(localType: "relay", protocolValue: "udp")
+            statistics: selectedPath(
+                localType: "relay",
+                remoteType: "relay",
+                protocolValue: "udp"
+            )
         ).status, .verified)
         XCTAssertEqual(SelectedPathVerifier.verify(
             profile: .productionRelay,
@@ -36,11 +48,23 @@ final class SelectedPathVerifierTests: XCTestCase {
         ).status, .violation)
         XCTAssertEqual(SelectedPathVerifier.verify(
             profile: .productionRelay,
-            statistics: selectedPath(localType: "relay", protocolValue: "tcp")
+            statistics: selectedPath(
+                localType: "relay",
+                remoteType: "relay",
+                protocolValue: "tcp"
+            )
+        ).status, .violation)
+        XCTAssertEqual(SelectedPathVerifier.verify(
+            profile: .productionRelay,
+            statistics: selectedPath(localType: "relay", protocolValue: "udp")
         ).status, .violation)
     }
 
-    private func selectedPath(localType: String, protocolValue: String) -> [RTCStatisticSnapshot] {
+    private func selectedPath(
+        localType: String,
+        remoteType: String = "host",
+        protocolValue: String
+    ) -> [RTCStatisticSnapshot] {
         [
             RTCStatisticSnapshot(
                 id: "transport-1",
@@ -68,7 +92,7 @@ final class SelectedPathVerifierTests: XCTestCase {
                 id: "remote-1",
                 type: "remote-candidate",
                 values: [
-                    "candidateType": .string("host"),
+                    "candidateType": .string(remoteType),
                     "protocol": .string("udp"),
                 ]
             ),

@@ -32,6 +32,42 @@ jq -nc '[
 
 "$ROOT/scripts/verify-diagnostics.sh" "$WORK/receiver" "$WORK/sender" direct-baseline >/dev/null
 
+mkdir -p "$WORK/android-receiver"
+jq -nc '[
+  {event:"receiver_runtime_initialized",fields:{decoder_low_latency:true}},
+  {event:"clock_calibration",fields:{sample_count:5,offset_ns:1,round_trip_ns:2,uncertainty_ns:1}},
+  {event:"signaling_connected",fields:{}},
+  {event:"receiver_registered",fields:{session_id:"server-session-1"}},
+  {event:"session_paired",fields:{session_id:"server-session-1"}},
+  {event:"sdp_offer_received",fields:{}},
+  {event:"sdp_answer_sent",fields:{}},
+  {event:"remote_video_playing",fields:{}},
+  {event:"rtc_stats",fields:{frames_decoded:2,codec:"video/H264",frame_width:1920,frame_height:1080,path_status:"accepted",local_path_type:"host",remote_path_type:"host",path_protocol:"udp"}}
+] | .[] | . + {schema_version:1,run_id:"android-run-1",monotonic_ns:1}' \
+  >"$WORK/android-receiver/receiver.jsonl"
+"$ROOT/scripts/verify-diagnostics.sh" \
+  "$WORK/android-receiver" "$WORK/sender" direct-baseline >/dev/null
+
+mkdir -p "$WORK/relay-android-receiver" "$WORK/relay-sender"
+jq 'if .event == "rtc_stats" then
+  .fields.local_path_type = "relay"
+  | .fields.remote_path_type = "host"
+  else . end' "$WORK/android-receiver/receiver.jsonl" \
+  >"$WORK/relay-android-receiver/receiver.jsonl"
+jq 'if .event == "selected_path" then
+  .fields.local_candidate_type = "relay"
+  | .fields.remote_candidate_type = "host"
+  elif .event == "rtc_stats" then
+  .fields.selected_path.local_candidate_type = "relay"
+  | .fields.selected_path.remote_candidate_type = "host"
+  else . end' "$WORK/sender/metrics.jsonl" >"$WORK/relay-sender/metrics.jsonl"
+if "$ROOT/scripts/verify-diagnostics.sh" \
+  "$WORK/relay-android-receiver" "$WORK/relay-sender" production-relay \
+  >/dev/null 2>&1; then
+  print -u2 "verifier accepted a production path whose remote candidate was not relay"
+  exit 1
+fi
+
 touch "$WORK/sender/webrtc_log_0"
 if "$ROOT/scripts/verify-diagnostics.sh" "$WORK/receiver" "$WORK/sender" direct-baseline >/dev/null 2>&1; then
   print -u2 "verifier accepted a raw libwebrtc log"
@@ -192,4 +228,63 @@ FAKE_ANDROID_STATE="$WORK/fake-android-state" \
   exit 1
 }
 
+cat >"$fake_tools/adb" <<'SH'
+#!/bin/zsh
+set -euo pipefail
+state="$FAKE_ANDROID_NETWORK_STATE"
+mkdir -p "$state"
+case "$*" in
+  'shell ip route get 10.0.2.2')
+    [[ -f "$state/route-ready" ]]
+    ;;
+  'shell cmd wifi connect-network AndroidWifi open')
+    touch "$state/connect-requested"
+    [[ "${FAKE_ANDROID_NETWORK_NEVER_CONNECT:-0}" == 1 ]] || touch "$state/route-ready"
+    ;;
+  *)
+    print -u2 "unexpected fake adb call: $*"
+    exit 2
+    ;;
+esac
+SH
+chmod +x "$fake_tools/adb"
+
+network_state="$WORK/fake-android-network"
+FAKE_ANDROID_NETWORK_STATE="$network_state" \
+ADB="$fake_tools/adb" \
+ANDROID_TV_NETWORK_WAIT_ATTEMPTS=2 \
+  "$ROOT/scripts/ensure-android-tv-network.sh" >/dev/null
+[[ -f "$network_state/connect-requested" && -f "$network_state/route-ready" ]] || {
+  print -u2 "Android TV network recovery did not reconnect AndroidWifi"
+  exit 1
+}
+
+rm -f "$network_state/connect-requested"
+FAKE_ANDROID_NETWORK_STATE="$network_state" \
+ADB="$fake_tools/adb" \
+ANDROID_TV_NETWORK_WAIT_ATTEMPTS=2 \
+  "$ROOT/scripts/ensure-android-tv-network.sh" >/dev/null
+[[ ! -e "$network_state/connect-requested" ]] || {
+  print -u2 "Android TV network recovery changed an already ready route"
+  exit 1
+}
+
+rm -f "$network_state/route-ready"
+if FAKE_ANDROID_NETWORK_STATE="$network_state" \
+  FAKE_ANDROID_NETWORK_NEVER_CONNECT=1 \
+  ADB="$fake_tools/adb" \
+  ANDROID_TV_NETWORK_WAIT_ATTEMPTS=2 \
+    "$ROOT/scripts/ensure-android-tv-network.sh" >/dev/null 2>&1; then
+  print -u2 "Android TV network recovery accepted an unavailable host route"
+  exit 1
+fi
+
 print "script verifier tests passed"
+
+baseline_plan="$($ROOT/scripts/run-android-tv-baseline.sh \
+  --dry-run --skip-macos-build --runtime-config /not/read/in/dry-run)"
+expected_plan=$'functional direct-baseline main\nfunctional direct-baseline virtual\nfunctional production-relay main\nfunctional production-relay virtual\nbaseline 1 direct-baseline virtual\nbaseline 1 production-relay virtual\nbaseline 2 direct-baseline virtual\nbaseline 2 production-relay virtual\nbaseline 3 direct-baseline virtual\nbaseline 3 production-relay virtual'
+[[ "$baseline_plan" == "$expected_plan" ]] || {
+  print -u2 "Android TV baseline dry-run did not preserve the approved functional and alternating baseline order"
+  exit 1
+}

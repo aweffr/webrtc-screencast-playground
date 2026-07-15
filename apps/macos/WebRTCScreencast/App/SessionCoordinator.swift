@@ -402,7 +402,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 case .stopCapture:
                     try? await captureSource?.stop()
                     captureSource = nil
-                    baselineChart?.stop()
+                    await baselineChart?.stop()
                     baselineChart = nil
                     displaySleepActivity?.stop()
                     displaySleepActivity = nil
@@ -471,7 +471,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
             try await recorder?.record(event: "virtual_display_created", fields: ["display_id": .integer(Int(displayID))])
             if launchOptions?.mediaBaseline == true, let recorder, let sessionDirectory {
                 let chart = MediaBaselineChartController(recorder: recorder, directory: sessionDirectory)
-                try chart.start(displayID: displayID)
+                try await chart.start(displayID: displayID)
                 baselineChart = chart
             }
         }

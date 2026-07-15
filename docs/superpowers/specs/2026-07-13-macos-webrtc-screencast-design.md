@@ -121,7 +121,7 @@ Video transceiver 使用 Unified Plan。Sender direction 为 send-only，Receive
 
 初始 tuning 为 1920×1080、max 30 fps、min/start/max bitrate 400 Kbps/2.2 Mbps/3 Mbps、screen content、maintain-resolution、NACK+RTX、FEC off。当前 WebRTC binary 自己负责 VideoToolbox realtime 和禁止 frame reordering；Apple `EnableLowLatencyRateControl` 不在一期伪装成已启用。
 
-`direct-baseline` 使用 `RTCIceTransportPolicyAll`、禁用 TCP candidate 且不配置 TURN。`production-relay` 使用 `RTCIceTransportPolicyRelay`、禁用 TCP candidate且仅配置 `turn:<host>:<port>?transport=udp`。建立连接后 `ICEPathVerifier` 必须从 RTCStats 和 candidate-pair event 验证 requested profile：production path 的 local/remote candidate 至少一侧为 relay，relay protocol 为 UDP；不符合时 UI 和日志显示 profile violation，而不是把连接标为验收成功。
+`direct-baseline` 使用 `RTCIceTransportPolicyAll`、禁用 TCP candidate 且不配置 TURN。`production-relay` 使用 `RTCIceTransportPolicyRelay`、禁用 TCP candidate且仅配置 `turn:<host>:<port>?transport=udp`。建立连接后 `ICEPathVerifier` 必须从 RTCStats 和 candidate-pair event 验证 requested profile：production path 的 local/remote candidate 都必须为 relay，relay protocol 必须为 UDP；不符合时 UI 和日志显示 profile violation，而不是把连接标为验收成功。
 
 ### Receiver render
 

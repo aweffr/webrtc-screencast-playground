@@ -89,6 +89,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
     func stop() async throws {
         guard let stream else { return }
         self.stream = nil
+        defer { try? stream.removeStreamOutput(self, type: .screen) }
         try await stream.stopCapture()
         frameGate = FrameGate()
     }

@@ -15,7 +15,12 @@ CONFIG="${4:-${RUNTIME_CONFIG:-}}"
 [[ "$PROFILE" == direct-baseline || "$PROFILE" == production-relay ]] || usage
 command -v jq >/dev/null || { print -u2 "jq is required"; exit 2; }
 
+android_receiver=0
 receiver="$RECEIVER_DIR/metrics.jsonl"
+if [[ -s "$RECEIVER_DIR/receiver.jsonl" ]]; then
+  receiver="$RECEIVER_DIR/receiver.jsonl"
+  android_receiver=1
+fi
 sender="$SENDER_DIR/metrics.jsonl"
 [[ -s "$receiver" ]] || { print -u2 "missing receiver metrics: $receiver"; exit 1; }
 [[ -s "$sender" ]] || { print -u2 "missing sender metrics: $sender"; exit 1; }
@@ -30,6 +35,102 @@ fi
 for file in "$receiver" "$sender"; do
   jq -e -c . "$file" >/dev/null || { print -u2 "invalid JSONL: $file"; exit 1; }
 done
+
+require_event() {
+  local file="$1" event="$2" label="$3"
+  jq -e --arg event "$event" 'select(.event == $event)' "$file" >/dev/null \
+    || { print -u2 "missing $label evidence ($event)"; exit 1; }
+}
+
+if (( android_receiver )); then
+  sender_session_id="$(jq -sr '
+    if length > 0
+      and all(.[]; (.session_id | type == "string") and (.session_id | length > 0))
+      and ([.[].session_id] | unique | length == 1)
+    then .[0].session_id else empty end
+  ' "$sender")"
+  receiver_session_id="$(jq -sr '
+    [.[] | select(.event == "session_paired") | .fields.session_id]
+    | if length == 1 and .[0] != null and (.[0] | length > 0) then .[0] else empty end
+  ' "$receiver")"
+  jq -se 'length > 0
+    and all(.[]; (.run_id | type == "string") and (.run_id | length > 0))
+    and ([.[].run_id] | unique | length == 1)' "$receiver" >/dev/null \
+    || { print -u2 "Android receiver evidence does not use one run_id"; exit 1; }
+  [[ -n "$sender_session_id" && "$sender_session_id" == "$receiver_session_id" ]] \
+    || { print -u2 "sender and Android receiver do not share one session_id"; exit 1; }
+
+  for event in session_started signaling_connected peer_paired rtc_stats \
+    sender_join_requested local_offer remote_answer capture_started; do
+    require_event "$sender" "$event" "sender"
+  done
+  for event in receiver_runtime_initialized clock_calibration signaling_connected \
+    receiver_registered session_paired sdp_offer_received sdp_answer_sent \
+    remote_video_playing rtc_stats; do
+    require_event "$receiver" "$event" "Android receiver"
+  done
+  jq -se 'any(.[];
+    .event == "rtc_stats"
+    and (.fields.outbound_video.frames // 0) > 0
+    and ((.fields.outbound_video.codec // "") | ascii_downcase | contains("h264")))' \
+    "$sender" >/dev/null || { print -u2 "missing sender H.264 encode evidence"; exit 1; }
+  jq -se 'any(.[];
+    .event == "rtc_stats"
+    and (.fields.frames_decoded // 0) > 0
+    and ((.fields.codec // "") | ascii_downcase | contains("h264"))
+    and .fields.frame_width == 1920
+    and .fields.frame_height == 1080)' "$receiver" >/dev/null \
+    || { print -u2 "missing Android H.264 1920x1080 decode evidence"; exit 1; }
+
+  jq -se 'any(.[]; .event == "selected_path" and .fields.status == "verified")' \
+    "$sender" >/dev/null || { print -u2 "missing sender selected-path evidence"; exit 1; }
+  if [[ "$PROFILE" == production-relay ]]; then
+    jq -se 'any(.[]; .event == "selected_path"
+      and .fields.status == "verified"
+      and .fields.local_candidate_type == "relay"
+      and .fields.remote_candidate_type == "relay"
+      and .fields.protocol == "udp")' "$sender" >/dev/null \
+      || { print -u2 "sender production path is not relay/relay udp"; exit 1; }
+    jq -se 'any(.[]; .event == "rtc_stats"
+      and .fields.path_status == "accepted"
+      and .fields.local_path_type == "relay"
+      and .fields.remote_path_type == "relay"
+      and .fields.path_protocol == "udp")' "$receiver" >/dev/null \
+      || { print -u2 "Android production path is not relay/relay udp"; exit 1; }
+  else
+    jq -se 'any(.[]; .event == "selected_path"
+      and .fields.status == "verified"
+      and .fields.local_candidate_type != "relay"
+      and .fields.remote_candidate_type != "relay"
+      and .fields.protocol == "udp")' "$sender" >/dev/null \
+      || { print -u2 "sender direct baseline selected a relay or non-UDP path"; exit 1; }
+    jq -se 'any(.[]; .event == "rtc_stats"
+      and .fields.path_status == "accepted"
+      and .fields.local_path_type != "relay"
+      and .fields.remote_path_type != "relay"
+      and .fields.path_protocol == "udp")' "$receiver" >/dev/null \
+      || { print -u2 "Android direct baseline selected a relay or non-UDP path"; exit 1; }
+  fi
+
+  source_kind="$(jq -sr '[.[] | select(.event == "session_started")][0].fields.source // ""' "$sender")"
+  if [[ "$source_kind" == virtual-extended-display ]]; then
+    require_event "$sender" virtual_display_created "virtual display"
+    require_event "$sender" virtual_display_removed "virtual display cleanup"
+  fi
+  if [[ -n "$CONFIG" ]]; then
+    [[ -r "$CONFIG" ]] || { print -u2 "runtime config is unreadable"; exit 1; }
+    for field in username password; do
+      secret="$(jq -r ".turn.$field // empty" "$CONFIG")"
+      [[ -z "$secret" ]] && continue
+      if LC_ALL=C grep -R -a -F -q -- "$secret" "$RECEIVER_DIR" "$SENDER_DIR"; then
+        print -u2 "diagnostics contain configured TURN $field"
+        exit 1
+      fi
+    done
+  fi
+  print "diagnostics verified: Android H.264 1920x1080 media and $PROFILE selected path"
+  exit 0
+fi
 
 canonical_session_id() {
   jq -sr '
@@ -46,12 +147,6 @@ receiver_session_id="$(canonical_session_id "$receiver")"
 sender_session_id="$(canonical_session_id "$sender")"
 [[ -n "$receiver_session_id" && "$receiver_session_id" == "$sender_session_id" ]] \
   || { print -u2 "sender and receiver metrics do not share one canonical session_id"; exit 1; }
-
-require_event() {
-  local file="$1" event="$2" label="$3"
-  jq -e --arg event "$event" 'select(.event == $event)' "$file" >/dev/null \
-    || { print -u2 "missing $label evidence ($event)"; exit 1; }
-}
 
 for event in session_started signaling_connected peer_paired rtc_stats; do
   require_event "$sender" "$event" "sender"
@@ -92,12 +187,14 @@ if [[ "$PROFILE" == production-relay ]]; then
       (.event == "rtc_stats"
         and .fields.selected_path.status == "verified"
         and .fields.selected_path.local_candidate_type == "relay"
+        and .fields.selected_path.remote_candidate_type == "relay"
         and .fields.selected_path.protocol == "udp")
       or (.event == "selected_path"
         and .fields.status == "verified"
         and .fields.local_candidate_type == "relay"
+        and .fields.remote_candidate_type == "relay"
         and .fields.protocol == "udp"))' "$file" >/dev/null \
-      || { print -u2 "production path is not relay/udp in $file"; exit 1; }
+      || { print -u2 "production path is not relay/relay udp in $file"; exit 1; }
   done
 else
   for file in "$receiver" "$sender"; do

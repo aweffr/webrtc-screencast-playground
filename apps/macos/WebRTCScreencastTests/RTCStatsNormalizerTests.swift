@@ -91,7 +91,7 @@ final class RTCStatsNormalizerTests: XCTestCase {
                 "candidateType": .string("relay"), "relayProtocol": .string("udp"),
             ]),
             stat("remote", "remote-candidate", [
-                "candidateType": .string("host"), "protocol": .string("udp"),
+                "candidateType": .string("relay"), "protocol": .string("udp"),
             ]),
         ]
     }

@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
 import cn.aweffr.webrtcscreencast.tv.config.ReferenceRuntimeConfig.IceProfile;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.Test;
@@ -27,6 +28,7 @@ public final class RtcStatsNormalizerTest {
     assertEquals(Integer.valueOf(1_920), sample.inbound().frameWidth());
     assertEquals(Integer.valueOf(1_080), sample.inbound().frameHeight());
     assertEquals("c2.android.avc.decoder", sample.inbound().decoderImplementation());
+    assertEquals("video/H264", sample.inbound().codecMimeType());
     assertNull(sample.inbound().qpSum());
   }
 
@@ -45,6 +47,14 @@ public final class RtcStatsNormalizerTest {
     RtcStatsNormalizer.Sample tcp = new RtcStatsNormalizer(IceProfile.PRODUCTION_RELAY)
         .normalize(1_000_000L, relayFixture("tcp"));
     assertEquals(RtcStatsNormalizer.PathStatus.VIOLATION, tcp.selectedPath().status());
+
+    Map<String, RTCStats> oneSidedRelay = relayFixture("udp");
+    oneSidedRelay.put("remote", stat("remote-candidate", "remote", Map.of(
+        "candidateType", "srflx", "protocol", "udp")));
+    assertEquals(
+        RtcStatsNormalizer.PathStatus.VIOLATION,
+        new RtcStatsNormalizer(IceProfile.PRODUCTION_RELAY)
+            .normalize(1_000_000L, oneSidedRelay).selectedPath().status());
   }
 
   @Test
@@ -55,6 +65,19 @@ public final class RtcStatsNormalizerTest {
 
     assertFalse(diagnostic.contains("203.0.113.9"));
     assertFalse(diagnostic.contains("candidate:secret"));
+  }
+
+  @Test
+  public void missingCodecIdProducesNullCapabilityInsteadOfCrashing() {
+    Map<String, RTCStats> mutable = directFixture(1_000L);
+    Map<String, Object> inbound = new HashMap<>(mutable.get("inbound").getMembers());
+    inbound.remove("codecId");
+    mutable.put("inbound", stat("inbound-rtp", "inbound", Map.copyOf(inbound)));
+
+    RtcStatsNormalizer.Sample sample = new RtcStatsNormalizer(IceProfile.DIRECT_BASELINE)
+        .normalize(1_000_000L, Map.copyOf(mutable));
+
+    assertNull(sample.inbound().codecMimeType());
   }
 
   private static Map<String, RTCStats> directFixture(long bytesReceived) {
@@ -77,7 +100,7 @@ public final class RtcStatsNormalizerTest {
         "address", "203.0.113.9",
         "candidate", "candidate:secret")));
     stats.put("remote", stat("remote-candidate", "remote", Map.of(
-        "candidateType", "srflx", "protocol", protocol)));
+        "candidateType", "relay", "protocol", protocol)));
     return stats;
   }
 
@@ -85,6 +108,7 @@ public final class RtcStatsNormalizerTest {
     Map<String, RTCStats> stats = new LinkedHashMap<>();
     stats.put("inbound", stat("inbound-rtp", "inbound", Map.ofEntries(
         Map.entry("kind", "video"),
+        Map.entry("codecId", "codec"),
         Map.entry("bytesReceived", bytesReceived),
         Map.entry("framesReceived", 60L),
         Map.entry("framesDecoded", 58L),
@@ -95,6 +119,7 @@ public final class RtcStatsNormalizerTest {
         Map.entry("frameHeight", 1_080),
         Map.entry("framesPerSecond", 30.0),
         Map.entry("decoderImplementation", "c2.android.avc.decoder"))));
+    stats.put("codec", stat("codec", "codec", Map.of("mimeType", "video/H264")));
     stats.put("transport", stat("transport", "transport", Map.of(
         "selectedCandidatePairId", "pair")));
     stats.put("pair", stat("candidate-pair", "pair", Map.of(

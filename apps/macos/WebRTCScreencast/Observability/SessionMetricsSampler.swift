@@ -44,6 +44,7 @@ actor SessionMetricsSampler {
             if let captureSource {
                 fields["capture"] = .object(Self.fields(from: captureSource.telemetrySnapshot()))
             }
+            fields["sender_media_boundary"] = .object(Self.fields(from: session.senderMediaBoundarySnapshot()))
             fields["render"] = .object(Self.fields(from: session.metricsRenderer.snapshot()))
             try? await recorder.record(event: "rtc_stats", fields: fields)
             do {
@@ -100,6 +101,20 @@ actor SessionMetricsSampler {
             "dirty_rect_count": stats.lastDirtyRectCount.map(JSONValue.integer) ?? .null,
             "dirty_ratio": stats.lastDirtyRatio.map(JSONValue.number) ?? .null,
             "frame_gate_state": .string(stats.gateState.rawValue),
+        ]
+    }
+
+    private static func fields(from stats: SenderMediaBoundarySnapshot) -> [String: JSONValue] {
+        [
+            "source_frames_forwarded": .integer(Int(stats.sourceFramesForwarded)),
+            "source_pixel_format": stats.sourcePixelFormat.map { .integer(Int($0)) } ?? .null,
+            "cast_tuning_session_id": stats.castTuningSessionID.map(JSONValue.string) ?? .null,
+            "cast_tuning_config_hash": stats.castTuningConfigHash.map(JSONValue.string) ?? .null,
+            "encoder_session_id": stats.encoderSessionID.map(JSONValue.string) ?? .null,
+            "video_toolbox_encoder_id": stats.videoToolboxEncoderID.map(JSONValue.string) ?? .null,
+            "expected_h264_profile": stats.expectedH264Profile.map(JSONValue.string) ?? .null,
+            "actual_h264_profile": stats.actualH264Profile.map(JSONValue.string) ?? .null,
+            "profile_mismatch": stats.profileMismatch.map(JSONValue.bool) ?? .null,
         ]
     }
 

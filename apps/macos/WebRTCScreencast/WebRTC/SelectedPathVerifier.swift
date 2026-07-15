@@ -75,9 +75,9 @@ enum SelectedPathVerifier {
         let isValid: Bool
         switch profile {
         case .directBaseline:
-            isValid = localType != "relay" && remoteType != "relay"
+            isValid = localType != "relay" && remoteType != "relay" && transport == "udp"
         case .productionRelay:
-            isValid = localType == "relay" && transport == "udp"
+            isValid = localType == "relay" && remoteType == "relay" && transport == "udp"
         }
         return SelectedPathEvidence(
             status: isValid ? .verified : .violation,

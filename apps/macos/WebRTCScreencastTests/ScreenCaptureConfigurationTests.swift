@@ -14,7 +14,7 @@ final class ScreenCaptureConfigurationTests: XCTestCase {
 
         XCTAssertEqual(values.width, 1_920)
         XCTAssertEqual(values.height, 1_080)
-        XCTAssertEqual(values.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+        XCTAssertEqual(values.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
         XCTAssertEqual(values.minimumFrameInterval, CMTime(value: 1, timescale: 30))
         XCTAssertEqual(values.queueDepth, 3)
         XCTAssertTrue(values.showsCursor)

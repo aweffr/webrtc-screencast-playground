@@ -66,7 +66,7 @@ struct ScreenCaptureConfigurationValues: Equatable, Sendable {
         return ScreenCaptureConfigurationValues(
             width: Int(outputSize.width),
             height: Int(outputSize.height),
-            pixelFormat: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+            pixelFormat: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
             minimumFrameInterval: CMTime(value: 1, timescale: 30),
             queueDepth: 3,
             showsCursor: true,
@@ -116,7 +116,6 @@ enum ScreenSourceProvider {
             iceProfile: iceProfile,
             excludedReceiverPID: excludedReceiverPID
         )
-
         let excludedApplications: [SCRunningApplication]
         if let excludedReceiverPID {
             guard let application = content.applications.first(where: { $0.processID == excludedReceiverPID }) else {

@@ -202,6 +202,7 @@ public final class ReceiverStateMachine {
         default -> illegal(event);
       };
       case PLAYING -> switch (event.type) {
+        case ANSWER_READY -> transition(State.PLAYING, Command.SEND_ANSWER);
         case REMOTE_ICE -> transition(State.PLAYING, Command.ADD_ICE);
         default -> illegal(event);
       };

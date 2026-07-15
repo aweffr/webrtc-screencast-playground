@@ -210,6 +210,12 @@ frame PNG。
 新增 cross-platform runner，复用现有 Go server、Mac Sender、marker/chart、质量分析与
 secret scanner，Android TV Receiver 取代第二个 Mac Receiver。
 
+量化模式下 chart 由同一 `.app` executable 的内部 child-process mode 呈现，Sender 仍按
+普通 display filter 采集 virtual display。这样 marker 是另一个进程真实提交到扩展屏的
+内容，不依赖 WindowServer 是否把采集进程自己的 window 合成进 display stream。child
+把 sequence、commit monotonic timestamp 和 source-reference 文件名写入 session-private
+JSONL；Sender teardown 后导入这些事件。该内部模式不改变用户可见 GUI/CLI contract。
+
 功能矩阵是：
 
 ```text
@@ -221,7 +227,8 @@ production-relay × virtual
 
 每组必须证明 receiver-first pairing、H.264-only negotiation、1920×1080 render、
 requested selected path、双方 metrics、正常 teardown；virtual 两组还必须证明 display
-创建和移除。Main 只作功能闭环，不参与数值画质比较。
+创建和移除。production-relay 的两端 selected pair 都必须是 `relay/relay + UDP`；
+direct-baseline 必须是非 relay 的 UDP。Main 只作功能闭环，不参与数值画质比较。
 
 量化基线按 Direct 1、TURN 1、Direct 2、TURN 2、Direct 3、TURN 3 交替执行，每次新建
 Mac Sender、Android Receiver session、PeerConnection 和 virtual display。沿用 10 秒

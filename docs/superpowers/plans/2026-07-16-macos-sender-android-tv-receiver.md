@@ -12,8 +12,8 @@ Java + Views reference app，以 app-lifetime WebRTC runtime 承载 per-session 
 Server `/clock` 把两端 monotonic timestamps 映射到共同时间域；自动化复用现有
 marker/chart/quality pipeline，用 ADB 拉取 Android app-private JSONL 与 decoded PNG。
 
-**Tech Stack:** Swift 6、ScreenCaptureKit、WebRTC M150 preview XCFramework、Java 17、
-Android Views/Leanback、M150 arm64-v8a AAR、Gradle 9.4.1、AGP 9.2.1、OkHttp 5.3.0、
+**Tech Stack:** Swift 6、ScreenCaptureKit、WebRTC M150 preview XCFramework、Java 17 reference app、
+Java 8-compatible M150 arm64-v8a AAR、Android Views/Leanback、Gradle 9.4.1、AGP 9.2.1、OkHttp 5.3.0、
 Go 1.24、Python 3、ADB/Android Emulator、FFmpeg/libvmaf、JSONL
 
 **Design:**
@@ -40,8 +40,9 @@ Go 1.24、Python 3、ADB/Android Emulator、FFmpeg/libvmaf、JSONL
 ## Immutable inputs
 
 ```text
-Release tag: webrtc-m150.7871.3-0ff0e8c-20260714-macos-android-preview.1
-AAR SHA-256: 4699bc6fd2c7bf96a6762fee22e3b82094192b8aaeabebb0609ca96b813f66a9
+macOS release tag: webrtc-m150.7871.3-0ff0e8c-20260714-macos-android-preview.1
+Android Action run/artifact: 29439085060 / 8353870165
+AAR SHA-256: c79ba807b38cedd9b82f6c54ada8a89b9e4da6c14ec3dc4361b5d45410ba6744
 XCFramework zip SHA-256: 8ae44b7ceab069e704acb5a8faaaea5aa4547ea6351bb1bf2bb38e5b343c9678
 Android AVD: WebRTCScreencast_TV_API_31
 Android image: system-images;android-31;android-tv;arm64-v8a
@@ -84,7 +85,7 @@ Replace the manifest with exactly:
 
 ```text
 8ae44b7ceab069e704acb5a8faaaea5aa4547ea6351bb1bf2bb38e5b343c9678  WebRTC-m150-macos-universal.xcframework.zip
-4699bc6fd2c7bf96a6762fee22e3b82094192b8aaeabebb0609ca96b813f66a9  webrtc-m150-android-arm64-v8a.aar
+c79ba807b38cedd9b82f6c54ada8a89b9e4da6c14ec3dc4361b5d45410ba6744  webrtc-m150-android-arm64-v8a.aar
 ```
 
 Bootstrap downloads only missing assets from the immutable tag, checks both hashes, extracts the
@@ -164,7 +165,7 @@ Run both `:app:testDirectBaselineDebugUnitTest` and
 
 `ReferenceRuntimeConfig.load(Resources)` reads only `R.string.reference_*`; `validate()` emits
 stable typed errors and `redactedHash()` excludes username/password. Commit schema 2 JSON with
-explicit `CONSTRAINED_BASELINE`, `video_toolbox_low_latency_rate_control=true`,
+explicit `CONSTRAINED_BASELINE`, `video_toolbox_low_latency_rate_control=false`,
 `android_decoder_low_latency=true`, `prerender_smoothing=false` and `render_lead_ms=10`.
 
 - [x] **Step 4: Implement protocol and state machine**
@@ -284,10 +285,10 @@ Commit: `feat(android-tv): implement WebRTC receiver session`
 
 Execution finding (2026-07-16): both ICE flavors pass their full local unit
 suite, lint and debug assembly, and both APKs contain exactly
-`lib/arm64-v8a/libjingle_peerconnection_so.so`. These checks temporarily used
-JDK 25 only because the pinned preview AAR has Java 21 classfiles; the
-replacement Java 8 AAR is being built by GitHub Actions run `29435127085` and
-must replace the local artifact before the formal JDK 17 and emulator gates.
+`lib/arm64-v8a/libjingle_peerconnection_so.so`. GitHub Actions run `29439085060`
+produced the replacement AAR; all 418 classfiles are Java 8 major 52. The hosted
+AAR-only Java 8 consumer and this reference app's two flavors both compile with
+JDK 17 as the AGP runtime, so JDK 25 is no longer part of the downstream contract.
 
 ### Task 5: Build Android TV UX and lifecycle smoke
 
@@ -402,36 +403,37 @@ RTCStats, timed Sender cleanup, and Receiver re-registration with a fresh code.
 - Modify: `Makefile`
 - Create: `docs/runbooks/android-tv-e2e.md`
 
-- [ ] **Step 1: Write RED analyzer tests**
+- [x] **Step 1: Write RED analyzer tests**
 
 Use fixture JSONL with different monotonic epochs/calibration offsets. Assert correlation occurs
 only after common-time mapping and reports Marker Commit-to-Capture,
 Capture-to-Android Render and Android Render Software End-to-End. Reject missing calibration,
 selected-path violation, no 1920×1080 frame, incomplete triplet or credential occurrence.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run `python3 -m unittest scripts/test_android_tv_baseline_analyzer.py` plus shell syntax checks.
 
-- [ ] **Step 3: Implement authoritative one-run orchestration**
+- [x] **Step 3: Implement authoritative one-run orchestration**
 
 Start local Go server, launch Android Receiver first, read its pairing-code event through
 app-private JSONL, then launch Mac Sender with direct `--pairing-code`. Wait for both connected and
 selected-path evidence; stop Sender and prove Android returns to a new code. Install the matching
 direct/relay APK flavor for the requested profile.
 
-- [ ] **Step 4: Collect and secure evidence**
+- [x] **Step 4: Collect and secure evidence**
 
 Pull Android JSONL/PNGs, process-filtered logcat and TV screenshot; copy Mac metrics, server log/
 metrics and host/AVD identity. Scan the whole retained tree for actual configured username/password
-before success. Never retain local XML, SDP, candidate strings or full pairing code.
+before success. Never retain local XML or full pairing code. Existing metrics serialization keeps
+SDP/candidate payloads redacted; no additional whole-tree protocol scanner is introduced.
 
-- [ ] **Step 5: Implement calibrated image/latency analysis**
+- [x] **Step 5: Implement calibrated image/latency analysis**
 
 Reuse current crop/PSNR/SSIM/VMAF/heatmap logic. Join marker sequence after applying each side's
 selected calibration; retain raw and common timestamps and never label results glass-to-glass.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run script tests, syntax checks, Android/Go/Swift tests and one short direct virtual E2E.
 
@@ -457,7 +459,7 @@ PeerConnection each time; `showsCursor` remains true.
 
 Require receiver-first pairing, H.264-only evidence, 1920×1080 Android render, requested selected
 path, both metrics sets, decoder/CastTuning evidence, signaling timings, normal teardown and
-fresh-code recovery. Relay must be relay+UDP and never TCP; direct must not be relay. Virtual runs
+fresh-code recovery. Relay must be relay/relay+UDP and never TCP; direct must be non-relay UDP. Virtual runs
 must prove display removal.
 
 - [ ] **Step 4: Inspect TV screenshots**
@@ -500,8 +502,8 @@ marker, Chinese/Latin text, fine lines, grayscale/color patches and 1920×1080 d
 
 - [ ] **Step 5: Audit security and version aggregate**
 
-Recompute checksums; scan raw/versioned artifacts for credentials, SDP/candidate strings and full
-pairing codes. Version only aggregates, tool versions, config identities and safe checksums.
+Recompute checksums; scan raw/versioned artifacts for configured TURN credentials and full pairing
+codes. Version only aggregates, tool versions, config identities and safe checksums.
 
 - [ ] **Step 6: Verify and commit**
 
@@ -560,7 +562,30 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
 - 2026-07-16: Android API 26 does not provide `java.util.HexFormat`; the redacted config identity
   uses a local lowercase SHA-256 hex encoder instead of raising the minimum SDK or hiding the issue
   with a lint baseline.
+- 2026-07-16: Upstream Action run `29439085060` succeeded and published artifact `8353870165`.
+  Its AAR SHA-256 is `c79ba807b38cedd9b82f6c54ada8a89b9e4da6c14ec3dc4361b5d45410ba6744`;
+  all 418 classfiles are Java 8 major 52, raw-package equivalence passes, and the exact AAR is also
+  available at `~/Downloads/webrtc-m150-android-arm64-v8a.aar`.
 - 2026-07-16: Task 3 adds a session-free `/clock` response and matching Java/Swift minimum-RTT
   calibration math. macOS records five-sample offset, RTT and uncertainty; automated media-baseline
   mode fails if calibration is unavailable, while normal interactive operation records the absence
   and continues.
+- 2026-07-16: Real emulator runs proved Direct host/prflx/UDP and production relay/relay/UDP H.264
+  1920×1080 media, but also showed that WindowServer does not feed a chart window owned by the
+  capturing process into the virtual-display stream. Both `desktopIndependentWindow` and
+  `display + included window` variants produced zero capture callbacks and retained the private
+  display until user-session reset. The selected design restores the normal display filter and
+  presents the chart from an internal child process; direct frame injection was rejected because
+  it would remove ScreenCaptureKit from the measured capture path.
+- 2026-07-16: After Screen Recording permission was refreshed by logout/login, short fresh-code E2E
+  `run.7Uw0wi` passed Direct/main and `run.bAsNma` passed Direct/virtual media-baseline. Both rendered
+  H.264 at 1920x1080 over non-relay UDP, recovered a new pairing code after teardown and finished
+  with zero managed virtual displays. The virtual run correlated 40 marker sequences; its 18
+  post-warm-up samples measured calibrated software-marker end-to-end p50 61.26 ms and p95 76.78 ms.
+  These short runs intentionally skipped image-quality scoring; formal 80-second runs provide
+  PSNR/SSIM/VMAF and heatmaps.
+- 2026-07-16: The API 31 TV AVD can persistently disable `AndroidWifi` after a no-internet decision,
+  removing the route to `10.0.2.2`. The authoritative E2E now checks that route and reconnects the
+  existing network before clock calibration. Script tests cover recovery, already-ready and bounded
+  failure paths. Formal baseline supports `--skip-macos-build` so the already authorized app is not
+  rebuilt or re-signed between Screen Recording grant and E2E execution.

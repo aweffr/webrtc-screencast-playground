@@ -8,6 +8,7 @@ import cn.aweffr.webrtcscreencast.tv.config.ReferenceRuntimeConfig;
 import cn.aweffr.webrtcscreencast.tv.observability.ClockCalibration;
 import cn.aweffr.webrtcscreencast.tv.observability.ClockCalibrationHttpClient;
 import cn.aweffr.webrtcscreencast.tv.observability.AndroidMarkerProbe;
+import cn.aweffr.webrtcscreencast.tv.observability.ReceiverAutomationChannel;
 import cn.aweffr.webrtcscreencast.tv.observability.ReceiverMetricsRecorder;
 import cn.aweffr.webrtcscreencast.tv.observability.RtcStatsNormalizer;
 import cn.aweffr.webrtcscreencast.tv.signaling.SignalingClient;
@@ -72,6 +73,7 @@ public final class ReceiverController implements ReceiverSessionController {
   private final ScheduledExecutorService executor;
   private final ReceiverStateMachine stateMachine = new ReceiverStateMachine();
   private final ReceiverRuntime runtime;
+  private final ReceiverAutomationChannel automation;
   private final ReceiverMetricsRecorder metrics;
   private final RtcStatsNormalizer statsNormalizer;
   private final List<PendingIce> pendingRemoteIce = new ArrayList<>();
@@ -112,6 +114,8 @@ public final class ReceiverController implements ReceiverSessionController {
       return thread;
     });
     metrics = new ReceiverMetricsRecorder(appContext);
+    automation = new ReceiverAutomationChannel(
+        new java.io.File(appContext.getFilesDir(), "automation"));
     metrics.record("receiver_runtime_initializing", Map.of(
         "config_hash", config.redactedHash(),
         "ice_profile", config.iceProfile().wireValue()));
@@ -293,6 +297,12 @@ public final class ReceiverController implements ReceiverSessionController {
       metrics.record("receiver_registered", Map.of(
           "session_id", sessionId,
           "duration_ms", elapsedMs(signalingStartedNs)));
+      try {
+        automation.publishPairingCode(sessionId, pairingCode);
+      } catch (IOException error) {
+        throw new ProtocolHandlingException(
+            "receiver_automation_channel_failed", new IllegalStateException(error));
+      }
       long delayMs = Math.max(
           0L, Duration.between(Instant.now(), registration.expiresAt()).toMillis());
       int timerGeneration = generation;
@@ -334,6 +344,7 @@ public final class ReceiverController implements ReceiverSessionController {
     }
     cancel(expiryTimer);
     expiryTimer = null;
+    automation.clear();
     pairingCode = null;
     pairedNs = SystemClock.elapsedRealtimeNanos();
     metrics.record("session_paired", Map.of(
@@ -381,7 +392,7 @@ public final class ReceiverController implements ReceiverSessionController {
           new WebRtcReceiverSession.Listener() {
             @Override
             public void onLocalAnswer(String sdp) {
-              post(callbackGeneration, () -> onLocalAnswer(sdp));
+              post(callbackGeneration, () -> ReceiverController.this.onLocalAnswer(sdp));
             }
 
             @Override
@@ -401,7 +412,14 @@ public final class ReceiverController implements ReceiverSessionController {
 
             @Override
             public void onConnectionState(PeerConnection.PeerConnectionState state) {
-              post(callbackGeneration, () -> onPeerConnectionState(state));
+              post(callbackGeneration,
+                  () -> ReceiverController.this.onPeerConnectionState(state));
+            }
+
+            @Override
+            public void onNegotiationStage(String stage) {
+              post(callbackGeneration, () -> metrics.record(
+                  "receiver_negotiation_stage", Map.of("stage", stage)));
             }
 
             @Override
@@ -418,7 +436,8 @@ public final class ReceiverController implements ReceiverSessionController {
   }
 
   private void onLocalAnswer(String sdp) {
-    if (stateMachine.state() != ReceiverStateMachine.State.NEGOTIATING) {
+    if (stateMachine.state() != ReceiverStateMachine.State.NEGOTIATING
+        && stateMachine.state() != ReceiverStateMachine.State.PLAYING) {
       return;
     }
     remoteDescriptionReady = true;
@@ -517,6 +536,7 @@ public final class ReceiverController implements ReceiverSessionController {
       put(fields, "frame_width", inbound.frameWidth());
       put(fields, "frame_height", inbound.frameHeight());
       put(fields, "decoder", inbound.decoderImplementation());
+      put(fields, "codec", inbound.codecMimeType());
     }
     RtcStatsNormalizer.SelectedPath path = latestStats.selectedPath();
     fields.put("path_status", path.status().name().toLowerCase(Locale.ROOT));
@@ -606,6 +626,7 @@ public final class ReceiverController implements ReceiverSessionController {
     }
     pendingRemoteIce.clear();
     remoteDescriptionReady = false;
+    automation.clear();
     pairingCode = null;
     sessionId = null;
     latestStats = null;

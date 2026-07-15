@@ -19,6 +19,35 @@ protocol WebRTCSessionDelegate: AnyObject {
     func webRTCSession(_ session: WebRTCSession, didFail error: Error)
 }
 
+struct SenderMediaBoundarySnapshot: Equatable, Sendable {
+    let sourceFramesForwarded: UInt64
+    let sourcePixelFormat: UInt32?
+    let castTuningSessionID: String?
+    let castTuningConfigHash: String?
+    let encoderSessionID: String?
+    let videoToolboxEncoderID: String?
+    let expectedH264Profile: String?
+    let actualH264Profile: String?
+    let profileMismatch: Bool?
+}
+
+final class SenderMediaBoundaryTelemetry: @unchecked Sendable {
+    private let lock = NSLock()
+    private var sourceFramesForwarded: UInt64 = 0
+    private var sourcePixelFormat: UInt32?
+
+    func recordSourceFrameForwarded(pixelFormat: UInt32) {
+        lock.withLock {
+            sourceFramesForwarded += 1
+            sourcePixelFormat = pixelFormat
+        }
+    }
+
+    func sourceSnapshot() -> (frames: UInt64, pixelFormat: UInt32?) {
+        lock.withLock { (sourceFramesForwarded, sourcePixelFormat) }
+    }
+}
+
 final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFrameSink, @unchecked Sendable {
     let role: CastingRole
     let iceEvidence: IceConfigurationEvidence
@@ -27,6 +56,7 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
     private weak var sessionDelegate: WebRTCSessionDelegate?
     private let factory: RTCPeerConnectionFactory
     private let peerConnection: RTCPeerConnection
+    private let senderBoundaryTelemetry = SenderMediaBoundaryTelemetry()
     private var tuningController: RTCCastTuningController?
     private let videoSource: RTCVideoSource?
     private let videoCapturer: RTCVideoCapturer?
@@ -150,6 +180,22 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         }
     }
 
+    func senderMediaBoundarySnapshot() -> SenderMediaBoundarySnapshot {
+        let tuning = tuningController?.snapshot()
+        let source = senderBoundaryTelemetry.sourceSnapshot()
+        return SenderMediaBoundarySnapshot(
+            sourceFramesForwarded: source.frames,
+            sourcePixelFormat: source.pixelFormat,
+            castTuningSessionID: tuning?.sessionId,
+            castTuningConfigHash: tuning?.effectiveConfigHash,
+            encoderSessionID: tuning?.encoderSessionId,
+            videoToolboxEncoderID: tuning?.videoToolboxEncoderId,
+            expectedH264Profile: tuning?.expectedH264Profile,
+            actualH264Profile: tuning?.actualH264Profile,
+            profileMismatch: tuning?.profileMismatch
+        )
+    }
+
     func startDiagnostics(in directory: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
@@ -161,6 +207,9 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         let buffer = RTCCVPixelBuffer(pixelBuffer: frame.pixelBuffer)
         let videoFrame = RTCVideoFrame(buffer: buffer, rotation: ._0, timeStampNs: frame.timestampNs)
         delegate.capturer(videoCapturer, didCapture: videoFrame)
+        senderBoundaryTelemetry.recordSourceFrameForwarded(
+            pixelFormat: CVPixelBufferGetPixelFormatType(frame.pixelBuffer)
+        )
         baselineProbe?.observe(
             pixelBuffer: frame.pixelBuffer,
             frameTimestampNs: frame.timestampNs,

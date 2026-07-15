@@ -41,6 +41,16 @@ public final class ReceiverStateMachineTest {
   }
 
   @Test
+  public void remoteTrackMayArriveBeforeTheLocalAnswerCallback() {
+    ReceiverStateMachine machine = machineIn(ReceiverStateMachine.State.NEGOTIATING);
+
+    assertTransition(machine.reduce(ReceiverStateMachine.Event.remoteTrack()),
+        ReceiverStateMachine.State.PLAYING);
+    assertTransition(machine.reduce(ReceiverStateMachine.Event.answerReady()),
+        ReceiverStateMachine.State.PLAYING, SEND_ANSWER);
+  }
+
+  @Test
   public void expiryAndHangupCleanUpOneTimeSessionBeforeFreshRegistration() {
     ReceiverStateMachine waiting = machineIn(ReceiverStateMachine.State.WAITING_CODE);
     ReceiverStateMachine.Transition expired = waiting.reduce(ReceiverStateMachine.Event.expired());
@@ -120,6 +130,9 @@ public final class ReceiverStateMachineTest {
     }
     machine.reduce(ReceiverStateMachine.Event.paired());
     machine.reduce(ReceiverStateMachine.Event.offerReceived());
+    if (target == ReceiverStateMachine.State.NEGOTIATING) {
+      return machine;
+    }
     machine.reduce(ReceiverStateMachine.Event.remoteTrack());
     if (target == ReceiverStateMachine.State.PLAYING) {
       return machine;
