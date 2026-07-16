@@ -44,6 +44,16 @@ class StaticQpReportTests(unittest.TestCase):
                     "pooled_metrics": {"vmaf": {"mean": score}}
                 }))
                 (case / "android-received-final.png").write_bytes(b"png")
+                metrics = case / "e2e" / "run.test" / "macos" / "session-sender"
+                metrics.mkdir(parents=True)
+                (metrics / "metrics.jsonl").write_text("\n".join(json.dumps(row) for row in [
+                    {"event": "signaling_connect_started", "monotonic_ns": 1_000_000},
+                    {"event": "signaling_connected", "monotonic_ns": 5_000_000},
+                    {"event": "sender_join_started", "monotonic_ns": 6_000_000},
+                    {"event": "peer_paired", "monotonic_ns": 9_000_000},
+                    {"event": "local_offer", "monotonic_ns": 10_000_000},
+                    {"event": "peer_connection_connected", "monotonic_ns": 191_000_000},
+                ]) + "\n")
 
             output = pathlib.Path(temporary) / "report.md"
             module.render_report(experiment, output)
@@ -51,6 +61,7 @@ class StaticQpReportTests(unittest.TestCase):
             self.assertIn("| 24 | 24 | 23 |", report)
             self.assertIn("| 18 | 18 | 17 |", report)
             self.assertIn("VMAF（参考）", report)
+            self.assertIn("| 24 | 4.000 | 3.000 | 181.000 |", report)
             self.assertEqual(report.count("android-received-final.png"), 4)
 
 

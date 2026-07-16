@@ -13,6 +13,28 @@ def read_json(path):
         return json.load(stream)
 
 
+def read_signaling_durations(case_root):
+    metrics_files = list(case_root.glob("e2e/run.*/macos/*-sender/metrics.jsonl"))
+    if len(metrics_files) != 1:
+        raise RuntimeError(f"expected one sender metrics file under {case_root}")
+    first_timestamp = {}
+    with metrics_files[0].open(encoding="utf-8") as stream:
+        for line in stream:
+            record = json.loads(line)
+            first_timestamp.setdefault(record.get("event"), record.get("monotonic_ns"))
+
+    def elapsed_ms(start, end):
+        if not isinstance(first_timestamp.get(start), int) or not isinstance(first_timestamp.get(end), int):
+            raise RuntimeError(f"missing {start}/{end} timing evidence for {case_root.name}")
+        return (first_timestamp[end] - first_timestamp[start]) / 1_000_000
+
+    return {
+        "websocket_connect_ms": elapsed_ms("signaling_connect_started", "signaling_connected"),
+        "pairing_ms": elapsed_ms("sender_join_started", "peer_paired"),
+        "negotiation_ms": elapsed_ms("local_offer", "peer_connection_connected"),
+    }
+
+
 def load_case(experiment_root, requested_qp):
     case_root = experiment_root / f"qp-{requested_qp}"
     evidence = read_json(case_root / "qp-evidence.json")
@@ -32,7 +54,12 @@ def load_case(experiment_root, requested_qp):
     score = vmaf.get("pooled_metrics", {}).get("vmaf", {}).get("mean")
     if not isinstance(score, (int, float)):
         raise RuntimeError(f"missing VMAF score for case {requested_qp}")
-    return {"evidence": evidence, "vmaf": float(score), "image": image}
+    return {
+        "evidence": evidence,
+        "vmaf": float(score),
+        "image": image,
+        "signaling": read_signaling_durations(case_root),
+    }
 
 
 def render_report(experiment_root, output):
@@ -80,6 +107,23 @@ def render_report(experiment_root, output):
         "VMAF 仅作为相对参考：reference 是接收截图前后同一静态桌面的本机主屏幕截图，"
         "按 ScreenCaptureKit 相同的 aspect-fit/letterbox 几何缩放到 1920×1080；它不是逐帧时间戳对齐的严格视频 VMAF，"
         "也不作为通过门槛。流中始终保留 cursor。",
+        "",
+        "## Signaling 建链耗时",
+        "",
+        "| 请求 Max QP | WebSocket connect (ms) | sender join → paired (ms) | offer → PeerConnection connected (ms) |",
+        "|---:|---:|---:|---:|",
+    ])
+    for qp in REQUESTED_QPS:
+        signaling = cases[qp]["signaling"]
+        lines.append(
+            f"| {qp} | {signaling['websocket_connect_ms']:.3f} | "
+            f"{signaling['pairing_ms']:.3f} | {signaling['negotiation_ms']:.3f} |"
+        )
+
+    lines.extend([
+        "",
+        "这些耗时来自 sender 的 monotonic event timestamps；只用于记录本轮 signaling/negotiation 建链，"
+        "不代表 glass-to-glass latency。",
         "",
         "## Android 实收画面",
         "",
