@@ -219,9 +219,9 @@ Cleanup 是幂等操作，按顺序停止 metrics timer、capture、track render
 
 ## Deployment
 
-Go server 提供单 binary 和 container image。K3s manifest 部署到 `apps` namespace，普通 ClusterIP + Traefik Ingress，默认 hostname `cast.k3s.aweffr.cn`，可复用 wildcard TLS 形成 WSS；同一 binary 在本机可以 plain `ws://127.0.0.1:<port>/ws` 运行。Server 不使用 coturn 的 hostNetwork、listener 或 relay ports。
+Go server 提供单 binary 和 container image。示例 K3s manifest 部署到 `apps` namespace，普通 ClusterIP + Traefik Ingress，并使用 `cast.example.com` 与示例 TLS secret；同一 binary 在本机可以 plain `ws://127.0.0.1:<port>/ws` 运行。Server 不使用 coturn 的 hostNetwork、listener 或 relay ports。
 
-部署变更不自动执行到现有 K3s；先生成并通过 `go test`、container build、manifest schema/render 校验。真实 apply 是独立的外部状态变更，执行前遵循 k3s-playground 的目标、影响和 rollback 纪律。
+部署变更不自动执行到任何 K3s；先生成并通过 `go test`、container build、manifest schema/render 校验。真实 apply 是独立的外部状态变更，执行前应在目标部署环境中完成影响和 rollback 审核。
 
 ## 明确不在一期
 

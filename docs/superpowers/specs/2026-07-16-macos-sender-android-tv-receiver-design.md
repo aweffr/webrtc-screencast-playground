@@ -171,7 +171,7 @@ register。因此 expiry、hangup 与 disconnect 都关闭旧 socket/PeerConnect
 ## macOS Sender 变更
 
 macOS 同时切换到 preview XCFramework 与 schema 2 tuning config；保持显式 Constrained
-Baseline，同时启用 Apple low-latency rate control。`LaunchOptions` 新增
+Baseline，并把 Apple low-latency rate control 明确保留为默认关闭的 follow-up。`LaunchOptions` 新增
 `--pairing-code <code>`，与 `--pairing-code-file` 互斥。参数完整时同一 App 自动开始
 Sender 会话，仍保留 Dock、状态/metrics window、Screen Recording permission identity
 和统一 cleanup；不新增 headless target 或 daemon。

@@ -33,7 +33,7 @@
     \"allow_frame_reordering\": false,
     \"h264_profile\": \"CONSTRAINED_BASELINE\",
     \"h264_level\": \"4.1\",
-    \"video_toolbox_low_latency_rate_control\": true
+    \"video_toolbox_low_latency_rate_control\": false
   },
   \"receiver\": {
     \"jitter_minimum_ms\": 0,

@@ -32,7 +32,9 @@ All duration values use Go duration syntax. Invalid or non-positive values stop 
 
 ## K3s deployment
 
-[`deploy/k3s/signaling.yaml`](../../deploy/k3s/signaling.yaml) targets the existing `apps` namespace and wildcard TLS Secret. Update the immutable image tag after publishing, validate the manifest, then apply through the `k3s-playground` operational workflow.
+[`deploy/k3s/signaling.yaml`](../../deploy/k3s/signaling.yaml) is an example targeting an `apps`
+namespace with placeholder registry, hostname, and TLS Secret values. Replace them, pin the image
+immutably, validate the manifest, and apply it through your deployment workflow.
 
 The deployment intentionally uses one replica and `Recreate`. Pairing/session state is in memory, so multiple replicas would split Receiver and Sender across independent registries unless a shared registry or routing affinity were added. A restart ends existing sessions and clients pair again.
 
@@ -41,7 +43,7 @@ Publish an immutable multi-architecture image because the development Mac is arm
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/aweffr/webrtc-screencast-signaling:<immutable-version> \
+  --tag ghcr.io/your-org/webrtc-screencast-signaling:<immutable-version> \
   --push \
   server
 ```

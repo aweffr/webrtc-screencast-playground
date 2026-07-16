@@ -25,7 +25,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: signaling
-          image: ghcr.io/aweffr/webrtc-screencast-signaling:0.1.0
+          # Replace this image with the registry used by your deployment.
+          image: ghcr.io/your-org/webrtc-screencast-signaling:0.1.0
           imagePullPolicy: IfNotPresent
           env:
             - name: LISTEN_ADDR
@@ -104,10 +105,10 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - cast.k3s.aweffr.cn
-      secretName: k3s-aweffr-cn-tls
+        - cast.example.com
+      secretName: cast-example-com-tls
   rules:
-    - host: cast.k3s.aweffr.cn
+    - host: cast.example.com
       http:
         paths:
           - path: /

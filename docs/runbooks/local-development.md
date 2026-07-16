@@ -77,8 +77,8 @@ invalid or missing values fail with a launch error rather than opening a partial
 Sender.
 
 The bundled CastTuning config uses schema 2, requests H.264 Constrained Baseline, and explicitly
-enables Apple VideoToolbox low-latency rate control. The current compatibility policy permits the
-encoder to produce High profile under that Apple setting only when the WebRTC runtime emits the
+keeps Apple VideoToolbox low-latency rate control disabled for the documented follow-up. If an
+experiment enables it, the compatibility policy permits High-profile output only with the
 corresponding structured profile-mismatch warning.
 
 ## Screen capture permission

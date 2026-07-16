@@ -13,7 +13,7 @@ TURN/UDP；Direct UDP 只作为对比基线。
 - Mac 已唤醒、解锁，且没有遗留的 managed virtual display。
 
 ```bash
-cd /Users/aweffr/developer/aweffr/webrtc-screencast-playground
+cd /path/to/webrtc-screencast-playground
 ./scripts/check-virtual-display-state.py --expect 0
 ```
 

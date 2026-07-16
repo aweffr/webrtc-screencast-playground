@@ -20,7 +20,7 @@ Go 1.24、Python 3、ADB/Android Emulator、FFmpeg/libvmaf、JSONL
 [`docs/superpowers/specs/2026-07-16-macos-sender-android-tv-receiver-design.md`](../specs/2026-07-16-macos-sender-android-tv-receiver-design.md)
 
 **Upstream evidence:**
-[`my-webrtc-builds Android AAR and Apple low-latency plan`](/Users/aweffr/developer/aweffr/my-webrtc-builds/docs/superpowers/plans/2026-07-14-android-aar-apple-low-latency.md)
+[`my-webrtc-builds Android AAR and Apple low-latency plan`](https://github.com/aweffr/my-webrtc-builds/blob/main/docs/superpowers/plans/2026-07-14-android-aar-apple-low-latency.md)
 
 ---
 
@@ -375,8 +375,8 @@ identity and coordinator cleanup path.
 
 - [x] **Step 4: Migrate to schema 2**
 
-Keep current bitrate, screen-content, NACK/RTX and 30fps values; explicitly use Baseline plus Apple
-low-latency rate control and Android receiver fields. Verify the linked framework metadata/hash is
+Keep current bitrate, screen-content, NACK/RTX and 30fps values; explicitly use Baseline, keep Apple
+low-latency rate control disabled for the follow-up, and add Android receiver fields. Verify the linked framework metadata/hash is
 the preview input, not the old `eeca1bc` asset.
 
 - [x] **Step 5: Verify and commit**
