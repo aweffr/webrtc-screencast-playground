@@ -7,9 +7,10 @@ XCFRAMEWORK=""
 OUTPUT_ROOT="$ROOT/artifacts/static-max-qp"
 RUN_SECONDS=30
 DEPENDENCY_ARTIFACTS_DIR="${ARTIFACTS_DIR:-$ROOT/artifacts}"
+SKIP_MACOS_BUILD=0
 
 usage() {
-  print -u2 "usage: $0 --runtime-config path --xcframework path [--output-root path] [--run-seconds n]"
+  print -u2 "usage: $0 --runtime-config path --xcframework path [--output-root path] [--run-seconds n] [--skip-macos-build]"
   exit 2
 }
 
@@ -19,6 +20,7 @@ while (( $# )); do
     --xcframework) [[ $# -ge 2 ]] || usage; XCFRAMEWORK="$2"; shift 2 ;;
     --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
     --run-seconds) [[ $# -ge 2 ]] || usage; RUN_SECONDS="$2"; shift 2 ;;
+    --skip-macos-build) SKIP_MACOS_BUILD=1; shift ;;
     *) usage ;;
   esac
 done
@@ -41,7 +43,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 xcframework_sha256="$(shasum -a 256 "$XCFRAMEWORK" | awk '{print $1}')"
-skip_build=0
+skip_build=$SKIP_MACOS_BUILD
 for max_qp in 24 22 20 18; do
   case_root="$experiment_root/qp-$max_qp"
   e2e_root="$case_root/e2e"
