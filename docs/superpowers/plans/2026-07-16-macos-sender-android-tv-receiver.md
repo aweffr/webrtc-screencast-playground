@@ -536,7 +536,7 @@ Prove preview inputs, TV-only APK, reference config, receiver lifecycle, Mac CLI
 1080p render, both paths, four functional runs, six calibrated runs, signaling timing, Android
 metrics, image/quality evidence, secret scan, cleanup, full verification and clean worktree.
 
-- [ ] **Step 5: Final repository report**
+- [x] **Step 5: Final repository report**
 
 Report implementation, files, design choices, test/E2E evidence, review/fixes, commits, branch/
 worktree state and physical-TV/public-signaling/optical-latency follow-ups.
@@ -621,3 +621,7 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
   use placeholder infrastructure. Tracked files contain no machine-specific user path, historical
   temporary artifact path, populated runtime XML or configured TURN credential. The Android sample
   and root tuning config both explicitly keep Apple low-latency rate control disabled as a follow-up.
+- 2026-07-16: The public repository is available at
+  `https://github.com/aweffr/webrtc-screencast-playground` with default branch `main`. Its published
+  history starts from the final sanitized tree, so removed machine paths and deployment-specific
+  hostnames from the internal development history are not reachable from the public remote.
