@@ -1,55 +1,55 @@
 {
   "version": "3.0.0",
-  "fps": 37.75,
+  "fps": 39.46,
   "frames": [
     {
       "frameNum": 0,
       "metrics": {
-        "integer_adm2": 0.896497,
-        "integer_adm_scale0": 0.791385,
-        "integer_adm_scale1": 0.816995,
-        "integer_adm_scale2": 0.932899,
-        "integer_adm_scale3": 0.959161,
+        "integer_adm2": 0.907886,
+        "integer_adm_scale0": 0.905929,
+        "integer_adm_scale1": 0.854070,
+        "integer_adm_scale2": 0.898257,
+        "integer_adm_scale3": 0.939995,
         "integer_motion2": 0.000000,
         "integer_motion": 0.000000,
-        "integer_vif_scale0": 0.555176,
-        "integer_vif_scale1": 0.841562,
-        "integer_vif_scale2": 0.892126,
-        "integer_vif_scale3": 0.927533,
-        "vmaf": 65.403656
+        "integer_vif_scale0": 0.337003,
+        "integer_vif_scale1": 0.574163,
+        "integer_vif_scale2": 0.664983,
+        "integer_vif_scale3": 0.733475,
+        "vmaf": 50.939093
       }
     }
   ],
   "pooled_metrics": {
     "integer_adm2": {
-      "min": 0.896497,
-      "max": 0.896497,
-      "mean": 0.896497,
-      "harmonic_mean": 0.896497
+      "min": 0.907886,
+      "max": 0.907886,
+      "mean": 0.907886,
+      "harmonic_mean": 0.907886
     },
     "integer_adm_scale0": {
-      "min": 0.791385,
-      "max": 0.791385,
-      "mean": 0.791385,
-      "harmonic_mean": 0.791385
+      "min": 0.905929,
+      "max": 0.905929,
+      "mean": 0.905929,
+      "harmonic_mean": 0.905929
     },
     "integer_adm_scale1": {
-      "min": 0.816995,
-      "max": 0.816995,
-      "mean": 0.816995,
-      "harmonic_mean": 0.816995
+      "min": 0.854070,
+      "max": 0.854070,
+      "mean": 0.854070,
+      "harmonic_mean": 0.854070
     },
     "integer_adm_scale2": {
-      "min": 0.932899,
-      "max": 0.932899,
-      "mean": 0.932899,
-      "harmonic_mean": 0.932899
+      "min": 0.898257,
+      "max": 0.898257,
+      "mean": 0.898257,
+      "harmonic_mean": 0.898257
     },
     "integer_adm_scale3": {
-      "min": 0.959161,
-      "max": 0.959161,
-      "mean": 0.959161,
-      "harmonic_mean": 0.959161
+      "min": 0.939995,
+      "max": 0.939995,
+      "mean": 0.939995,
+      "harmonic_mean": 0.939995
     },
     "integer_motion2": {
       "min": 0.000000,
@@ -64,34 +64,34 @@
       "harmonic_mean": 0.000000
     },
     "integer_vif_scale0": {
-      "min": 0.555176,
-      "max": 0.555176,
-      "mean": 0.555176,
-      "harmonic_mean": 0.555176
+      "min": 0.337003,
+      "max": 0.337003,
+      "mean": 0.337003,
+      "harmonic_mean": 0.337003
     },
     "integer_vif_scale1": {
-      "min": 0.841562,
-      "max": 0.841562,
-      "mean": 0.841562,
-      "harmonic_mean": 0.841562
+      "min": 0.574163,
+      "max": 0.574163,
+      "mean": 0.574163,
+      "harmonic_mean": 0.574163
     },
     "integer_vif_scale2": {
-      "min": 0.892126,
-      "max": 0.892126,
-      "mean": 0.892126,
-      "harmonic_mean": 0.892126
+      "min": 0.664983,
+      "max": 0.664983,
+      "mean": 0.664983,
+      "harmonic_mean": 0.664983
     },
     "integer_vif_scale3": {
-      "min": 0.927533,
-      "max": 0.927533,
-      "mean": 0.927533,
-      "harmonic_mean": 0.927533
+      "min": 0.733475,
+      "max": 0.733475,
+      "mean": 0.733475,
+      "harmonic_mean": 0.733475
     },
     "vmaf": {
-      "min": 65.403656,
-      "max": 65.403656,
-      "mean": 65.403656,
-      "harmonic_mean": 65.403656
+      "min": 50.939093,
+      "max": 50.939093,
+      "mean": 50.939093,
+      "harmonic_mean": 50.939093
     }
   },
   "aggregate_metrics": {
