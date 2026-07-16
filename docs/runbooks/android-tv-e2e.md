@@ -91,6 +91,9 @@ permission identity：
   --skip-macos-build
 ```
 
+连续实验的每个 case 都拥有独立 emulator 生命周期。runner 在 `adb emu kill` 后等待设备
+真正从 adb server 消失，再启动下一组，避免把 shutdown 中的设备误判为可复用实例。
+
 报告分别列出：
 
 - Marker Commit → Capture；

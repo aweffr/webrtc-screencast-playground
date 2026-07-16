@@ -119,6 +119,10 @@ cleanup() {
   fi
   if (( started_emulator )); then
     adb emu kill >/dev/null 2>&1 || true
+    for _ in {1..300}; do
+      adb get-state >/dev/null 2>&1 || break
+      sleep 0.1
+    done
   fi
   exit "$exit_code"
 }
