@@ -29,7 +29,6 @@ struct SenderMediaBoundarySnapshot: Equatable, Sendable {
     let expectedH264Profile: String?
     let actualH264Profile: String?
     let profileMismatch: Bool?
-    let encoderSessionId: String?
     let requestedMaxQp: Int?
     let effectiveMaxQp: Int?
     let maxQpApplyState: String?
@@ -240,7 +239,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             expectedH264Profile: tuning?.expectedH264Profile,
             actualH264Profile: tuning?.actualH264Profile,
             profileMismatch: tuning?.profileMismatch,
-            encoderSessionId: tuning?.encoderSessionId,
             requestedMaxQp: tuning?.requestedMaxQp?.intValue,
             effectiveMaxQp: tuning?.effectiveMaxQp?.intValue,
             maxQpApplyState: tuning?.maxQpApplyState,

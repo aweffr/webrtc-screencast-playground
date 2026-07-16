@@ -57,6 +57,38 @@ final class WebRTCSessionConstructionTests: XCTestCase {
         XCTAssertFalse(names.contains { $0.hasPrefix("webrtc_log") })
     }
 
+    func testSenderBoundaryMetricsUseTheExistingEncoderSessionField() {
+        let snapshot = SenderMediaBoundarySnapshot(
+            sourceFramesForwarded: 1,
+            sourcePixelFormat: nil,
+            castTuningSessionID: "cast-1",
+            castTuningConfigHash: "hash-1",
+            encoderSessionID: "vt-1",
+            videoToolboxEncoderID: "encoder-1",
+            expectedH264Profile: "BASELINE",
+            actualH264Profile: "BASELINE",
+            profileMismatch: false,
+            requestedMaxQp: 24,
+            effectiveMaxQp: 24,
+            maxQpApplyState: "applied",
+            maxQpGeneration: 2,
+            maxQpOSStatus: 0,
+            lastEncodedQp: 24,
+            lastKeyFrameQp: 24,
+            lastKeyFrameBytes: 12_345,
+            clarityMode: .staticClarity,
+            claritySuccessfulRefreshes: 1,
+            clarityFailedRefreshes: 0,
+            clarityMotionRestores: 0
+        )
+
+        let fields = SessionMetricsSampler.fields(from: snapshot)
+
+        XCTAssertEqual(fields["encoder_session_id"], .string("vt-1"))
+        XCTAssertEqual(fields["requested_max_qp"], .integer(24))
+        XCTAssertEqual(fields["last_key_frame_qp"], .integer(24))
+    }
+
     private func repositoryRoot() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
