@@ -41,13 +41,19 @@ def is_bound_evidence(evidence, requested_qp):
 
 
 def latest_bound_evidence(records, requested_qp):
-    for record in reversed(records):
+    for index in range(len(records) - 1, -1, -1):
+        record = records[index]
         if record.get("event") != "rtc_stats":
             continue
         evidence = record.get("fields", {}).get("sender_media_boundary")
         if isinstance(evidence, dict) and is_bound_evidence(evidence, requested_qp):
-            return dict(evidence)
-    raise ValueError(f"no bound max-QP evidence for {requested_qp}")
+            result = dict(evidence)
+            result["metrics_record_index"] = index
+            return result
+        raise ValueError(
+            f"latest rtc_stats does not contain bound max-QP evidence for {requested_qp}"
+        )
+    raise ValueError("no rtc_stats records")
 
 
 def same_capture_window(before, after):
@@ -57,6 +63,12 @@ def same_capture_window(before, after):
     if not is_bound_evidence(before, requested_qp):
         return False
     if not is_bound_evidence(after, requested_qp):
+        return False
+    before_index = before.get("metrics_record_index")
+    after_index = after.get("metrics_record_index")
+    if not isinstance(before_index, int) or not isinstance(after_index, int):
+        return False
+    if after_index <= before_index:
         return False
     return all(before.get(field) == after.get(field) for field in CAPTURE_IDENTITY_FIELDS)
 

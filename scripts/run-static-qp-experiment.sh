@@ -101,7 +101,9 @@ for max_qp in 24 22 20 18; do
   }
   cp "$run_root/static-qp-evidence.json" "$case_root/qp-evidence.json"
   jq -e --argjson max_qp "$max_qp" '
-    .evidence_binding == "generation-session-stable-across-screenshot" and
+    .evidence_binding == "generation-session-stable-across-fresh-post-screenshot-sample" and
+    (.metrics_record_index | numbers) >= 0 and
+    (.post_screenshot_metrics_record_index | numbers) > .metrics_record_index and
     .requested_max_qp == $max_qp and
     .effective_max_qp == $max_qp and
     .max_qp_apply_state == "applied" and

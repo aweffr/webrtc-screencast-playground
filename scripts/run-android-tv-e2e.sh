@@ -364,16 +364,29 @@ if (( STATIC_QP_EVIDENCE )); then
 
     screencapture -x "$RUN_ROOT/macos-main-source.png"
     adb exec-out screencap -p >"$ANDROID_EVIDENCE/receiver-playing.png"
-    "$ROOT/scripts/static_qp_evidence.py" latest \
-      --metrics "$sender_directory/metrics.jsonl" \
-      --requested "$static_max_qp" \
-      --output "$after_evidence" >/dev/null 2>&1 || continue
-    if "$ROOT/scripts/static_qp_evidence.py" same-window \
-        --before "$before_evidence" --after "$after_evidence"; then
-      jq --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+    after_evidence_ready=0
+    for _ in {1..30}; do
+      if "$ROOT/scripts/static_qp_evidence.py" latest \
+          --metrics "$sender_directory/metrics.jsonl" \
+          --requested "$static_max_qp" \
+          --output "$after_evidence" >/dev/null 2>&1 \
+          && "$ROOT/scripts/static_qp_evidence.py" same-window \
+            --before "$before_evidence" --after "$after_evidence"; then
+        after_evidence_ready=1
+        break
+      fi
+      kill -0 "$sender_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if (( after_evidence_ready )); then
+      post_screenshot_index="$(jq -er '.metrics_record_index | numbers' "$after_evidence")"
+      jq \
+        --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --argjson post_screenshot_index "$post_screenshot_index" '
         . + {
-          evidence_binding: "generation-session-stable-across-screenshot",
-          android_screenshot_captured_at: $captured_at
+          evidence_binding: "generation-session-stable-across-fresh-post-screenshot-sample",
+          android_screenshot_captured_at: $captured_at,
+          post_screenshot_metrics_record_index: $post_screenshot_index
         }
       ' "$before_evidence" >"$captured_evidence"
       chmod 600 "$captured_evidence"

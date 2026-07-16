@@ -5,6 +5,9 @@ import pathlib
 
 
 REQUESTED_QPS = (24, 22, 20, 18)
+SCREENSHOT_BINDING = (
+    "generation-session-stable-across-fresh-post-screenshot-sample"
+)
 
 
 def read_json(path):
@@ -57,8 +60,18 @@ def load_case(experiment_root, requested_qp):
         or not evidence.get("last_qp_sample_encoder_session_id")
     ):
         raise RuntimeError(f"QP sample binding mismatch for case {requested_qp}")
-    if evidence.get("evidence_binding") != "generation-session-stable-across-screenshot":
+    if evidence.get("evidence_binding") != SCREENSHOT_BINDING:
         raise RuntimeError(f"screenshot-bound QP evidence is missing for case {requested_qp}")
+    before_index = evidence.get("metrics_record_index")
+    after_index = evidence.get("post_screenshot_metrics_record_index")
+    if (
+        not isinstance(before_index, int)
+        or not isinstance(after_index, int)
+        or after_index <= before_index
+    ):
+        raise RuntimeError(
+            f"fresh post-screenshot metrics evidence is missing for case {requested_qp}"
+        )
     score = vmaf.get("pooled_metrics", {}).get("vmaf", {}).get("mean")
     if not isinstance(score, (int, float)):
         raise RuntimeError(f"missing VMAF score for case {requested_qp}")

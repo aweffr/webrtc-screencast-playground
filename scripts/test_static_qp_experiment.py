@@ -33,7 +33,9 @@ class StaticQpReportTests(unittest.TestCase):
                 case = experiment / f"qp-{requested}"
                 case.mkdir()
                 (case / "qp-evidence.json").write_text(json.dumps({
-                    "evidence_binding": "generation-session-stable-across-screenshot",
+                    "evidence_binding": "generation-session-stable-across-fresh-post-screenshot-sample",
+                    "metrics_record_index": 42,
+                    "post_screenshot_metrics_record_index": 43,
                     "requested_max_qp": requested,
                     "effective_max_qp": requested,
                     "max_qp_apply_state": "applied",
@@ -101,6 +103,32 @@ class StaticQpReportTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "QP sample binding"):
                 module.load_case(experiment, 24)
 
+    def test_case_rejects_evidence_without_a_fresh_post_screenshot_sample(self):
+        spec = importlib.util.spec_from_file_location("static_qp_report", MODULE_PATH)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = pathlib.Path(temporary)
+            case = experiment / "qp-24"
+            case.mkdir()
+            (case / "android-received-final.png").write_bytes(b"png")
+            (case / "vmaf.json").write_text(json.dumps({
+                "pooled_metrics": {"vmaf": {"mean": 80.0}}
+            }))
+            evidence = {
+                **StaticQpCaptureEvidenceTests.boundary(2, "vt-two", actual_qp=23),
+                "requested_max_qp": 24,
+                "effective_max_qp": 24,
+                "evidence_binding": "generation-session-stable-across-fresh-post-screenshot-sample",
+                "metrics_record_index": 42,
+                "post_screenshot_metrics_record_index": 42,
+            }
+            (case / "qp-evidence.json").write_text(json.dumps(evidence))
+
+            with self.assertRaisesRegex(RuntimeError, "fresh post-screenshot"):
+                module.load_case(experiment, 24)
+
 
 class StaticQpCaptureEvidenceTests(unittest.TestCase):
     @staticmethod
@@ -139,14 +167,42 @@ class StaticQpCaptureEvidenceTests(unittest.TestCase):
             {"event": "rtc_stats", "fields": {"sender_media_boundary": current}},
         ]
 
-        self.assertEqual(module.latest_bound_evidence(records, 22), current)
+        self.assertEqual(
+            module.latest_bound_evidence(records, 22),
+            {**current, "metrics_record_index": 2},
+        )
+
+    def test_latest_bound_evidence_rejects_matching_history_when_latest_stats_moved(self):
+        module = self.load_module()
+        stale = self.boundary(2, "vt-static")
+        motion = self.boundary(3, "vt-motion", actual_qp=32)
+        motion.update({
+            "clarity_mode": "motion",
+            "requested_max_qp": 32,
+            "effective_max_qp": 32,
+        })
+        records = [
+            {"event": "rtc_stats", "fields": {"sender_media_boundary": stale}},
+            {"event": "rtc_stats", "fields": {"sender_media_boundary": motion}},
+        ]
+
+        with self.assertRaisesRegex(ValueError, "latest rtc_stats"):
+            module.latest_bound_evidence(records, 22)
 
     def test_capture_window_rejects_generation_or_session_change(self):
         module = self.load_module()
         before = self.boundary(2, "vt-two")
-        self.assertTrue(module.same_capture_window(before, dict(before)))
+        before["metrics_record_index"] = 10
+        same_record = dict(before)
+        after = dict(before)
+        after["metrics_record_index"] = 11
+        self.assertFalse(module.same_capture_window(before, same_record))
+        self.assertTrue(module.same_capture_window(before, after))
         self.assertFalse(
-            module.same_capture_window(before, self.boundary(3, "vt-three"))
+            module.same_capture_window(before, {
+                **self.boundary(3, "vt-three"),
+                "metrics_record_index": 12,
+            })
         )
 
 
