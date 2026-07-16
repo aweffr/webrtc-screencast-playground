@@ -2,6 +2,12 @@
 
 本文记录 `webrtc-screencast-playground` 进入设计前已经核实的事实、当前可行的媒体链路，以及仍需确认的产品与工程决策。结论以 WebRTC M150 release、对应 upstream source、Apple 平台文档、现有 coturn runbook 和外部专家建议为依据。
 
+> **2026-07-16 current-state amendment：** 本文保留最初调研过程，但媒体参数已由真实
+> 主屏观感与 Android TV E2E 校准为 1920×1080、最大 15 fps、start/max bitrate
+> 3/5 Mbps、max QP 32。复制主屏幕已实现 96×54 luma static-clarity detector：稳定
+> 600 ms 后 live 切到约 1 fps 并请求 H.264 IDR，变化恢复 15 fps。当前权威契约见
+> [macOS screencast design](../superpowers/specs/2026-07-13-macos-webrtc-screencast-design.md)。
+
 ## 当前结论
 
 第一阶段可以使用同一个 macOS native app 同时承载发送端和接收端角色。发送链路采用 ScreenCaptureKit、应用层 Frame Gate、`RTCCVPixelBuffer`、WebRTC H.264 VideoToolbox encoder；接收链路采用 WebRTC H.264 VideoToolbox decoder 和 `RTCMTLNSVideoView`。项目最低系统版本需要设为 macOS 14，因为指定 WebRTC framework 的 deployment target 是 `14.0`。
@@ -12,7 +18,7 @@
 
 已确认的一期范围是：接受 M150 zero-hertz adapter 每 1 秒重发最后一帧；不监听全局键鼠，也不动态降低 ScreenCaptureKit cadence。相关性能优化保留为独立 follow-up。
 
-虚拟扩展屏的 logical workspace 和 backing pixels 均为 1920×1080、scale 1×。virtual display 以 60 Hz 运行，媒体采集与 H.264 编码上限为 30 fps。主屏复制不修改发送端显示设置，完整画面等比例适配到 1920×1080 stream，必要时 letterbox，不裁剪。HiDPI backing 与 1080p downsampling 留作后续画质实验。
+虚拟扩展屏的 logical workspace 和 backing pixels 均为 1920×1080、scale 1×。virtual display 以 60 Hz 运行，媒体采集与 H.264 编码上限为 15 fps。主屏复制不修改发送端显示设置，完整画面由 ScreenCaptureKit 高质量等比例 downscale 到 1920×1080 stream，必要时 letterbox，不裁剪。
 
 同一个 app 在会话开始时选择 Sender 或 Receiver。每个 Casting Session 恰好包含一个 Sender 和一个 Receiver，只传输一路 Sender → Receiver 视频，不支持同时双向投屏或会话中途交换角色。控制、测量和恢复消息可以双向传输。
 
@@ -33,7 +39,7 @@ arm64 tar 包内部 `SHA256SUMS` 全部通过。XCFramework 的根 binary 同时
 
 ```text
 SCDisplay / virtual display
-  → ScreenCaptureKit (1920×1080, NV12, max 30 fps, queueDepth 3)
+  → ScreenCaptureKit (1920×1080, NV12, max 15 fps, queueDepth 3)
   → Frame Gate (dirty rect + hysteresis, latest frame wins)
   → RTCCVPixelBuffer / RTCVideoFrame
   → RTCVideoSource
@@ -52,23 +58,23 @@ ScreenCaptureKit 可以在捕获阶段完成缩放和 NV12 转换。M150 的 `RT
 
 ### 可直接进入第一阶段
 
-- ScreenCaptureKit 最大采集帧率设为 30 fps，`queueDepth=3`，输出 1920×1080 NV12。
+- ScreenCaptureKit 最大采集帧率设为 15 fps，`queueDepth=3`，输出 1920×1080 NV12。
 - 使用 dirty rect 的并集面积判断变化规模，不把重叠矩形面积直接相加。
 - Frame Gate 放在 ScreenCaptureKit 与 `RTCVideoSource` 之间，只把选中的最新帧提交给 WebRTC。
-- 升档快、降档慢；从 30 fps 逐级降到 15 fps、5 fps 和 idle，避免状态来回抖动。
+- Frame Gate 在 motion/detail 使用 15 fps，低变化降到 5 fps 和 idle，避免状态来回抖动。
 - 发送源标记为 screen/text content，优先保持分辨率；H.264 使用 non-interleaved `packetization-mode=1`。
 - VideoToolbox 使用 realtime、禁止 frame reordering；恢复优先采用 NACK+RTX，失败后 PLI/IDR，不启用 FEC。
-- 起始试验码率可从 `min=400 Kbps`、`start=2.2 Mbps`、`max=3 Mbps` 开始。它比现有 `DETAIL_IDLE` 的 6 Mbps 上限更适合作为公网低延迟基线，但最终需要用真实办公内容校准。
+- 当前校准参数为 `min=400 Kbps`、`start=3 Mbps`、`max=5 Mbps`、`max QP=32`；它优先保证 1080p 主屏文字清晰度，性能与画质仍以实际 metrics 为准。
 
 ### 调整后采用
 
-M150 的 zero-hertz adapter 在 screen-content mode、source constraints 为 `min_fps=0`、`max_fps>0` 时启用。进入 idle 后，它会每 1 秒重发最后一帧，并非完全停止 RTP video；这一行为可以接受，也不需要额外实现 2–5 秒视频 heartbeat。实现后的实际日志显示当前 CastTuning ObjC 路径没有应用 `min_fps` constraint，因此当前 app 尚未启用该 adapter；一期由 Frame Gate 停止提交、Receiver 保留最后一帧，framework 接入差距已转入 follow-up。
+M150 的 zero-hertz adapter 在 screen-content mode、source constraints 为 `min_fps=0`、`max_fps>0` 时启用。进入 idle 后，它会每 1 秒重发最后一帧，并非完全停止 RTP video；这一行为可以接受，也不需要额外实现 2–5 秒视频 heartbeat。当前 CastTuning ObjC 路径仍没有应用 `min_fps=0`，因此 app 没有宣称启用了 zero-hertz adapter。复制主屏幕改由 static-clarity live `max_fps=1` 产生约 1 fps 输出，并强制一个刷新 IDR；补齐真正的 zero-hertz source constraint 仍是 follow-up。
 
-第一阶段不动态把 ScreenCaptureKit 从 30 fps 降到 5 fps，也不监听全局键鼠。保持 capture 30 fps 可以在下一个系统画面更新时立即唤醒 Frame Gate；全局键盘监听会增加 Input Monitoring 或 Accessibility 权限。只有 CPU/GPU/功耗数据证明长期 30 fps capture 成本明显时，再增加第二层 capture cadence 调整。
+当前不动态降低 ScreenCaptureKit 的 15 fps cadence，也不监听全局键鼠。保持 capture cadence 可以在下一个系统画面更新时立即唤醒视觉检测与 Frame Gate；全局键盘监听会增加 Input Monitoring 或 Accessibility 权限。只有 CPU/GPU/功耗数据证明长期 capture 成本明显时，再增加第二层 capture cadence 调整。
 
 该取舍已确认，后续工作见 [`content-aware-capture-efficiency.md`](../follow-ups/content-aware-capture-efficiency.md)。
 
-低分辨率亮度差适合作为 dirty rect 不可靠时的第二信号。首版先记录 dirty ratio、误判样本和状态转换；出现视频、透明动画或合成层误判后，再用 Metal 或 Accelerate 实现 160×90 luminance/tile diff，避免在 capture callback 上加入未经证实的 CPU 工作。
+低分辨率亮度差已作为 dirty rect 之外的第二信号落地。复制主屏幕对 NV12 luma plane 做 96×54 grid sampling，以 changed-sample ratio 2%/8% 作为进入/退出 hysteresis；连续稳定 600 ms 后请求刷新 IDR。metrics 记录 ratio、mode、刷新/失败/恢复次数及 encoded/decoded keyframe counters。扩展屏不启用该策略。
 
 Constrained High 的压缩效率通常优于 Constrained Baseline，但它属于 receiver compatibility 决策。macOS-to-macOS 首版可以把 Constrained High 作为实验 profile，同时保留 Baseline 对照；不能在尚未验证目标设备 decoder 前删除 Baseline。
 

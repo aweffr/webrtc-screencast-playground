@@ -67,7 +67,7 @@ struct ScreenCaptureConfigurationValues: Equatable, Sendable {
             width: Int(outputSize.width),
             height: Int(outputSize.height),
             pixelFormat: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-            minimumFrameInterval: CMTime(value: 1, timescale: 30),
+            minimumFrameInterval: CMTime(value: 1, timescale: 15),
             queueDepth: 3,
             showsCursor: true,
             preservesAspectRatio: true,
@@ -145,6 +145,7 @@ extension ScreenCaptureConfigurationValues {
         configuration.showsCursor = showsCursor
         configuration.preservesAspectRatio = preservesAspectRatio
         configuration.scalesToFit = true
+        configuration.captureResolution = .nominal
         configuration.destinationRect = destinationRect
         configuration.backgroundColor = CGColor.black
         configuration.capturesAudio = false

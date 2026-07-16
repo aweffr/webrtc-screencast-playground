@@ -1,14 +1,14 @@
 import Foundation
 
 enum FrameGateState: String, Codable, Sendable {
-    case motion30
+    case motion15
     case detail15
     case quiet5
     case idle
 
     var minimumSubmitInterval: Duration? {
         switch self {
-        case .motion30: .nanoseconds(33_333_333)
+        case .motion15: .nanoseconds(66_666_667)
         case .detail15: .nanoseconds(66_666_667)
         case .quiet5: .milliseconds(200)
         case .idle: nil
@@ -38,9 +38,9 @@ struct FrameGate: Sendable {
 
         let previousState = state
         if dirtyRatio >= 0.005 {
-            transition(to: .motion30, at: timestamp)
+            transition(to: .motion15, at: timestamp)
         } else if dirtyRatio > 0 {
-            if state == .motion30 {
+            if state == .motion15 {
                 stateEnteredAt = timestamp
             } else {
                 transition(to: .detail15, at: timestamp)
@@ -72,7 +72,7 @@ struct FrameGate: Sendable {
         guard let stateEnteredAt else { return }
         let elapsed = timestamp - stateEnteredAt
         switch state {
-        case .motion30 where elapsed >= .milliseconds(500):
+        case .motion15 where elapsed >= .milliseconds(500):
             transition(to: .detail15, at: timestamp)
         case .detail15 where elapsed >= .milliseconds(800):
             transition(to: .quiet5, at: timestamp)
@@ -95,7 +95,7 @@ struct FrameGate: Sendable {
         case .idle: 0
         case .quiet5: 1
         case .detail15: 2
-        case .motion30: 3
+        case .motion15: 3
         }
     }
 }

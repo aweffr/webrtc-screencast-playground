@@ -11,10 +11,10 @@ final class FrameGateTests: XCTestCase {
         XCTAssertTrue(decision.shouldSubmit)
     }
 
-    func testLargeChangeImmediatelyEntersThirtyFPS() {
+    func testLargeChangeImmediatelyEntersMotionState() {
         var gate = FrameGate()
         let decision = gate.evaluate(dirtyRatio: 0.005, timestamp: .zero)
-        XCTAssertEqual(decision.state, .motion30)
+        XCTAssertEqual(decision.state, .motion15)
         XCTAssertTrue(decision.shouldSubmit)
     }
 
@@ -29,7 +29,7 @@ final class FrameGateTests: XCTestCase {
         var gate = FrameGate()
         _ = gate.evaluate(dirtyRatio: 0.01, timestamp: .zero)
 
-        XCTAssertEqual(gate.evaluate(dirtyRatio: 0, timestamp: .milliseconds(499)).state, .motion30)
+        XCTAssertEqual(gate.evaluate(dirtyRatio: 0, timestamp: .milliseconds(499)).state, .motion15)
         XCTAssertEqual(gate.evaluate(dirtyRatio: 0, timestamp: .milliseconds(500)).state, .detail15)
         XCTAssertEqual(gate.evaluate(dirtyRatio: 0, timestamp: .milliseconds(1_299)).state, .detail15)
         XCTAssertEqual(gate.evaluate(dirtyRatio: 0, timestamp: .milliseconds(1_300)).state, .quiet5)
@@ -48,7 +48,7 @@ final class FrameGateTests: XCTestCase {
         XCTAssertEqual(small.state, .detail15)
         XCTAssertTrue(small.shouldSubmit)
         let large = gate.evaluate(dirtyRatio: 0.02, timestamp: .milliseconds(1_602))
-        XCTAssertEqual(large.state, .motion30)
+        XCTAssertEqual(large.state, .motion15)
         XCTAssertTrue(large.shouldSubmit)
     }
 
@@ -56,7 +56,8 @@ final class FrameGateTests: XCTestCase {
         var gate = FrameGate()
         XCTAssertTrue(gate.evaluate(dirtyRatio: 0.01, timestamp: .zero).shouldSubmit)
         XCTAssertFalse(gate.evaluate(dirtyRatio: 0.01, timestamp: .milliseconds(10)).shouldSubmit)
-        XCTAssertTrue(gate.evaluate(dirtyRatio: 0.01, timestamp: .milliseconds(34)).shouldSubmit)
+        XCTAssertFalse(gate.evaluate(dirtyRatio: 0.01, timestamp: .milliseconds(34)).shouldSubmit)
+        XCTAssertTrue(gate.evaluate(dirtyRatio: 0.01, timestamp: .milliseconds(67)).shouldSubmit)
 
         var detailGate = FrameGate()
         XCTAssertTrue(detailGate.evaluate(dirtyRatio: 0.0001, timestamp: .zero).shouldSubmit)
@@ -75,6 +76,6 @@ final class FrameGateTests: XCTestCase {
         _ = gate.evaluate(dirtyRatio: 0.01, timestamp: .milliseconds(100))
         let decision = gate.evaluate(dirtyRatio: 0.01, timestamp: .milliseconds(90))
         XCTAssertFalse(decision.shouldSubmit)
-        XCTAssertEqual(decision.state, .motion30)
+        XCTAssertEqual(decision.state, .motion15)
     }
 }

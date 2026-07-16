@@ -4,11 +4,11 @@
   "sender": {
     "max_width": 1920,
     "max_height": 1080,
-    "max_fps": 30,
+    "max_fps": 15,
     "content_mode": "TEXT",
     "min_bitrate_bps": 400000,
-    "start_bitrate_bps": 2200000,
-    "max_bitrate_bps": 3000000,
+    "start_bitrate_bps": 3000000,
+    "max_bitrate_bps": 5000000,
     "degradation_preference": "MAINTAIN_RESOLUTION",
     "network_priority": "HIGH"
   },
@@ -28,7 +28,7 @@
     "h264_profile": "CONSTRAINED_BASELINE",
     "h264_level": "4.1",
     "max_frame_delay_count": 1,
-    "max_qp": 42,
+    "max_qp": 32,
     "video_toolbox_low_latency_rate_control": false
   },
   "receiver": {

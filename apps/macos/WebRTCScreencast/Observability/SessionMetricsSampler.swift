@@ -82,6 +82,7 @@ actor SessionMetricsSampler {
             "id": .string(stats.id),
             "bytes": stats.bytes.map { .integer(Int($0)) } ?? .null,
             "frames": stats.frames.map { .integer(Int($0)) } ?? .null,
+            "key_frames": stats.keyFrames.map { .integer(Int($0)) } ?? .null,
             "frames_dropped": stats.framesDropped.map { .integer(Int($0)) } ?? .null,
             "bitrate_bps": stats.bitrateBps.map(JSONValue.number) ?? .null,
             "fps": stats.framesPerSecond.map(JSONValue.number) ?? .null,
@@ -101,6 +102,9 @@ actor SessionMetricsSampler {
             "dirty_rect_count": stats.lastDirtyRectCount.map(JSONValue.integer) ?? .null,
             "dirty_ratio": stats.lastDirtyRatio.map(JSONValue.number) ?? .null,
             "frame_gate_state": .string(stats.gateState.rawValue),
+            "visual_stability_mode": .string(stats.visualStabilityMode.rawValue),
+            "visual_changed_sample_ratio": stats.lastVisualChangedSampleRatio.map(JSONValue.number) ?? .null,
+            "clarity_refresh_requests": .integer(Int(stats.clarityRefreshRequests)),
         ]
     }
 
@@ -115,6 +119,10 @@ actor SessionMetricsSampler {
             "expected_h264_profile": stats.expectedH264Profile.map(JSONValue.string) ?? .null,
             "actual_h264_profile": stats.actualH264Profile.map(JSONValue.string) ?? .null,
             "profile_mismatch": stats.profileMismatch.map(JSONValue.bool) ?? .null,
+            "clarity_mode": .string(stats.clarityMode.rawValue),
+            "clarity_successful_refreshes": .integer(Int(stats.claritySuccessfulRefreshes)),
+            "clarity_failed_refreshes": .integer(Int(stats.clarityFailedRefreshes)),
+            "clarity_motion_restores": .integer(Int(stats.clarityMotionRestores)),
         ]
     }
 

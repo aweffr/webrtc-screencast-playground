@@ -1,5 +1,11 @@
 # macOS WebRTC Screencast Implementation Plan
 
+> **Historical execution record.** Embedded configuration and test values describe the original
+> 2026-07-14 implementation sequence and are not current runtime defaults. As of 2026-07-16 the
+> authoritative media contract is max 15 fps, 400 Kbps/3 Mbps/5 Mbps min/start/max bitrate,
+> max QP 32, plus main-display static-clarity refresh. See the linked design document and root
+> `config/cast-tuning.default.json`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build and verify a native macOS Sender/Receiver app plus Go WebSocket signaling server that closes H.264 screencast sessions on one Mac over direct UDP and forced coturn TURN/UDP while exporting useful metrics.

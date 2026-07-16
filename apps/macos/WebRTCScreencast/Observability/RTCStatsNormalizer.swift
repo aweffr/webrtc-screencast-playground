@@ -34,6 +34,7 @@ struct NormalizedVideoRTPStats: Equatable, Sendable {
     let id: String
     let bytes: UInt64?
     let frames: UInt64?
+    let keyFrames: UInt64?
     let framesDropped: UInt64?
     let bitrateBps: Double?
     let framesPerSecond: Double?
@@ -135,6 +136,7 @@ struct RTCStatsNormalizer: Sendable {
             id: statistic.id,
             bytes: bytes,
             frames: frames,
+            keyFrames: statistic.values[outbound ? "keyFramesEncoded" : "keyFramesDecoded"]?.uint64Value,
             framesDropped: statistic.values["framesDropped"]?.uint64Value,
             bitrateBps: bitrate,
             framesPerSecond: frameRate,

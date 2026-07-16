@@ -375,7 +375,7 @@ identity and coordinator cleanup path.
 
 - [x] **Step 4: Migrate to schema 2**
 
-Keep current bitrate, screen-content, NACK/RTX and 30fps values; explicitly use Baseline, keep Apple
+Keep the then-current bitrate, screen-content and NACK/RTX values; explicitly use Baseline, keep Apple
 low-latency rate control disabled for the follow-up, and add Android receiver fields. Verify the linked framework metadata/hash is
 the preview input, not the old `eeca1bc` asset.
 

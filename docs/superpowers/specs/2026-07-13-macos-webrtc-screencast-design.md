@@ -102,16 +102,18 @@ Virtual display object 必须被强引用到 session 结束。退出、失败或
 
 ### ScreenCaptureKit 与 Frame Gate
 
-`ScreenCaptureSource` 配置：1920×1080、NV12 video range、max 30 fps、`queueDepth=3`、cursor visible、`preservesAspectRatio=true`。主屏非 16:9 时根据 source aspect 计算 `destinationRect`，在黑色 1920×1080 IOSurface 中 letterbox；virtual display 正好填满输出。callback 只解析 frame status、timestamp、content rect、dirty rect 和 pixel buffer，然后交给专用 serial media queue。
+`ScreenCaptureSource` 配置：1920×1080、NV12 video range、max 15 fps、nominal source resolution、`queueDepth=3`、cursor visible、`preservesAspectRatio=true`。主屏非 16:9 时根据 source aspect 计算 `destinationRect`，由 ScreenCaptureKit 做一次等比例 1080p downscale，并在黑色 1920×1080 IOSurface 中 letterbox；virtual display 正好填满输出。callback 只解析 frame status、timestamp、content rect、dirty rect 和 pixel buffer，然后交给专用 serial media queue。
 
-`DirtyRegionAnalyzer` 使用 sweep-line 计算 dirty rect clipped union area，不能用面积简单相加或 bounding box 代替。`FrameGate` 维护 30/15/5/idle 四种提交状态，遵循“升档快、降档慢”，且始终 latest-frame-wins：
+`DirtyRegionAnalyzer` 使用 sweep-line 计算 dirty rect clipped union area，不能用面积简单相加或 bounding box 代替。`FrameGate` 维护 15/15/5/idle 四种提交状态，遵循“升档快、降档慢”，且始终 latest-frame-wins：
 
-- dirty ratio ≥ 0.5% 立即进入 30 fps；0–0.5% 的非零变化至少进入 15 fps。
-- 低变化持续 500 ms 后从 30 降到 15 fps，再持续 800 ms 降到 5 fps；完全静止 300 ms 后进入 idle。
-- idle 收到任意变化立即恢复至少 15 fps；大变化直接恢复 30 fps。
+- dirty ratio ≥ 0.5% 立即进入 motion 15 fps；0–0.5% 的非零变化进入 detail 15 fps。
+- 低变化持续 500 ms 后保持 detail 15 fps，再持续 800 ms 降到 5 fps；完全静止 300 ms 后进入 idle。
+- idle 收到任意变化立即恢复 15 fps。
 - Gate 只控制向 `RTCVideoSource` 的提交，不动态修改 ScreenCaptureKit cadence。
 
-通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。M150 zero-hertz adapter 在 idle 期间约每秒重发最后一帧，这种行为可以接受，因此不另造 heartbeat。实现后的运行证据表明当前 ObjC/CastTuning 接入尚未把 `min_fps=0` 应用到 source constraints；一期实际行为是停止提交新帧并由 Receiver 保留最后一帧，启用 zero-hertz adapter 记入 follow-up。
+通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。复制主屏幕另用 96×54 luma grid 判断视觉稳定性：连续 600 ms 的 changed-sample ratio 不超过 2% 时，通过 CastTuning live patch 把 WebRTC source/sender 限到 1 fps、保持 5 Mbps，并在提交刷新帧前请求 IDR；变化超过 8% 时恢复 15 fps。2%/8% hysteresis 允许 cursor 和局部 UI 微动而不反复切档。这条清晰度策略不修改 ScreenCaptureKit cadence，也不用于 virtual display。
+
+M150 zero-hertz adapter 在 idle 期间约每秒重发最后一帧，这种行为可以接受，因此不另造 heartbeat。当前 ObjC/CastTuning 接入尚未把 `min_fps=0` 应用到 source constraints；static-clarity 模式实际由 live `max_fps=1` 产生约 1 fps 输出，补齐 zero-hertz adapter 仍记入 follow-up。
 
 ### WebRTC session 与 H.264 policy
 
@@ -119,7 +121,7 @@ Virtual display object 必须被强引用到 session 结束。退出、失败或
 
 Video transceiver 使用 Unified Plan。Sender direction 为 send-only，Receiver 为 recv-only。创建 offer/answer 前，从 factory video capabilities 中筛出 H.264、`packetization-mode=1` 的 capability，并通过 `setCodecPreferences` 只保留 H.264；如果 capability 不存在则会话失败，不能静默协商 VP8/VP9/AV1。初始 profile 使用 Constrained Baseline，Constrained High 只作为可选实验配置。
 
-初始 tuning 为 1920×1080、max 30 fps、min/start/max bitrate 400 Kbps/2.2 Mbps/3 Mbps、screen content、maintain-resolution、NACK+RTX、FEC off。当前 WebRTC binary 自己负责 VideoToolbox realtime 和禁止 frame reordering；Apple `EnableLowLatencyRateControl` 不在一期伪装成已启用。
+当前 tuning 为 1920×1080、max 15 fps、min/start/max bitrate 400 Kbps/3 Mbps/5 Mbps、max QP 32、screen content、maintain-resolution、NACK+RTX、FEC off。该参数优先保证真实 macOS 桌面的文字清晰度；当前 WebRTC binary 自己负责 VideoToolbox realtime 和禁止 frame reordering，Apple `EnableLowLatencyRateControl` 不在一期伪装成已启用。
 
 `direct-baseline` 使用 `RTCIceTransportPolicyAll`、禁用 TCP candidate 且不配置 TURN。`production-relay` 使用 `RTCIceTransportPolicyRelay`、禁用 TCP candidate且仅配置 `turn:<host>:<port>?transport=udp`。建立连接后 `ICEPathVerifier` 必须从 RTCStats 和 candidate-pair event 验证 requested profile：production path 的 local/remote candidate 都必须为 relay，relay protocol 必须为 UDP；不符合时 UI 和日志显示 profile violation，而不是把连接标为验收成功。
 
@@ -174,7 +176,7 @@ Receiver register 后 server 生成 8 位 Crockford Base32 code 和 opaque sessi
 - path：candidate types、protocol、relay protocol、network type、RTT、available outgoing bitrate、loss/jitter。
 - inbound/render：frames received/decoded/dropped/rendered、decode time、jitter-buffer delay、freeze/pause、NACK/PLI/FIR、decoder implementation、render cadence/frame age/size。
 
-RTCStats values 是动态字典，`RTCStatsNormalizer` 负责类型安全提取并在字段缺失时输出 null + capability event，而不是 crash 或伪造 0。UI 只显示连接状态、selected path、capture/encode/render fps、bitrate、RTT、loss、QP 和 Frame Gate state 的小型现场面板；完整证据以 JSONL 为准。
+RTCStats values 是动态字典，`RTCStatsNormalizer` 负责类型安全提取并在字段缺失时输出 null + capability event，而不是 crash 或伪造 0。JSONL 额外记录 luma changed-sample ratio、visual stability/clarity mode、刷新成功/失败/恢复次数及 encoded/decoded keyframe counters，便于证明 static-clarity 刷新真正到达 Receiver。UI 只显示连接状态、selected path、capture/encode/render fps、bitrate、RTT、loss、QP 和 Frame Gate state 的小型现场面板；完整证据以 JSONL 为准。
 
 `DiagnosticExporter` 生成结构化诊断 zip，包含 client JSONL、可安全导出的 CastTuning telemetry、server metrics snapshot（若可达）和 manifest/checksum。原始 `RTCFileLogger` 与 RTC event log 会包含无法可靠脱敏的 ICE candidate、ufrag/password，因此一期禁用且 exporter 发现这类历史文件时 fail closed。导出前还运行 runtime credential scan，发现原文时中止并报告错误。
 
