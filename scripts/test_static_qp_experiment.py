@@ -8,6 +8,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent
 MODULE_PATH = ROOT / "render-static-qp-report.py"
+EVIDENCE_MODULE_PATH = ROOT / "static_qp_evidence.py"
 
 
 class StaticQpReportTests(unittest.TestCase):
@@ -32,6 +33,7 @@ class StaticQpReportTests(unittest.TestCase):
                 case = experiment / f"qp-{requested}"
                 case.mkdir()
                 (case / "qp-evidence.json").write_text(json.dumps({
+                    "evidence_binding": "generation-session-stable-across-screenshot",
                     "requested_max_qp": requested,
                     "effective_max_qp": requested,
                     "max_qp_apply_state": "applied",
@@ -98,6 +100,54 @@ class StaticQpReportTests(unittest.TestCase):
 
             with self.assertRaisesRegex(RuntimeError, "QP sample binding"):
                 module.load_case(experiment, 24)
+
+
+class StaticQpCaptureEvidenceTests(unittest.TestCase):
+    @staticmethod
+    def load_module():
+        spec = importlib.util.spec_from_file_location(
+            "static_qp_evidence", EVIDENCE_MODULE_PATH
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def boundary(generation, session, actual_qp=22, encoded_bytes=12345):
+        return {
+            "clarity_mode": "static_clarity",
+            "requested_max_qp": 22,
+            "effective_max_qp": 22,
+            "max_qp_apply_state": "applied",
+            "max_qp_generation": generation,
+            "max_qp_applied_encoder_session_id": session,
+            "last_key_frame_qp": actual_qp,
+            "last_key_frame_bytes": encoded_bytes,
+            "last_qp_sample_generation": generation,
+            "last_qp_sample_encoder_session_id": session,
+        }
+
+    def test_latest_bound_evidence_uses_latest_matching_record(self):
+        module = self.load_module()
+        stale = self.boundary(1, "vt-one")
+        mismatched = self.boundary(2, "vt-two")
+        mismatched["last_qp_sample_encoder_session_id"] = "vt-one"
+        current = self.boundary(3, "vt-three", encoded_bytes=33333)
+        records = [
+            {"event": "rtc_stats", "fields": {"sender_media_boundary": stale}},
+            {"event": "rtc_stats", "fields": {"sender_media_boundary": mismatched}},
+            {"event": "rtc_stats", "fields": {"sender_media_boundary": current}},
+        ]
+
+        self.assertEqual(module.latest_bound_evidence(records, 22), current)
+
+    def test_capture_window_rejects_generation_or_session_change(self):
+        module = self.load_module()
+        before = self.boundary(2, "vt-two")
+        self.assertTrue(module.same_capture_window(before, dict(before)))
+        self.assertFalse(
+            module.same_capture_window(before, self.boundary(3, "vt-three"))
+        )
 
 
 if __name__ == "__main__":

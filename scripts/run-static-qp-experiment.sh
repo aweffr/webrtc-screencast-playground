@@ -74,23 +74,22 @@ for max_qp in 24 22 20 18; do
   [[ -n "$run_root" ]] || { print -u2 "missing E2E run for QP $max_qp"; exit 1; }
   metrics_file="$(find "$run_root/macos" -mindepth 2 -maxdepth 2 -name metrics.jsonl -type f -print -quit)"
   [[ -s "$metrics_file" ]] || { print -u2 "missing sender metrics for QP $max_qp"; exit 1; }
-
-  jq -s -e --argjson max_qp "$max_qp" '
-    [ .[]
-      | select(.event == "rtc_stats")
-      | .fields.sender_media_boundary
-      | select(
-          .requested_max_qp == $max_qp and
-          .effective_max_qp == $max_qp and
-          .max_qp_apply_state == "applied" and
-          .last_qp_sample_generation == .max_qp_generation and
-          .last_qp_sample_encoder_session_id == .max_qp_applied_encoder_session_id and
-          .last_key_frame_qp != null and
-          .last_key_frame_qp <= $max_qp and
-          .last_key_frame_bytes > 0
-        )
-    ] | last
-  ' "$metrics_file" >"$case_root/qp-evidence.json"
+  [[ -s "$run_root/static-qp-evidence.json" ]] || {
+    print -u2 "missing screenshot-bound QP evidence for QP $max_qp"
+    exit 1
+  }
+  cp "$run_root/static-qp-evidence.json" "$case_root/qp-evidence.json"
+  jq -e --argjson max_qp "$max_qp" '
+    .evidence_binding == "generation-session-stable-across-screenshot" and
+    .requested_max_qp == $max_qp and
+    .effective_max_qp == $max_qp and
+    .max_qp_apply_state == "applied" and
+    .last_qp_sample_generation == .max_qp_generation and
+    .last_qp_sample_encoder_session_id == .max_qp_applied_encoder_session_id and
+    .last_key_frame_qp != null and
+    .last_key_frame_qp <= $max_qp and
+    .last_key_frame_bytes > 0
+  ' "$case_root/qp-evidence.json" >/dev/null
 
   cp "$run_root/android/receiver-playing.png" "$case_root/android-received-final.png"
   cp "$run_root/macos-main-source.png" "$case_root/macos-main-source.png"
