@@ -36,8 +36,11 @@ class StaticQpReportTests(unittest.TestCase):
                     "effective_max_qp": requested,
                     "max_qp_apply_state": "applied",
                     "max_qp_generation": 2,
+                    "max_qp_applied_encoder_session_id": "vt-one",
                     "last_key_frame_qp": actual,
                     "last_key_frame_bytes": 12345,
+                    "last_qp_sample_generation": 2,
+                    "last_qp_sample_encoder_session_id": "vt-one",
                     "encoder_session_id": "vt-one",
                 }))
                 (case / "vmaf.json").write_text(json.dumps({
@@ -63,6 +66,34 @@ class StaticQpReportTests(unittest.TestCase):
             self.assertIn("VMAF（参考）", report)
             self.assertIn("| 24 | 4.000 | 3.000 | 181.000 |", report)
             self.assertEqual(report.count("android-received-final.png"), 4)
+
+    def test_case_rejects_qp_sample_from_another_generation_or_session(self):
+        spec = importlib.util.spec_from_file_location("static_qp_report", MODULE_PATH)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = pathlib.Path(temporary)
+            case = experiment / "qp-24"
+            case.mkdir()
+            (case / "android-received-final.png").write_bytes(b"png")
+            (case / "vmaf.json").write_text(json.dumps({
+                "pooled_metrics": {"vmaf": {"mean": 80.0}}
+            }))
+            (case / "qp-evidence.json").write_text(json.dumps({
+                "requested_max_qp": 24,
+                "effective_max_qp": 24,
+                "max_qp_apply_state": "applied",
+                "max_qp_generation": 2,
+                "max_qp_applied_encoder_session_id": "vt-two",
+                "last_key_frame_qp": 23,
+                "last_key_frame_bytes": 12345,
+                "last_qp_sample_generation": 1,
+                "last_qp_sample_encoder_session_id": "vt-one",
+            }))
+
+            with self.assertRaisesRegex(RuntimeError, "QP sample binding"):
+                module.load_case(experiment, 24)
 
 
 if __name__ == "__main__":

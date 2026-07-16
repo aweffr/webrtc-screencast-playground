@@ -51,6 +51,13 @@ def load_case(experiment_root, requested_qp):
     actual_qp = evidence.get("last_key_frame_qp")
     if not isinstance(actual_qp, int) or not 0 <= actual_qp <= requested_qp:
         raise RuntimeError(f"invalid keyframe QP evidence for case {requested_qp}")
+    if (
+        evidence.get("last_qp_sample_generation") != evidence.get("max_qp_generation")
+        or evidence.get("last_qp_sample_encoder_session_id")
+        != evidence.get("max_qp_applied_encoder_session_id")
+        or not evidence.get("last_qp_sample_encoder_session_id")
+    ):
+        raise RuntimeError(f"QP sample binding mismatch for case {requested_qp}")
     score = vmaf.get("pooled_metrics", {}).get("vmaf", {}).get("mean")
     if not isinstance(score, (int, float)):
         raise RuntimeError(f"missing VMAF score for case {requested_qp}")
