@@ -55,19 +55,40 @@ for max_qp in 24 22 20 18; do
   chmod 600 "$runtime_case"
 
   typeset -a e2e_args
-  e2e_args=(
-    --profile production-relay
-    --source main
-    --runtime-config "$runtime_case"
-    --run-seconds "$RUN_SECONDS"
-    --output-root "$e2e_root"
-    --static-qp-evidence
-  )
-  (( skip_build )) && e2e_args+=(--skip-macos-build)
-  WEBRTC_XCFRAMEWORK_ZIP="$XCFRAMEWORK" \
-    ARTIFACTS_DIR="$DEPENDENCY_ARTIFACTS_DIR" \
-    "$ROOT/scripts/run-android-tv-e2e.sh" "${e2e_args[@]}" \
-      | tee "$case_root/e2e.log"
+  e2e_success=0
+  for attempt in 1 2 3; do
+    attempt_root="$case_root/e2e-attempt-$attempt"
+    attempt_log="$case_root/e2e-attempt-$attempt.log"
+    mkdir -p "$attempt_root"
+    e2e_args=(
+      --profile production-relay
+      --source main
+      --runtime-config "$runtime_case"
+      --run-seconds "$RUN_SECONDS"
+      --output-root "$attempt_root"
+      --static-qp-evidence
+    )
+    (( skip_build )) && e2e_args+=(--skip-macos-build)
+    if WEBRTC_XCFRAMEWORK_ZIP="$XCFRAMEWORK" \
+        ARTIFACTS_DIR="$DEPENDENCY_ARTIFACTS_DIR" \
+        "$ROOT/scripts/run-android-tv-e2e.sh" "${e2e_args[@]}" \
+          | tee "$attempt_log"; then
+      run_root="$(find "$attempt_root" -mindepth 1 -maxdepth 1 -type d -name 'run.*' -print -quit)"
+      [[ -n "$run_root" ]] || { print -u2 "successful E2E did not retain a run"; exit 1; }
+      mv "$run_root" "$e2e_root/"
+      mv "$attempt_log" "$case_root/e2e.log"
+      rm -rf "$attempt_root"
+      e2e_success=1
+      break
+    fi
+    skip_build=1
+    mkdir -p "$case_root/e2e-failed"
+    mv "$attempt_root" "$case_root/e2e-failed/attempt-$attempt"
+    mv "$attempt_log" "$case_root/e2e-failed/attempt-$attempt.log"
+    print -u2 "QP $max_qp E2E attempt $attempt failed; retrying"
+    sleep 2
+  done
+  (( e2e_success )) || { print -u2 "QP $max_qp E2E failed after 3 attempts"; exit 1; }
   skip_build=1
 
   run_root="$(find "$e2e_root" -mindepth 1 -maxdepth 1 -type d -name 'run.*' -print -quit)"
