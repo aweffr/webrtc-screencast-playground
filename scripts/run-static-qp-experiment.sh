@@ -105,15 +105,19 @@ for max_qp in 24 22 20 18; do
   jq -e '.pooled_metrics.vmaf.mean | numbers' "$case_root/vmaf.json" >/dev/null
 done
 
+android_context="$experiment_root/qp-24/context.json"
+jq -e '.android.avd and .android.api and .android.abi and .android.display' \
+  "$android_context" >/dev/null
 jq -n \
   --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg xcframework_sha256 "$xcframework_sha256" \
   --arg app_commit "$(git -C "$ROOT" rev-parse HEAD)" \
   --arg hardware_model "$(sysctl -n hw.model)" \
   --arg macos_version "$(sw_vers -productVersion)" \
-  --arg android_device "$(adb shell getprop ro.product.model | tr -d '\r')" \
-  --arg android_api "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" \
-  --arg android_abi "$(adb shell getprop ro.product.cpu.abi | tr -d '\r')" \
+  --arg android_device "$(jq -r '.android.avd' "$android_context")" \
+  --arg android_api "$(jq -r '.android.api' "$android_context")" \
+  --arg android_abi "$(jq -r '.android.abi' "$android_context")" \
+  --arg android_display "$(jq -r '.android.display' "$android_context")" \
   --argjson run_seconds "$RUN_SECONDS" \
   '{
     schema_version: 1,
@@ -125,6 +129,7 @@ jq -n \
     android_device: $android_device,
     android_api: $android_api,
     android_abi: $android_abi,
+    android_display: $android_display,
     profile: "production-relay",
     source: "main",
     run_seconds: $run_seconds,
