@@ -236,7 +236,13 @@ chmod 600 "$CONFIG_FILE"
 if (( ! SKIP_MACOS_BUILD )); then
   make -C "$ROOT" build-macos
 fi
-"$ROOT/apps/android-tv/gradlew" -p "$ROOT/apps/android-tv" "$GRADLE_TASK"
+WEBRTC_ANDROID_AAR="${ARTIFACTS_DIR:-$ROOT/artifacts}/webrtc-m150-android-arm64-v8a.aar"
+[[ -f "$WEBRTC_ANDROID_AAR" ]] || {
+  print -u2 "verified Android WebRTC AAR is missing: $WEBRTC_ANDROID_AAR"
+  exit 1
+}
+WEBRTC_ANDROID_AAR="$WEBRTC_ANDROID_AAR" \
+  "$ROOT/apps/android-tv/gradlew" -p "$ROOT/apps/android-tv" "$GRADLE_TASK"
 restore_local_xml
 APP_EXECUTABLE="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app/Contents/MacOS/WebRTCScreencast"
 [[ -x "$APP_EXECUTABLE" && -f "$APK" ]] || {

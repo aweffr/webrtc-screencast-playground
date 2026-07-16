@@ -64,8 +64,12 @@ android {
     }
 }
 
+val webRtcAar = providers.environmentVariable("WEBRTC_ANDROID_AAR").orNull
+    ?.let(::file)
+    ?: rootProject.file("../../artifacts/webrtc-m150-android-arm64-v8a.aar")
+
 dependencies {
-    implementation(files(rootProject.file("../../artifacts/webrtc-m150-android-arm64-v8a.aar")))
+    implementation(files(webRtcAar))
     implementation("com.squareup.okhttp3:okhttp:5.3.0")
 
     testImplementation("junit:junit:4.13.2")
