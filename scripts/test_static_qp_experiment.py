@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import importlib.util
+import json
+import pathlib
+import tempfile
+import unittest
+
+
+ROOT = pathlib.Path(__file__).resolve().parent
+MODULE_PATH = ROOT / "render-static-qp-report.py"
+
+
+class StaticQpReportTests(unittest.TestCase):
+    def test_report_requires_and_renders_all_four_qp_cases(self):
+        spec = importlib.util.spec_from_file_location("static_qp_report", MODULE_PATH)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = pathlib.Path(temporary) / "experiment"
+            experiment.mkdir()
+            (experiment / "manifest.json").write_text(json.dumps({
+                "generated_at": "2026-07-16T00:00:00Z",
+                "xcframework_sha256": "abc123",
+                "profile": "production-relay",
+                "source": "main",
+                "run_seconds": 30,
+            }))
+            for requested, actual, score in [
+                (24, 23, 81.1), (22, 21, 82.2), (20, 19, 83.3), (18, 17, 84.4)
+            ]:
+                case = experiment / f"qp-{requested}"
+                case.mkdir()
+                (case / "qp-evidence.json").write_text(json.dumps({
+                    "requested_max_qp": requested,
+                    "effective_max_qp": requested,
+                    "max_qp_apply_state": "applied",
+                    "max_qp_generation": 2,
+                    "last_key_frame_qp": actual,
+                    "last_key_frame_bytes": 12345,
+                    "encoder_session_id": "vt-one",
+                }))
+                (case / "vmaf.json").write_text(json.dumps({
+                    "pooled_metrics": {"vmaf": {"mean": score}}
+                }))
+                (case / "android-received-final.png").write_bytes(b"png")
+
+            output = pathlib.Path(temporary) / "report.md"
+            module.render_report(experiment, output)
+            report = output.read_text()
+            self.assertIn("| 24 | 24 | 23 |", report)
+            self.assertIn("| 18 | 18 | 17 |", report)
+            self.assertIn("VMAF（参考）", report)
+            self.assertEqual(report.count("android-received-final.png"), 4)
+
+
+if __name__ == "__main__":
+    unittest.main()

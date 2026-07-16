@@ -10,13 +10,14 @@ RUN_SECONDS=20
 OUTPUT_ROOT="$ROOT/artifacts/android-tv-e2e"
 MEDIA_BASELINE=0
 SKIP_MACOS_BUILD=0
+STATIC_QP_EVIDENCE=0
 PACKAGE="cn.aweffr.webrtcscreencast.tv"
 ACTIVITY="$PACKAGE/.ui.ReceiverActivity"
 AVD_NAME="${ANDROID_TV_AVD_NAME:-WebRTCScreencast_TV_API_31}"
 LOCAL_XML="$ROOT/apps/android-tv/app/src/debug/res/values/reference_runtime.local.xml"
 
 usage() {
-  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--run-seconds n] [--output-root path] [--media-baseline] [--skip-macos-build]"
+  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--run-seconds n] [--output-root path] [--media-baseline] [--static-qp-evidence] [--skip-macos-build]"
   exit 2
 }
 
@@ -28,6 +29,7 @@ while (( $# )); do
     --run-seconds) [[ $# -ge 2 ]] || usage; RUN_SECONDS="$2"; shift 2 ;;
     --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
     --media-baseline) MEDIA_BASELINE=1; shift ;;
+    --static-qp-evidence) STATIC_QP_EVIDENCE=1; shift ;;
     --skip-macos-build) SKIP_MACOS_BUILD=1; shift ;;
     *) usage ;;
   esac
@@ -56,6 +58,16 @@ fi
 for tool in adb curl jq python3; do
   command -v "$tool" >/dev/null || { print -u2 "$tool is required"; exit 2; }
 done
+if (( STATIC_QP_EVIDENCE )); then
+  [[ "$SOURCE" == main ]] || {
+    print -u2 "--static-qp-evidence requires --source main"
+    exit 2
+  }
+  command -v screencapture >/dev/null || {
+    print -u2 "screencapture is required"
+    exit 2
+  }
+fi
 
 mkdir -p "$OUTPUT_ROOT"
 OUTPUT_ROOT="$(cd "$OUTPUT_ROOT" && pwd -P)"
@@ -308,6 +320,38 @@ done
   print -u2 "cross-platform media/path evidence did not become ready"
   exit 1
 }
+if (( STATIC_QP_EVIDENCE )); then
+  static_max_qp="$(jq -er '.static_max_qp | numbers' "$CONFIG_FILE")"
+  static_qp_ready=0
+  for _ in {1..200}; do
+    if jq -s -e --argjson max_qp "$static_max_qp" '
+      [ .[]
+        | select(.event == "rtc_stats")
+        | .fields.sender_media_boundary
+        | select(
+            .clarity_mode == "static_clarity" and
+            .requested_max_qp == $max_qp and
+            .effective_max_qp == $max_qp and
+            .max_qp_apply_state == "applied" and
+            .last_key_frame_qp != null and
+            .last_key_frame_qp <= $max_qp and
+            .last_key_frame_bytes > 0
+          )
+      ] | length > 0
+    ' "$sender_directory/metrics.jsonl" >/dev/null 2>&1; then
+      static_qp_ready=1
+      break
+    fi
+    kill -0 "$sender_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  (( static_qp_ready )) || {
+    print -u2 "static max-QP evidence did not become ready"
+    exit 1
+  }
+  sleep 0.5
+  screencapture -x "$RUN_ROOT/macos-main-source.png"
+fi
 adb exec-out screencap -p >"$ANDROID_EVIDENCE/receiver-playing.png"
 
 set +e
