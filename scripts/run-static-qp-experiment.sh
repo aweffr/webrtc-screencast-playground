@@ -6,6 +6,7 @@ RUNTIME_CONFIG=""
 XCFRAMEWORK=""
 OUTPUT_ROOT="$ROOT/artifacts/static-max-qp"
 RUN_SECONDS=30
+DEPENDENCY_ARTIFACTS_DIR="${ARTIFACTS_DIR:-$ROOT/artifacts}"
 
 usage() {
   print -u2 "usage: $0 --runtime-config path --xcframework path [--output-root path] [--run-seconds n]"
@@ -62,7 +63,7 @@ for max_qp in 24 22 20 18; do
   )
   (( skip_build )) && e2e_args+=(--skip-macos-build)
   WEBRTC_XCFRAMEWORK_ZIP="$XCFRAMEWORK" \
-    ARTIFACTS_DIR="$ROOT/artifacts" \
+    ARTIFACTS_DIR="$DEPENDENCY_ARTIFACTS_DIR" \
     "$ROOT/scripts/run-android-tv-e2e.sh" "${e2e_args[@]}" \
       | tee "$case_root/e2e.log"
   skip_build=1
