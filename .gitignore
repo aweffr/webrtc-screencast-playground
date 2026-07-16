@@ -1,9 +1,7 @@
-# Downloaded release assets are verified by artifacts/SHA256SUMS and remain local.
-artifacts/*.tar.gz
-artifacts/*.zip
-artifacts/*.aar
-artifacts/media-baseline/
-artifacts/android-tv-e2e/
+# Downloaded release assets and generated experiment evidence remain local.
+# SHA256SUMS is the only versioned contract in the artifacts workspace.
+/artifacts/*
+!/artifacts/SHA256SUMS
 
 # Runtime credentials and machine-local configuration must never be committed.
 secrets/
