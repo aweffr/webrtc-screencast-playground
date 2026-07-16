@@ -66,6 +66,10 @@ class StaticQpReportTests(unittest.TestCase):
             self.assertIn("VMAF（参考）", report)
             self.assertIn("| 24 | 4.000 | 3.000 | 181.000 |", report)
             self.assertEqual(report.count("android-received-final.png"), 4)
+            self.assertIn(
+                "(report/qp-24-android-received-final.png)",
+                report,
+            )
 
     def test_case_rejects_qp_sample_from_another_generation_or_session(self):
         spec = importlib.util.spec_from_file_location("static_qp_report", MODULE_PATH)

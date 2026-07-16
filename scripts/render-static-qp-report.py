@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import os
 import pathlib
 
 
@@ -96,7 +95,7 @@ def render_report(experiment_root, output):
         "",
         "## 数据",
         "",
-        "| 请求 Max QP | 回读 Max QP | 实际 IDR QP | IDR bytes | generation | encoder session | VMAF（参考） |",
+        "| 请求 Max QP | 回读 Max QP | 实际 IDR QP | IDR bytes | generation | applied/sample encoder session | VMAF（参考） |",
         "|---:|---:|---:|---:|---:|---|---:|",
     ]
     for qp in REQUESTED_QPS:
@@ -106,7 +105,8 @@ def render_report(experiment_root, output):
             f"| {qp} | {evidence['effective_max_qp']} | "
             f"{evidence['last_key_frame_qp']} | {evidence['last_key_frame_bytes']} | "
             f"{evidence.get('max_qp_generation', 'N/A')} | "
-            f"`{evidence.get('encoder_session_id', 'UNKNOWN')}` | {case['vmaf']:.3f} |"
+            f"`{evidence.get('max_qp_applied_encoder_session_id', 'UNKNOWN')}` | "
+            f"{case['vmaf']:.3f} |"
         )
 
     lines.extend([
@@ -136,7 +136,7 @@ def render_report(experiment_root, output):
         "",
     ])
     for qp in REQUESTED_QPS:
-        relative = pathlib.Path(os.path.relpath(cases[qp]["image"], output.parent))
+        relative = pathlib.Path(output.stem) / f"qp-{qp}-android-received-final.png"
         lines.extend([
             f"### Max QP {qp}",
             "",
