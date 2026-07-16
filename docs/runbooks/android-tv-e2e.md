@@ -80,6 +80,17 @@ capture；因此测量没有绕过屏幕采集边界。
 变更，应先 build，再在 System Settings 中确认该 app 的授权，并完成所需的 logout/login，
 最后才用该参数运行正式矩阵。runner 仍会检查 app executable 是否存在。
 
+静态 QP 实验同样支持 `--skip-macos-build`。在第一次实验前完成一次 build、签名和授权，
+然后让四组 QP case 全部复用同一个 `.app`，避免 ad-hoc rebuild 改变 Screen Recording
+permission identity：
+
+```bash
+./scripts/run-static-qp-experiment.sh \
+  --runtime-config "$PWD/secrets/runtime.json" \
+  --xcframework /absolute/path/to/WebRTC-m150-macos-arm64.xcframework.zip \
+  --skip-macos-build
+```
+
 报告分别列出：
 
 - Marker Commit → Capture；
