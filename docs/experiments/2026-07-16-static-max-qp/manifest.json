@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-16T06:41:13Z",
+  "xcframework_sha256": "264692ea18790940a1121ca4d2a0729722fbd604e3fc88f2812b1541a91a8044",
+  "app_commit": "a2c306e4dac27a9792a640b2920ed990a0f632cd",
+  "hardware_model": "Mac17,8",
+  "macos_version": "26.5.2",
+  "android_device": "WebRTCScreencast_TV_API_31",
+  "android_api": "31",
+  "android_abi": "arm64-v8a",
+  "android_display": "Physical size: 1920x1080",
+  "profile": "production-relay",
+  "source": "main",
+  "run_seconds": 30,
+  "requested_max_qp": [
+    24,
+    22,
+    20,
+    18
+  ]
+}

@@ -25,6 +25,8 @@ This index separates stable reference documentation from historical implementati
 - [macOS Sender → Android TV Receiver research](research/2026-07-15-macos-sender-android-tv-receiver.md)
 - [Cross-platform receiver design](superpowers/specs/2026-07-16-macos-sender-android-tv-receiver-design.md)
 - [Cross-platform implementation and evidence plan](superpowers/plans/2026-07-16-macos-sender-android-tv-receiver.md)
+- [Static Max-QP Android TV experiment](experiments/2026-07-16-static-max-qp.md): real
+  TURN/UDP QP 24/22/20/18 evidence, received frames, signaling timings, and VMAF reference.
 
 Files under `docs/superpowers/` are retained as historical design and execution evidence. Current
 setup instructions live in the runbooks and root README. Current media parameters and

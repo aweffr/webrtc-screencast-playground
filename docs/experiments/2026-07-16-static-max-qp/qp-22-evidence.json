@@ -1,0 +1,23 @@
+{
+  "actual_h264_profile": "BASELINE",
+  "cast_tuning_config_hash": "45ee11c86e069c95",
+  "cast_tuning_session_id": "cast-176047d295ed-2",
+  "clarity_failed_refreshes": 0,
+  "clarity_mode": "static_clarity",
+  "clarity_motion_restores": 1,
+  "clarity_successful_refreshes": 2,
+  "effective_max_qp": 22,
+  "encoder_session_id": "vt-0xba2c6a6c0-4",
+  "expected_h264_profile": "BASELINE",
+  "last_encoded_qp": 22,
+  "last_key_frame_bytes": 125838,
+  "last_key_frame_qp": 22,
+  "max_qp_apply_state": "applied",
+  "max_qp_generation": 4,
+  "max_qp_os_status": 0,
+  "profile_mismatch": false,
+  "requested_max_qp": 22,
+  "source_frames_forwarded": 221,
+  "source_pixel_format": 875704422,
+  "video_toolbox_encoder_id": "com.apple.videotoolbox.videoencoder.ave.avc"
+}
