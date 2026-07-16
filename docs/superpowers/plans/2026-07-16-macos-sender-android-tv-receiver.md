@@ -515,22 +515,22 @@ Commit reports/findings as `docs: record Android TV media baseline`.
 **Files:**
 - Modify implementation/tests/docs only for validated Critical/High findings.
 
-- [ ] **Step 1: Prepare the review package**
+- [x] **Step 1: Prepare the review package**
 
 Include requirements, research, design, plan, upstream preview evidence, commits/diff, test commands,
 functional matrix, baseline, screenshot/PNG inspection, secret scan and emulator-only boundary.
 
-- [ ] **Step 2: Dispatch a no-history reviewer**
+- [x] **Step 2: Dispatch a no-history reviewer**
 
 Limit review to requirement alignment, TV correctness, negotiation/path, lifecycle cleanup, clock
 math, evidence integrity, secret safety and missing Critical/High verification.
 
-- [ ] **Step 3: Fix and re-review**
+- [x] **Step 3: Fix and re-review**
 
 Reproduce accepted findings, add the smallest regression test, rerun affected real E2E, and return
 to the same reviewer. Stop with no mandatory finding or after three rounds.
 
-- [ ] **Step 4: Completion audit**
+- [x] **Step 4: Completion audit**
 
 Prove preview inputs, TV-only APK, reference config, receiver lifecycle, Mac CLI code, H.264-only
 1080p render, both paths, four functional runs, six calibrated runs, signaling timing, Android
@@ -612,3 +612,12 @@ worktree state and physical-TV/public-signaling/optical-latency follow-ups.
   verification. The API 31 arm64 TV emulator also passed all five
   `connectedDirectBaselineDebugAndroidTest` tests; emulator shutdown and managed-display count zero
   were verified afterward.
+- 2026-07-16: The final no-history clean-context review reported `No mandatory findings` and found
+  the four functional sessions, six alternating baselines, versioned reports, checksums, H.264/
+  1080p/path/teardown evidence and credential/absolute-path scans sufficient for the completion
+  claim. No Critical/High fix or review rerun was required.
+- 2026-07-16: Open-source preparation added a complete cross-platform README, documentation index,
+  Apache-2.0 license, contribution and private security-reporting guides; deployment examples now
+  use placeholder infrastructure. Tracked files contain no machine-specific user path, historical
+  temporary artifact path, populated runtime XML or configured TURN credential. The Android sample
+  and root tuning config both explicitly keep Apple low-latency rate control disabled as a follow-up.
