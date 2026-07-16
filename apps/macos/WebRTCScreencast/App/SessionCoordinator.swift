@@ -207,6 +207,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 role: role,
                 ice: ice,
                 castTuningJSON: tuningData,
+                staticMaxQp: configuration.staticMaxQp,
                 displayRenderer: role == .receiver ? videoViewStore.renderer : nil,
                 baselineProbe: baselineProbe,
                 delegate: self
@@ -291,7 +292,8 @@ final class SessionCoordinator: NSObject, ObservableObject {
             iceProfile: selectedProfile,
             turn: nil,
             metricsDirectory: base,
-            excludedReceiverPID: nil
+            excludedReceiverPID: nil,
+            staticMaxQp: 24
         )
     }
 

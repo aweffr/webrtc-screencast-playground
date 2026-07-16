@@ -7,5 +7,6 @@
     "password": ""
   },
   "metrics_directory": "~/Library/Application Support/WebRTCScreencast/Diagnostics",
-  "excluded_receiver_pid": null
+  "excluded_receiver_pid": null,
+  "static_max_qp": 24
 }

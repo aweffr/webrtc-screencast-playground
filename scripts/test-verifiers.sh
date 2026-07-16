@@ -158,7 +158,11 @@ mv "$bootstrap_artifacts"/*.aar "$bootstrap_release/"
 cat >"$bootstrap_bin/lipo" <<'SH'
 #!/bin/zsh
 [[ "$1" == "-archs" && -f "$2" ]] || exit 2
-print 'arm64 x86_64'
+if [[ "$2" == *'/macos-arm64/'* ]]; then
+  print 'arm64'
+else
+  print 'arm64 x86_64'
+fi
 SH
 chmod +x "$bootstrap_bin/lipo"
 
@@ -173,6 +177,25 @@ WEBRTC_RELEASE_BASE_URL="file://$bootstrap_release" \
 }
 [[ -f "$bootstrap_artifacts/webrtc-m150-android-arm64-v8a.aar" ]] || {
   print -u2 "bootstrap did not preserve the verified Android AAR"
+  exit 1
+}
+
+arm_framework_stage="$bootstrap_root/arm-framework-stage/WebRTC.xcframework"
+mkdir -p "$arm_framework_stage/macos-arm64/WebRTC.framework/Versions/A"
+print '<plist version="1.0"><dict/></plist>' >"$arm_framework_stage/Info.plist"
+print 'arm-framework-binary' \
+  >"$arm_framework_stage/macos-arm64/WebRTC.framework/Versions/A/WebRTC"
+ln -s Versions/A/WebRTC \
+  "$arm_framework_stage/macos-arm64/WebRTC.framework/WebRTC"
+(cd "$bootstrap_root/arm-framework-stage" && zip -qry \
+  "$bootstrap_root/WebRTC-m150-macos-arm64.xcframework.zip" WebRTC.xcframework)
+PATH="$bootstrap_bin:$PATH" \
+ARTIFACTS_DIR="$bootstrap_artifacts" \
+VENDOR_DIR="$bootstrap_vendor" \
+WEBRTC_XCFRAMEWORK_ZIP="$bootstrap_root/WebRTC-m150-macos-arm64.xcframework.zip" \
+  "$ROOT/scripts/bootstrap-webrtc.sh" >/dev/null
+[[ -f "$bootstrap_vendor/WebRTC.xcframework/macos-arm64/WebRTC.framework/Versions/A/WebRTC" ]] || {
+  print -u2 "bootstrap rejected the local arm64-only XCFramework override"
   exit 1
 }
 

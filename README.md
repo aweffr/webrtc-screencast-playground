@@ -65,6 +65,10 @@ The bootstrap downloads the pinned M150 macOS XCFramework and Android AAR from
 [`aweffr/my-webrtc-builds`](https://github.com/aweffr/my-webrtc-builds), verifies their SHA-256
 checksums, and extracts only ignored local dependencies.
 
+For a locally built experiment artifact, set `WEBRTC_XCFRAMEWORK_ZIP` to an
+absolute zip path. The override remains machine-local; bootstrap still verifies
+the pinned Android AAR and validates the extracted framework layout.
+
 ```bash
 git clone https://github.com/aweffr/webrtc-screencast-playground.git
 cd webrtc-screencast-playground

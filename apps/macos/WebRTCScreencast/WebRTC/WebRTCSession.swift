@@ -29,6 +29,15 @@ struct SenderMediaBoundarySnapshot: Equatable, Sendable {
     let expectedH264Profile: String?
     let actualH264Profile: String?
     let profileMismatch: Bool?
+    let encoderSessionId: String?
+    let requestedMaxQp: Int?
+    let effectiveMaxQp: Int?
+    let maxQpApplyState: String?
+    let maxQpGeneration: UInt64?
+    let maxQpOSStatus: Int?
+    let lastEncodedQp: Int?
+    let lastKeyFrameQp: Int?
+    let lastKeyFrameBytes: Int?
     let clarityMode: VisualStabilityMode
     let claritySuccessfulRefreshes: UInt64
     let clarityFailedRefreshes: UInt64
@@ -74,6 +83,7 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         role: CastingRole,
         ice: IceConfigurationResult,
         castTuningJSON: Data,
+        staticMaxQp: Int = 24,
         displayRenderer: (any RTCVideoRenderer)? = nil,
         baselineProbe: MediaBaselineFrameProbe? = nil,
         delegate: WebRTCSessionDelegate? = nil
@@ -127,11 +137,14 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
                 motionFPS: senderPolicy.maxFPS,
                 clarityFPS: 1,
                 maxBitrateBps: senderPolicy.maxBitrateBps,
-                applyLivePolicy: { maxFPS, maxBitrateBps in
+                motionMaxQp: senderPolicy.maxQp,
+                staticMaxQp: staticMaxQp,
+                applyLivePolicy: { maxFPS, maxBitrateBps, maxQp in
                     tuningAccessLock.withLock {
                         let patch = RTCCastTuningLivePatch()
                         patch.maxFps = NSNumber(value: maxFPS)
                         patch.maxBitrateBps = NSNumber(value: maxBitrateBps)
+                        patch.maxQp = NSNumber(value: maxQp)
                         return tuningController.apply(patch).status == .applied
                     }
                 },
@@ -227,6 +240,15 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             expectedH264Profile: tuning?.expectedH264Profile,
             actualH264Profile: tuning?.actualH264Profile,
             profileMismatch: tuning?.profileMismatch,
+            encoderSessionId: tuning?.encoderSessionId,
+            requestedMaxQp: tuning?.requestedMaxQp?.intValue,
+            effectiveMaxQp: tuning?.effectiveMaxQp?.intValue,
+            maxQpApplyState: tuning?.maxQpApplyState,
+            maxQpGeneration: tuning?.maxQpGeneration,
+            maxQpOSStatus: tuning?.maxQpOSStatus?.intValue,
+            lastEncodedQp: tuning?.lastEncodedQp?.intValue,
+            lastKeyFrameQp: tuning?.lastKeyFrameQp?.intValue,
+            lastKeyFrameBytes: tuning?.lastKeyFrameBytes?.intValue,
             clarityMode: clarity?.mode ?? .motion,
             claritySuccessfulRefreshes: clarity?.successfulRefreshes ?? 0,
             clarityFailedRefreshes: clarity?.failedRefreshes ?? 0,
@@ -284,15 +306,17 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         }
     }
 
-    private static func senderPolicy(from jsonData: Data) -> (maxFPS: Int, maxBitrateBps: Int) {
+    private static func senderPolicy(from jsonData: Data) -> (maxFPS: Int, maxBitrateBps: Int, maxQp: Int) {
         guard let root = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
               let sender = root["sender"] as? [String: Any]
         else {
-            return (15, 5_000_000)
+            return (15, 5_000_000, 32)
         }
         let maxFPS = (sender["max_fps"] as? NSNumber)?.intValue ?? 15
         let maxBitrateBps = (sender["max_bitrate_bps"] as? NSNumber)?.intValue ?? 5_000_000
-        return (maxFPS, maxBitrateBps)
+        let encoder = root["encoder"] as? [String: Any]
+        let maxQp = (encoder?["max_qp"] as? NSNumber)?.intValue ?? 32
+        return (maxFPS, maxBitrateBps, maxQp)
     }
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}

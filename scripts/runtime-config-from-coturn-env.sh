@@ -65,7 +65,8 @@ jq -n \
     ice_profile: "production-relay",
     turn: {url: $turn_url, username: $username, password: $password},
     metrics_directory: $metrics,
-    excluded_receiver_pid: null
+    excluded_receiver_pid: null,
+    static_max_qp: 24
   }' >"$temporary"
 chmod 600 "$temporary"
 mv -f "$temporary" "$OUTPUT"

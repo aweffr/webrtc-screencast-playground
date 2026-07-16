@@ -79,6 +79,50 @@ final class RuntimeConfigurationTests: XCTestCase {
         XCTAssertThrowsError(try configuration.validate())
     }
 
+    func testStaticMaxQpDefaultsTo24AndAcceptsExperimentValues() throws {
+        let defaultConfiguration = try RuntimeConfiguration.decode(Data(#"""
+        {
+          "signaling_url": "ws://127.0.0.1:8080/ws",
+          "ice_profile": "direct-baseline",
+          "turn": null,
+          "metrics_directory": "/tmp/metrics",
+          "excluded_receiver_pid": null
+        }
+        """#.utf8))
+        XCTAssertEqual(defaultConfiguration.staticMaxQp, 24)
+
+        for value in [24, 22, 20, 18] {
+            let configuration = try RuntimeConfiguration.decode(Data(#"""
+            {
+              "signaling_url": "ws://127.0.0.1:8080/ws",
+              "ice_profile": "direct-baseline",
+              "turn": null,
+              "metrics_directory": "/tmp/metrics",
+              "excluded_receiver_pid": null,
+              "static_max_qp": \#(value)
+            }
+            """#.utf8))
+            XCTAssertEqual(configuration.staticMaxQp, value)
+            XCTAssertNoThrow(try configuration.validate())
+        }
+    }
+
+    func testStaticMaxQpRejectsValuesOutsideH264Range() throws {
+        for value in [-1, 52] {
+            let configuration = try RuntimeConfiguration.decode(Data(#"""
+            {
+              "signaling_url": "ws://127.0.0.1:8080/ws",
+              "ice_profile": "direct-baseline",
+              "turn": null,
+              "metrics_directory": "/tmp/metrics",
+              "excluded_receiver_pid": null,
+              "static_max_qp": \#(value)
+            }
+            """#.utf8))
+            XCTAssertThrowsError(try configuration.validate())
+        }
+    }
+
     func testLoadUsesExplicitConfigPath() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
