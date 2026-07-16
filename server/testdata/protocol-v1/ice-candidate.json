@@ -1,0 +1,1 @@
+{"version":1,"message_id":"sender-3","type":"ice.candidate","payload":{"candidate":"candidate:1 1 UDP 2122260223 192.0.2.1 50000 typ host","sdp_mid":"0","sdp_mline_index":0}}

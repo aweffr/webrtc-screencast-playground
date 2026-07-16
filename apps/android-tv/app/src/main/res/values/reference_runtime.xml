@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reference_signaling_url" translatable="false">ws://10.0.2.2:8080/ws</string>
+    <string name="reference_turn_url" translatable="false">turn:turn.example.invalid:3478?transport=udp</string>
+    <string name="reference_turn_username" translatable="false">REPLACE_ME</string>
+    <string name="reference_turn_password" translatable="false">REPLACE_ME</string>
+    <string name="reference_cast_tuning_json" translatable="false"><![CDATA[{
+  \"schema_version\": 2,
+  \"profile\": \"DETAIL_ACTIVE\",
+  \"sender\": {
+    \"max_width\": 1920,
+    \"max_height\": 1080,
+    \"max_fps\": 30,
+    \"content_mode\": \"TEXT\",
+    \"min_bitrate_bps\": 400000,
+    \"start_bitrate_bps\": 2200000,
+    \"max_bitrate_bps\": 3000000,
+    \"degradation_preference\": \"MAINTAIN_RESOLUTION\",
+    \"network_priority\": \"HIGH\"
+  },
+  \"transport\": {
+    \"disable_tcp_candidates\": true,
+    \"screencast_min_bitrate_bps\": 400000
+  },
+  \"pacing\": {
+    \"screenshare_alr_probing\": true,
+    \"factor\": 1.1,
+    \"max_queue_ms\": 100
+  },
+  \"encoder\": {
+    \"hardware_policy\": \"PREFER_HARDWARE\",
+    \"realtime\": true,
+    \"allow_frame_reordering\": false,
+    \"h264_profile\": \"CONSTRAINED_BASELINE\",
+    \"h264_level\": \"4.1\",
+    \"video_toolbox_low_latency_rate_control\": false
+  },
+  \"receiver\": {
+    \"jitter_minimum_ms\": 0,
+    \"prerender_smoothing\": false,
+    \"render_lead_ms\": 10,
+    \"android_decoder_low_latency\": true,
+    \"stale_decoded_frame_ms\": 150
+  },
+  \"recovery\": {
+    \"nack_enabled\": true,
+    \"nack_history_ms\": 1000,
+    \"rtx_enabled\": true,
+    \"fec_mode\": \"DISABLED\",
+    \"pli_min_interval_ms\": 300,
+    \"no_decoded_frame_timeout_ms\": 150,
+    \"decoder_recreate_after_failed_pli\": 2,
+    \"sender_reset_after_failed_pli\": 3
+  },
+  \"telemetry\": {
+    \"sample_interval_ms\": 1000
+  }
+}]]></string>
+</resources>

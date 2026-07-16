@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WebRTC 投屏</string>
+    <string name="waiting_title">准备接收投屏</string>
+    <string name="connecting">正在连接…</string>
+    <string name="enter_code">在 Mac 上输入投屏码</string>
+    <string name="pairing">正在建立投屏…</string>
+    <string name="error_title">连接已中断</string>
+    <string name="error_body">请检查网络后重试</string>
+    <string name="retry">重试</string>
+</resources>

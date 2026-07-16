@@ -1,0 +1,46 @@
+name: WebRTCScreencast
+options:
+  bundleIdPrefix: cn.aweffr
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CLANG_ENABLE_MODULES: YES
+    OTHER_LDFLAGS: "$(inherited) -ObjC"
+targets:
+  WebRTCScreencast:
+    type: application
+    platform: macOS
+    sources:
+      - path: WebRTCScreencast
+      - path: ../../config/cast-tuning.default.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cn.aweffr.WebRTCScreencast
+        PRODUCT_NAME: WebRTCScreencast
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: WebRTCScreencast/Resources/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: WebRTCScreencast/Bridging/WebRTCScreencast-Bridging-Header.h
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - framework: ../../Vendor/WebRTC.xcframework
+        embed: true
+    scheme:
+      testTargets:
+        - WebRTCScreencastTests
+  WebRTCScreencastTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: WebRTCScreencastTests
+    dependencies:
+      - target: WebRTCScreencast
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cn.aweffr.WebRTCScreencastTests
+        GENERATE_INFOPLIST_FILE: YES

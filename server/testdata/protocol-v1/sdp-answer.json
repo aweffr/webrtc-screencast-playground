@@ -1,0 +1,1 @@
+{"version":1,"message_id":"receiver-2","type":"sdp.answer","payload":{"sdp":"v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n"}}

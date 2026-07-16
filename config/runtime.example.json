@@ -1,0 +1,11 @@
+{
+  "signaling_url": "ws://127.0.0.1:8080/ws",
+  "ice_profile": "production-relay",
+  "turn": {
+    "url": "turn:turn.example.invalid:3478?transport=udp",
+    "username": "",
+    "password": ""
+  },
+  "metrics_directory": "~/Library/Application Support/WebRTCScreencast/Diagnostics",
+  "excluded_receiver_pid": null
+}

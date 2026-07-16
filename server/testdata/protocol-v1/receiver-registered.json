@@ -1,0 +1,1 @@
+{"version":1,"message_id":"server-1","type":"receiver.registered","payload":{"session_id":"session-1","pairing_code":"01ABCD23","expires_at":"2026-07-14T01:02:03Z"}}
