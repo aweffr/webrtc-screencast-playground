@@ -83,6 +83,8 @@ for max_qp in 24 22 20 18; do
           .requested_max_qp == $max_qp and
           .effective_max_qp == $max_qp and
           .max_qp_apply_state == "applied" and
+          .last_qp_sample_generation == .max_qp_generation and
+          .last_qp_sample_encoder_session_id == .max_qp_applied_encoder_session_id and
           .last_key_frame_qp != null and
           .last_key_frame_qp <= $max_qp and
           .last_key_frame_bytes > 0

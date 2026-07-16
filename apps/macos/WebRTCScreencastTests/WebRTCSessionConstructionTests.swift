@@ -73,9 +73,12 @@ final class WebRTCSessionConstructionTests: XCTestCase {
             maxQpApplyState: "applied",
             maxQpGeneration: 2,
             maxQpOSStatus: 0,
+            maxQpAppliedEncoderSessionID: "vt-2",
             lastEncodedQp: 24,
             lastKeyFrameQp: 24,
             lastKeyFrameBytes: 12_345,
+            lastQpSampleGeneration: 2,
+            lastQpSampleEncoderSessionID: "vt-2",
             clarityMode: .staticClarity,
             claritySuccessfulRefreshes: 1,
             clarityFailedRefreshes: 0,
@@ -87,6 +90,9 @@ final class WebRTCSessionConstructionTests: XCTestCase {
         XCTAssertEqual(fields["encoder_session_id"], .string("vt-1"))
         XCTAssertEqual(fields["requested_max_qp"], .integer(24))
         XCTAssertEqual(fields["last_key_frame_qp"], .integer(24))
+        XCTAssertEqual(fields["max_qp_applied_encoder_session_id"], .string("vt-2"))
+        XCTAssertEqual(fields["last_qp_sample_generation"], .integer(2))
+        XCTAssertEqual(fields["last_qp_sample_encoder_session_id"], .string("vt-2"))
     }
 
     private func repositoryRoot() -> URL {
