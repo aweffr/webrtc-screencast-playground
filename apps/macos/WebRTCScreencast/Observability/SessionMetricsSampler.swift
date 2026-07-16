@@ -108,7 +108,7 @@ actor SessionMetricsSampler {
         ]
     }
 
-    private static func fields(from stats: SenderMediaBoundarySnapshot) -> [String: JSONValue] {
+    static func fields(from stats: SenderMediaBoundarySnapshot) -> [String: JSONValue] {
         [
             "source_frames_forwarded": .integer(Int(stats.sourceFramesForwarded)),
             "source_pixel_format": stats.sourcePixelFormat.map { .integer(Int($0)) } ?? .null,
@@ -119,7 +119,6 @@ actor SessionMetricsSampler {
             "expected_h264_profile": stats.expectedH264Profile.map(JSONValue.string) ?? .null,
             "actual_h264_profile": stats.actualH264Profile.map(JSONValue.string) ?? .null,
             "profile_mismatch": stats.profileMismatch.map(JSONValue.bool) ?? .null,
-            "encoder_session_id": stats.encoderSessionId.map(JSONValue.string) ?? .null,
             "requested_max_qp": stats.requestedMaxQp.map(JSONValue.integer) ?? .null,
             "effective_max_qp": stats.effectiveMaxQp.map(JSONValue.integer) ?? .null,
             "max_qp_apply_state": stats.maxQpApplyState.map(JSONValue.string) ?? .null,
