@@ -135,6 +135,9 @@ trap 'exit 143' TERM
 command -v caffeinate >/dev/null || { print -u2 "caffeinate is required"; exit 2; }
 caffeinate -di -w $$ >/dev/null 2>&1 &
 caffeinate_pid=$!
+# `-d` prevents a future display sleep but does not wake an already sleeping
+# main display, which ScreenCaptureKit omits from SCShareableContent.
+caffeinate -u -t 2 >/dev/null 2>&1
 "$ROOT/scripts/provision-android-tv-avd.sh" >/dev/null
 if ! adb get-state >/dev/null 2>&1; then
   emulator "@$AVD_NAME" -no-window -no-audio -no-boot-anim -no-snapshot-save \
