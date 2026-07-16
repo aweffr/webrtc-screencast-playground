@@ -2,64 +2,54 @@
 
 本报告记录同一台 Mac 发送到 Android TV API 31 arm64 emulator、经 production TURN/UDP 的四档静态画质实验。所有 case 均保持 1920×1080、静态 1 fps、动态 15 fps、5 Mbps；只改变静态 `MaxAllowedFrameQP`。
 
-- 生成时间：`2026-07-16T08:35:39Z`
+- 生成时间：`2026-07-16T09:48:11Z`
 - XCFramework SHA-256：`9b551376bfbd056b70d8b75142efa697a049fcff9a27f6a2a4694a847b140ba4`
-- macOS app commit：`1aa5ae80d9e271339fa079a359848408d693621e`
+- macOS app commit：`25236cabf2a4a51357c7fdebfd144f45b3e0e022`
 - 发送端：`Mac17,8` / macOS `26.5.2`
 - 接收端：`WebRTCScreencast_TV_API_31` / API `31` / `arm64-v8a`
 - 单档运行时长：`30 s`
 - 路径：`relay/relay + UDP`（每档均由现有 E2E verifier 校验）
+- 原始证据目录：`artifacts/static-max-qp/20260716T094423Z`
 
 ## 数据
 
-| 请求 Max QP | 回读 Max QP | 实际 IDR QP | IDR bytes | generation | applied/sample encoder session | VMAF（参考） |
-|---:|---:|---:|---:|---:|---|---:|
-| 24 | 24 | 24 | 93956 | 2 | `vt-0xa4d086e40-2` | 67.614 |
-| 22 | 22 | 22 | 166650 | 6 | `vt-0xa01086800-6` | 65.404 |
-| 20 | 20 | 20 | 214843 | 2 | `vt-0x929086800-2` | 65.160 |
-| 18 | 18 | 18 | 198198 | 2 | `vt-0x9c505a800-2` | 68.292 |
+| 请求 Max QP | 回读 Max QP | 实际 IDR QP | IDR bytes | generation | applied/sample encoder session | ICE path | Android 实收图 | `view_image` 观察 | VMAF（参考） |
+|---:|---:|---:|---:|---:|---|---|---|---|---:|
+| 24 | 24 | 24 | 137640 | 2 | `vt-0xafd08a800-2` | relay/relay + UDP | [PNG](2026-07-16-static-max-qp/qp-24-android-received-final.png) | 整帧完整，无色块/宏块；细密岩石与水面纹理相对稍软 | 50.465 |
+| 22 | 22 | 22 | 166080 | 2 | `vt-0x85708a800-2` | relay/relay + UDP | [PNG](2026-07-16-static-max-qp/qp-22-android-received-final.png) | 整帧完整，无色块/宏块；时钟文字与背景细节清晰 | 50.939 |
+| 20 | 20 | 20 | 214803 | 2 | `vt-0xa9f08a800-2` | relay/relay + UDP | [PNG](2026-07-16-static-max-qp/qp-20-android-received-final.png) | 整帧完整，无色块/宏块；细密纹理保留良好 | 50.258 |
+| 18 | 18 | 18 | 247995 | 2 | `vt-0x9f308a800-2` | relay/relay + UDP | [PNG](2026-07-16-static-max-qp/qp-18-android-received-final.png) | 整帧完整，无色块/宏块；细密纹理保留良好 | 51.928 |
 
-VMAF 仅作为参考：每档 reference 是接收截图前后取得的本机主屏幕截图，按
-ScreenCaptureKit 相同的 aspect-fit/letterbox 几何缩放到 1920×1080。它不是逐帧时间戳
-对齐的严格视频 VMAF，而且四档抓到的桌面内容不同，因此分数不会随 QP 严格单调变化，
-不能用于给四档画质排序，也不作为通过门槛。流中始终保留 cursor。
+VMAF 仅作为参考列：reference 是接收截图前后同一静态主屏幕的本机截图，按 ScreenCaptureKit 相同的 aspect-fit/letterbox 几何缩放到 1920×1080。本轮画面是锁屏时钟与壁纸，不同 case 存在分钟数字、截取时刻和少量画面位置差异；因此它不是逐帧时间戳对齐的严格视频 VMAF，不能用 50.258 与 50.939 这类小幅差值给 QP 做严格排名，也不作为通过门槛。
+
+ScreenCaptureKit 的 `showsCursor` 本轮仍始终开启；锁屏场景下 cursor 未必出现在最终截图中。
+
+## 证据绑定
+
+每个 case 在保存 Android 截图时同时固化一份 `static-qp-evidence.json`。自动化只在以下条件全部成立时接受截图：
+
+- clarity mode 已进入 `static_clarity`；
+- requested/effective Max QP 一致，VideoToolbox 回读为 `applied`；
+- QP sample generation 等于 Max-QP generation；
+- QP sample encoder session 等于实际应用 Max-QP 的 encoder session；
+- 本机 reference 和 Android 截图前后 250 ms 内，generation/session 仍与同一份 evidence 一致。
+
+四档 evidence 均标记 `generation-session-stable-across-screenshot`，截图与 evidence 落盘时间在同一秒内。报告生成器会拒绝没有该绑定标记的数据，不会再从 case 结束时的历史 metrics 推断截图对应 QP。
 
 ## Signaling 建链耗时
 
 | 请求 Max QP | WebSocket connect (ms) | sender join → paired (ms) | offer → PeerConnection connected (ms) |
 |---:|---:|---:|---:|
-| 24 | 2.755 | 2.233 | 490.106 |
-| 22 | 14.720 | 4.106 | 254.066 |
-| 20 | 2.938 | 3.306 | 247.331 |
-| 18 | 2.733 | 3.623 | 229.118 |
+| 24 | 12.159 | 2.609 | 204.850 |
+| 22 | 3.884 | 2.045 | 206.109 |
+| 20 | 3.180 | 2.212 | 238.155 |
+| 18 | 3.316 | 2.366 | 212.661 |
 
 这些耗时来自 sender 的 monotonic event timestamps；只用于记录本轮 signaling/negotiation 建链，不代表 glass-to-glass latency。
 
-## 视觉检查与结论
-
-四张 Android 实收 PNG 均已按原始 1920×1080 分辨率通过 `view_image` 检查。主屏画面完整，
-aspect-fit 与两侧 letterbox 正确；未见明显 macroblocking、破帧、色块或 Android receiver UI
-覆盖。QP 24 的细小灰色文字相对柔和但可辨；QP 22 的密集中文正文已清晰；QP 20 与 QP 18
-也保持清楚。由于每档采样时桌面内容不同，这里只确认各档达到可用画质，不把视觉结果解释成
-严格 controlled A/B 排名。QP 18 图中的投屏状态窗和诊断路径属于被采集的 Mac 主屏内容，
-不是接收端叠加。
-
-本轮最关键的证据是四档均满足 `requested == effective == actual IDR QP`，并且每个 actual
-QP sample 的 generation 与 encoder session 都和该次 apply 完全一致。这证明 motion 状态可继续
-使用 Max QP 32，静止状态能在不重建 PeerConnection 的情况下切换到 24、22、20 或 18；底层
-VideoToolbox compression session 会按 generation 受控替换，并在首帧前应用新上限。
-
-建议默认静态 Max QP 采用 **22**：本轮密集中文在 QP 22 下已清晰，相比 20/18 给 5 Mbps
-budget 与 IDR burst 留有更多余量。QP 20 可作为偏画质档；QP 18 暂不作为默认值。这个建议是
-画质、瞬时 IDR 大小与稳定性的工程折中，不是由非严格对齐的 VMAF 排名推导出的门槛。
-
-QP 18 首次运行在开始采集/编码前发生一次偶发 ICE failure；失败 run 未进入表格，保留在本机
-`artifacts/static-max-qp/20260716T082859Z/qp-18/e2e-failed/`。表中的 QP 18 来自随后通过完整
-production-relay verifier 的独立重跑。可复核的安全证据包括本目录的 `manifest.json`、每档
-`qp-evidence.json`、VMAF JSON 与下列四张 Android 实收 PNG；完整原始 metrics 保留在本机
-`artifacts/static-max-qp/20260716T082859Z/`。
-
 ## Android 实收画面
+
+以下四张 1920×1080 PNG 均已使用 `view_image`、原始分辨率逐张检查。画面均为 Android TV 实际 decode/render 后的最终帧；左右黑边是主屏幕 aspect-fit 到 16:9 后的正常 pillarbox，未发现接收端 UI 覆盖、视频破损、色块或明显宏块。
 
 ### Max QP 24
 
@@ -76,3 +66,16 @@ production-relay verifier 的独立重跑。可复核的安全证据包括本目
 ### Max QP 18
 
 ![Android received final frame — Max QP 18](2026-07-16-static-max-qp/qp-18-android-received-final.png)
+
+## 结论与建议
+
+本轮证明改造的核心闭环成立：运行时传入 24/22/20/18 后，VideoToolbox 会换用新 encoder session，并在与 Android 截图绑定的 IDR 上精确观测到 24/22/20/18。
+
+在本轮锁屏静态场景中，IDR 大小随 QP 收紧而单调增长：`137640 → 166080 → 214803 → 247995 bytes`。结合逐图观察，建议：
+
+- 静态默认使用 **Max QP 22**：相比 24 有更明确的画质余量，同时 IDR 体积增幅仍明显低于 20/18。
+- 对画质更偏执且能承受更大 IDR 的参考实现，可选 **Max QP 20**。
+- **Max QP 18** 已验证能精确生效，但本轮没有显示出足以支撑它成为默认值的可视收益，而 IDR 成本最高。
+- 画面恢复动态后继续放宽到 **Max QP 32**，不用静态策略牺牲动态时的码率容量。
+
+这个结论是一期参考实现的参数建议，不是通用画质门槛。

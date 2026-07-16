@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-16T08:35:39Z",
+  "generated_at": "2026-07-16T09:48:11Z",
   "xcframework_sha256": "9b551376bfbd056b70d8b75142efa697a049fcff9a27f6a2a4694a847b140ba4",
-  "app_commit": "1aa5ae80d9e271339fa079a359848408d693621e",
+  "app_commit": "25236cabf2a4a51357c7fdebfd144f45b3e0e022",
   "hardware_model": "Mac17,8",
   "macos_version": "26.5.2",
   "android_device": "WebRTCScreencast_TV_API_31",
