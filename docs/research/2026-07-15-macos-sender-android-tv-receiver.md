@@ -11,9 +11,10 @@ Android TV Receiver。Receiver 启动并注册后展示配对码，macOS GUI 或
 - Go signaling protocol 已实现 Receiver 注册、8 位一次性配对码、Sender join、
   SDP/ICE 透明转发和断线清理。
 - macOS 客户端已有 H.264 Sender、主屏复制、虚拟扩展屏、Direct UDP、强制
-  TURN/UDP、RTCStats 和诊断导出；CLI 尚缺直接传入配对码的参数。
-- M150 preview 已提供可由 App 直接消费的 arm64-v8a AAR，以及包含 Apple
-  low-latency rate-control 支持的 macOS XCFramework；下游项目当前仍使用旧产物。
+  TURN/UDP、RTCStats 和诊断导出；同一 `.app` 的 CLI 已支持直接传入配对码。
+- M150 preview 已提供可由 App 直接消费的 arm64-v8a AAR，以及包含 opt-in Apple
+  low-latency rate-control 支持的 macOS XCFramework；本项目已切换并固定这两个产物，
+  当前配置仍明确关闭 Apple low-latency rate control。
 - 本机已安装 arm64 Android CLI/Emulator 工具链，但现有 AVD 是手机形态；SDK
   仓库可安装 API 31 Android TV arm64-v8a image，并已有 1080p TV device definition。
 - 公网 coturn 已部署并有 UDP allocation 证据；公网 screencast signaling 尚未部署。

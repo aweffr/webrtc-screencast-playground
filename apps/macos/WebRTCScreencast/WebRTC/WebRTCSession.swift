@@ -29,6 +29,10 @@ struct SenderMediaBoundarySnapshot: Equatable, Sendable {
     let expectedH264Profile: String?
     let actualH264Profile: String?
     let profileMismatch: Bool?
+    let clarityMode: VisualStabilityMode
+    let claritySuccessfulRefreshes: UInt64
+    let clarityFailedRefreshes: UInt64
+    let clarityMotionRestores: UInt64
 }
 
 final class SenderMediaBoundaryTelemetry: @unchecked Sendable {
@@ -57,7 +61,9 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
     private let factory: RTCPeerConnectionFactory
     private let peerConnection: RTCPeerConnection
     private let senderBoundaryTelemetry = SenderMediaBoundaryTelemetry()
+    private let tuningAccessLock: NSLock
     private var tuningController: RTCCastTuningController?
+    private var staticClarityRefreshController: StaticClarityRefreshController?
     private let videoSource: RTCVideoSource?
     private let videoCapturer: RTCVideoCapturer?
     private let displayRenderer: (any RTCVideoRenderer)?
@@ -78,6 +84,8 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         self.displayRenderer = displayRenderer
         self.baselineProbe = baselineProbe
         metricsRenderer = MetricsVideoRenderer(baselineProbe: role == .receiver ? baselineProbe : nil)
+        let tuningAccessLock = NSLock()
+        self.tuningAccessLock = tuningAccessLock
 
         let tuningConfiguration = try RTCCastTuningConfiguration(jsonData: castTuningJSON)
         tuningConfiguration.apply(to: ice.configuration)
@@ -114,12 +122,37 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             videoSource = source
             videoCapturer = RTCVideoCapturer(delegate: source)
             tuningController.attach(created.sender, track: track, source: source)
+            let senderPolicy = Self.senderPolicy(from: castTuningJSON)
+            staticClarityRefreshController = StaticClarityRefreshController(
+                motionFPS: senderPolicy.maxFPS,
+                clarityFPS: 1,
+                maxBitrateBps: senderPolicy.maxBitrateBps,
+                applyLivePolicy: { maxFPS, maxBitrateBps in
+                    tuningAccessLock.withLock {
+                        let patch = RTCCastTuningLivePatch()
+                        patch.maxFps = NSNumber(value: maxFPS)
+                        patch.maxBitrateBps = NSNumber(value: maxBitrateBps)
+                        return tuningController.apply(patch).status == .applied
+                    }
+                },
+                forceKeyFrame: {
+                    tuningAccessLock.withLock {
+                        do {
+                            try tuningController.forceKeyFrame()
+                            return true
+                        } catch {
+                            return false
+                        }
+                    }
+                }
+            )
         } else {
             guard let created = peerConnection.addTransceiver(of: RTCRtpMediaType.video, init: transceiverInit) else {
                 throw WebRTCSessionError.transceiverCreationFailed
             }
             videoSource = nil
             videoCapturer = nil
+            staticClarityRefreshController = nil
             tuningController.attach(created.receiver)
         }
 
@@ -181,7 +214,8 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
     }
 
     func senderMediaBoundarySnapshot() -> SenderMediaBoundarySnapshot {
-        let tuning = tuningController?.snapshot()
+        let tuning = tuningAccessLock.withLock { tuningController?.snapshot() }
+        let clarity = staticClarityRefreshController?.snapshot()
         let source = senderBoundaryTelemetry.sourceSnapshot()
         return SenderMediaBoundarySnapshot(
             sourceFramesForwarded: source.frames,
@@ -192,7 +226,11 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             videoToolboxEncoderID: tuning?.videoToolboxEncoderId,
             expectedH264Profile: tuning?.expectedH264Profile,
             actualH264Profile: tuning?.actualH264Profile,
-            profileMismatch: tuning?.profileMismatch
+            profileMismatch: tuning?.profileMismatch,
+            clarityMode: clarity?.mode ?? .motion,
+            claritySuccessfulRefreshes: clarity?.successfulRefreshes ?? 0,
+            clarityFailedRefreshes: clarity?.failedRefreshes ?? 0,
+            clarityMotionRestores: clarity?.motionRestores ?? 0
         )
     }
 
@@ -202,8 +240,9 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
 
     func stopDiagnostics() {}
 
-    func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame) {
-        guard role == .sender, let videoCapturer, let delegate = videoCapturer.delegate else { return }
+    func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame) -> Bool {
+        guard role == .sender, let videoCapturer, let delegate = videoCapturer.delegate else { return false }
+        let transitionApplied = staticClarityRefreshController?.handle(frame.clarityTransition) ?? false
         let buffer = RTCCVPixelBuffer(pixelBuffer: frame.pixelBuffer)
         let videoFrame = RTCVideoFrame(buffer: buffer, rotation: ._0, timeStampNs: frame.timestampNs)
         delegate.capturer(videoCapturer, didCapture: videoFrame)
@@ -215,6 +254,7 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             frameTimestampNs: frame.timestampNs,
             callbackNs: frame.callbackMonotonicNs
         )
+        return transitionApplied
     }
 
     func screenCaptureSource(_ source: ScreenCaptureSource, didStopWithError error: Error) {
@@ -242,6 +282,17 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
                 peerConnection.answer(for: constraints, completionHandler: completion)
             }
         }
+    }
+
+    private static func senderPolicy(from jsonData: Data) -> (maxFPS: Int, maxBitrateBps: Int) {
+        guard let root = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let sender = root["sender"] as? [String: Any]
+        else {
+            return (15, 5_000_000)
+        }
+        let maxFPS = (sender["max_fps"] as? NSNumber)?.intValue ?? 15
+        let maxBitrateBps = (sender["max_bitrate_bps"] as? NSNumber)?.intValue ?? 5_000_000
+        return (maxFPS, maxBitrateBps)
     }
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}

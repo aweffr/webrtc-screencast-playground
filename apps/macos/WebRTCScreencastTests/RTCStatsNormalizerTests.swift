@@ -9,6 +9,7 @@ final class RTCStatsNormalizerTests: XCTestCase {
             stat("out-1", "outbound-rtp", [
                 "kind": .string("video"), "codecId": .string("codec-1"),
                 "bytesSent": .number(1_000), "framesEncoded": .string("20"),
+                "keyFramesEncoded": .number(2),
                 "qpSum": .number(400), "remoteId": .string("remote-in-1"),
                 "encoderImplementation": .string("VideoToolbox"),
             ]),
@@ -20,6 +21,7 @@ final class RTCStatsNormalizerTests: XCTestCase {
         XCTAssertEqual(sample.outbound?.codecMimeType, "video/H264")
         XCTAssertEqual(sample.outbound?.bytes, 1_000)
         XCTAssertEqual(sample.outbound?.frames, 20)
+        XCTAssertEqual(sample.outbound?.keyFrames, 2)
         XCTAssertEqual(sample.outbound?.averageQP, 20)
         XCTAssertEqual(sample.outbound?.implementation, "VideoToolbox")
         XCTAssertEqual(sample.remoteInbound?.roundTripTimeMs, 25)

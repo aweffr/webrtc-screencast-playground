@@ -20,13 +20,17 @@ This index separates stable reference documentation from historical implementati
 
 ## Research and design records
 
-- [Initial feasibility research](research/2026-07-13-feasibility-baseline.md)
+- [Initial feasibility research](research/2026-07-13-feasibility-baseline.md): historical research
+  with a current-state amendment at the top.
 - [macOS Sender → Android TV Receiver research](research/2026-07-15-macos-sender-android-tv-receiver.md)
 - [Cross-platform receiver design](superpowers/specs/2026-07-16-macos-sender-android-tv-receiver-design.md)
 - [Cross-platform implementation and evidence plan](superpowers/plans/2026-07-16-macos-sender-android-tv-receiver.md)
 
 Files under `docs/superpowers/` are retained as historical design and execution evidence. Current
-setup instructions live in the runbooks and root README.
+setup instructions live in the runbooks and root README. Current media parameters and
+static-clarity behavior are authoritative in the
+[macOS screencast design](superpowers/specs/2026-07-13-macos-webrtc-screencast-design.md), not in
+the embedded code samples of older implementation plans.
 
 ## Follow-ups
 

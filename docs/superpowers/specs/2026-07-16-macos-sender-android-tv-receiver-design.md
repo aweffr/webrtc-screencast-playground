@@ -135,8 +135,8 @@ production-relay variant 检测到 placeholder、空 credential、非 `turn:` UR
 `transport=udp` 时进入不可恢复的配置错误，既不连接 signaling 也不打印实际值；
 direct variant 不要求 credential。配置 hash 只覆盖 canonical redacted fields。
 
-CastTuning 使用 schema 2，显式请求 Constrained Baseline、Apple low-latency rate
-control 与 Android decoder low latency。Android 通过 `CastTuningController` 配置
+CastTuning 使用 schema 2，显式请求 Constrained Baseline 和 Android decoder low
+latency，并把 Apple low-latency rate control 保持为 `false`。Android 通过 `CastTuningController` 配置
 field trials/RTCConfiguration、创建 `CastTuningVideoDecoderFactory` 并 attach receiver。
 若 MediaCodec 拒绝 `KEY_LOW_LATENCY`，沿用 AAR 内置的一次无该 key 重试；app 记录
 requested 与 decoder implementation，自动化从该进程 logcat 的稳定 WebRTC fallback

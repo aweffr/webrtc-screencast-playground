@@ -10,7 +10,8 @@ inspect: ScreenCaptureKit → VideoToolbox/WebRTC M150 → UDP → Android WebRT
 ## What is included
 
 - **macOS app (Swift 6):** GUI Sender, same-app CLI launch mode, main-display mirror, and a private
-  1920×1080 virtual extended display.
+  1920×1080 virtual extended display. Main-display mirror uses a luma-based static-clarity mode
+  that requests a fresh H.264 keyframe and runs the stable picture at about 1 fps.
 - **Android TV app (Java 8-compatible source):** TV-only launcher, receiver-first registration,
   one-time pairing-code screen, H.264 playback, D-pad-safe recovery, and app-private telemetry.
 - **Signaling server (Go):** `/ws`, `/clock`, `/healthz`, and Prometheus `/metrics`; it never carries
@@ -18,7 +19,8 @@ inspect: ScreenCaptureKit → VideoToolbox/WebRTC M150 → UDP → Android WebRT
 - **Network profiles:** `direct-baseline` for local comparison and `production-relay` for forced
   `relay/relay + UDP`. TURN/TCP is deliberately unsupported.
 - **Observability:** signaling timing, clock calibration, capture/encode/decode/render events,
-  normalized RTCStats, selected-path verification, and redacted JSONL diagnostics.
+  normalized RTCStats, selected-path verification, static-clarity transitions/keyframes, and
+  redacted JSONL diagnostics.
 - **Automated evidence:** calibrated software-marker latency plus 1920×1080 screenshots, PSNR,
   SSIM, VMAF reference values, and heatmaps. These metrics are not optical glass-to-glass latency.
 

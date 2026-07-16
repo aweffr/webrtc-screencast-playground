@@ -15,11 +15,14 @@ final class ScreenCaptureConfigurationTests: XCTestCase {
         XCTAssertEqual(values.width, 1_920)
         XCTAssertEqual(values.height, 1_080)
         XCTAssertEqual(values.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
-        XCTAssertEqual(values.minimumFrameInterval, CMTime(value: 1, timescale: 30))
+        XCTAssertEqual(values.minimumFrameInterval, CMTime(value: 1, timescale: 15))
         XCTAssertEqual(values.queueDepth, 3)
         XCTAssertTrue(values.showsCursor)
         XCTAssertTrue(values.preservesAspectRatio)
         XCTAssertEqual(values.destinationRect, CGRect(x: 0, y: 0, width: 1_920, height: 1_080))
+
+        let streamConfiguration = values.makeStreamConfiguration()
+        XCTAssertEqual(streamConfiguration.captureResolution, .nominal)
     }
 
     func testMainDisplayUsesLetterboxGeometry() throws {

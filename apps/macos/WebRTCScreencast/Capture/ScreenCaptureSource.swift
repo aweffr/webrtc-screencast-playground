@@ -13,6 +13,9 @@ struct CapturedScreenFrame {
     let dirtyRectCount: Int
     let dirtyRatio: Double
     let gateState: FrameGateState
+    let visualStabilityMode: VisualStabilityMode
+    let visualChangedSampleRatio: Double?
+    let clarityTransition: VisualStabilityTransition
 }
 
 struct CaptureTelemetrySnapshot: Equatable, Sendable {
@@ -23,12 +26,29 @@ struct CaptureTelemetrySnapshot: Equatable, Sendable {
     let lastDirtyRectCount: Int?
     let lastDirtyRatio: Double?
     let gateState: FrameGateState
+    let visualStabilityMode: VisualStabilityMode
+    let lastVisualChangedSampleRatio: Double?
+    let clarityRefreshRequests: UInt64
 }
 
 protocol ScreenCaptureFrameSink: AnyObject {
     /// Called synchronously on the serial capture queue. Implementations must not block.
-    func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame)
+    /// Returns whether an attached clarity transition reached the WebRTC tuning boundary.
+    func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame) -> Bool
     func screenCaptureSource(_ source: ScreenCaptureSource, didStopWithError error: Error)
+}
+
+struct ClarityTransitionLatch: Sendable {
+    private(set) var pending: VisualStabilityTransition = .none
+
+    mutating func update(with detected: VisualStabilityTransition) -> VisualStabilityTransition {
+        if detected != .none { pending = detected }
+        return pending
+    }
+
+    mutating func recordApplied(_ applied: Bool) {
+        if applied { pending = .none }
+    }
 }
 
 enum ScreenCaptureSourceError: Error {
@@ -44,6 +64,9 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private weak var sink: ScreenCaptureFrameSink?
     private var stream: SCStream?
     private var frameGate = FrameGate()
+    private var visualStabilityDetector = VisualStabilityDetector()
+    private var clarityTransitionLatch = ClarityTransitionLatch()
+    private var staticClarityEnabled = false
     private let telemetryLock = NSLock()
     private var callbackFrames: UInt64 = 0
     private var submittedFrames: UInt64 = 0
@@ -52,6 +75,9 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private var lastDirtyRectCount: Int?
     private var lastDirtyRatio: Double?
     private var lastGateState: FrameGateState = .idle
+    private var lastVisualStabilityMode: VisualStabilityMode = .motion
+    private var lastVisualChangedSampleRatio: Double?
+    private var clarityRefreshRequests: UInt64 = 0
 
     init(sink: ScreenCaptureFrameSink) {
         self.sink = sink
@@ -71,6 +97,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             iceProfile: iceProfile,
             excludedReceiverPID: excludedReceiverPID
         )
+        staticClarityEnabled = source == .mainDisplayMirror
         let stream = SCStream(
             filter: resolved.filter,
             configuration: resolved.configuration.makeStreamConfiguration(),
@@ -92,6 +119,9 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         defer { try? stream.removeStreamOutput(self, type: .screen) }
         try await stream.stopCapture()
         frameGate = FrameGate()
+        visualStabilityDetector = VisualStabilityDetector()
+        clarityTransitionLatch = ClarityTransitionLatch()
+        staticClarityEnabled = false
     }
 
     func stream(
@@ -132,18 +162,39 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             dirtyRatio: dirtyRatio,
             timestamp: .nanoseconds(scaledTime.value)
         )
+        let visualDecision: VisualStabilityDecision?
+        if staticClarityEnabled,
+           let samples = LumaFrameSampler.sample(pixelBuffer: pixelBuffer) {
+            visualDecision = visualStabilityDetector.evaluate(
+                samples: samples,
+                timestamp: .nanoseconds(scaledTime.value)
+            )
+        } else {
+            visualDecision = nil
+        }
+        let clarityTransition = clarityTransitionLatch.update(
+            with: visualDecision?.transition ?? .none
+        )
+        let shouldSubmit = decision.shouldSubmit || clarityTransition != .none
         telemetryLock.withLock {
             callbackFrames += 1
             lastTimestampNs = scaledTime.value
             lastDirtyRectCount = dirtyRectCount
             lastDirtyRatio = dirtyRatio
             lastGateState = decision.state
-            if decision.shouldSubmit { submittedFrames += 1 }
+            if let visualDecision {
+                lastVisualStabilityMode = visualDecision.mode
+                lastVisualChangedSampleRatio = visualDecision.changedSampleRatio
+                if visualDecision.transition == .enterStaticClarity {
+                    clarityRefreshRequests += 1
+                }
+            }
+            if shouldSubmit { submittedFrames += 1 }
             else { droppedFrames += 1 }
         }
-        guard decision.shouldSubmit else { return }
+        guard shouldSubmit else { return }
 
-        sink?.screenCaptureSource(
+        let transitionApplied = sink?.screenCaptureSource(
             self,
             didCapture: CapturedScreenFrame(
                 pixelBuffer: pixelBuffer,
@@ -154,9 +205,15 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
                 scaleFactor: metadata.scaleFactor,
                 dirtyRectCount: dirtyRectCount,
                 dirtyRatio: dirtyRatio,
-                gateState: decision.state
+                gateState: decision.state,
+                visualStabilityMode: visualDecision?.mode ?? .motion,
+                visualChangedSampleRatio: visualDecision?.changedSampleRatio,
+                clarityTransition: clarityTransition
             )
-        )
+        ) ?? false
+        if clarityTransition != .none {
+            clarityTransitionLatch.recordApplied(transitionApplied)
+        }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
@@ -172,7 +229,10 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
                 lastTimestampNs: lastTimestampNs,
                 lastDirtyRectCount: lastDirtyRectCount,
                 lastDirtyRatio: lastDirtyRatio,
-                gateState: lastGateState
+                gateState: lastGateState,
+                visualStabilityMode: lastVisualStabilityMode,
+                lastVisualChangedSampleRatio: lastVisualChangedSampleRatio,
+                clarityRefreshRequests: clarityRefreshRequests
             )
         }
     }
