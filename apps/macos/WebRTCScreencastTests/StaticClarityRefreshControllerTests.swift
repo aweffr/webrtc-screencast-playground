@@ -12,8 +12,10 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             motionFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            applyLivePolicy: { fps, bitrate in
-                calls.append("apply:\(fps):\(bitrate)")
+            motionMaxQp: 32,
+            staticMaxQp: 22,
+            applyLivePolicy: { fps, bitrate, maxQp in
+                calls.append("apply:\(fps):\(bitrate):\(maxQp)")
                 return true
             },
             forceKeyFrame: {
@@ -23,7 +25,7 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
         )
 
         XCTAssertTrue(controller.handle(.enterStaticClarity))
-        XCTAssertEqual(calls, ["apply:1:5000000", "force-key-frame"])
+        XCTAssertEqual(calls, ["apply:1:5000000:22", "force-key-frame"])
         XCTAssertEqual(controller.snapshot().mode, .staticClarity)
         XCTAssertEqual(controller.snapshot().successfulRefreshes, 1)
     }
@@ -35,7 +37,7 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
         recorder.calls.removeAll()
 
         XCTAssertTrue(controller.handle(.exitStaticClarity))
-        XCTAssertEqual(recorder.calls, ["apply:15:5000000"])
+        XCTAssertEqual(recorder.calls, ["apply:15:5000000:32"])
         XCTAssertEqual(controller.snapshot().mode, .motion)
     }
 
@@ -45,8 +47,10 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             motionFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            applyLivePolicy: { fps, bitrate in
-                calls.append("apply:\(fps):\(bitrate)")
+            motionMaxQp: 32,
+            staticMaxQp: 22,
+            applyLivePolicy: { fps, bitrate, maxQp in
+                calls.append("apply:\(fps):\(bitrate):\(maxQp)")
                 return true
             },
             forceKeyFrame: {
@@ -58,7 +62,7 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
         XCTAssertFalse(controller.handle(.enterStaticClarity))
         XCTAssertEqual(
             calls,
-            ["apply:1:5000000", "force-key-frame", "apply:15:5000000"]
+            ["apply:1:5000000:22", "force-key-frame", "apply:15:5000000:32"]
         )
         let snapshot = controller.snapshot()
         XCTAssertEqual(snapshot.mode, .motion)
@@ -73,7 +77,9 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             motionFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            applyLivePolicy: { _, _ in
+            motionMaxQp: 32,
+            staticMaxQp: 22,
+            applyLivePolicy: { _, _, _ in
                 applyAttempts += 1
                 return applyAttempts > 1
             },
@@ -96,7 +102,9 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             motionFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            applyLivePolicy: { fps, _ in
+            motionMaxQp: 32,
+            staticMaxQp: 22,
+            applyLivePolicy: { fps, _, _ in
                 if fps == 15, failNextMotionRestore {
                     failNextMotionRestore = false
                     return false
@@ -136,8 +144,10 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             motionFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            applyLivePolicy: { fps, bitrate in
-                recorder.calls.append("apply:\(fps):\(bitrate)")
+            motionMaxQp: 32,
+            staticMaxQp: 22,
+            applyLivePolicy: { fps, bitrate, maxQp in
+                recorder.calls.append("apply:\(fps):\(bitrate):\(maxQp)")
                 return true
             },
             forceKeyFrame: {

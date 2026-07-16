@@ -12,7 +12,8 @@ The native app reads JSON from `--config <absolute-path>`. Without that option i
     "password": "REPLACE_LOCALLY"
   },
   "metrics_directory": "~/Library/Application Support/WebRTCScreencast/Diagnostics",
-  "excluded_receiver_pid": null
+  "excluded_receiver_pid": null,
+  "static_max_qp": 24
 }
 ```
 
@@ -24,6 +25,7 @@ The native app reads JSON from `--config <absolute-path>`. Without that option i
 | `turn.username`, `turn.password` | Production only: non-empty fixed credentials for controlled clients. |
 | `metrics_directory` | Parent directory for one session directory per app process. `~` is expanded. |
 | `excluded_receiver_pid` | Direct baseline Sender only; used by single-Mac comparison to avoid capturing the Receiver window. |
+| `static_max_qp` | Optional H.264 static-clarity cap in `0...51`; defaults to `24`. Motion restores the bundled encoder cap (`32`). |
 
 Production mode sets `iceTransportPolicy=relay`, disables TCP candidates, and has no direct fallback. Direct baseline has no TURN server and is not a production setting.
 

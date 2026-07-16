@@ -10,12 +10,14 @@ struct StaticClarityRefreshSnapshot: Equatable, Sendable {
 /// Applies the rare live encoder transition used to refresh a stable desktop.
 /// The capture queue serializes transitions; the lock only protects metrics reads.
 final class StaticClarityRefreshController: @unchecked Sendable {
-    typealias ApplyLivePolicy = (_ maxFPS: Int, _ maxBitrateBps: Int) -> Bool
+    typealias ApplyLivePolicy = (_ maxFPS: Int, _ maxBitrateBps: Int, _ maxQp: Int) -> Bool
     typealias ForceKeyFrame = () -> Bool
 
     private let motionFPS: Int
     private let clarityFPS: Int
     private let maxBitrateBps: Int
+    private let motionMaxQp: Int
+    private let staticMaxQp: Int
     private let applyLivePolicy: ApplyLivePolicy
     private let forceKeyFrame: ForceKeyFrame
     private let lock = NSLock()
@@ -28,12 +30,16 @@ final class StaticClarityRefreshController: @unchecked Sendable {
         motionFPS: Int,
         clarityFPS: Int,
         maxBitrateBps: Int,
+        motionMaxQp: Int,
+        staticMaxQp: Int,
         applyLivePolicy: @escaping ApplyLivePolicy,
         forceKeyFrame: @escaping ForceKeyFrame
     ) {
         self.motionFPS = motionFPS
         self.clarityFPS = clarityFPS
         self.maxBitrateBps = maxBitrateBps
+        self.motionMaxQp = motionMaxQp
+        self.staticMaxQp = staticMaxQp
         self.applyLivePolicy = applyLivePolicy
         self.forceKeyFrame = forceKeyFrame
     }
@@ -63,12 +69,12 @@ final class StaticClarityRefreshController: @unchecked Sendable {
 
     private func enterStaticClarity() -> Bool {
         guard snapshot().mode != .staticClarity else { return true }
-        guard applyLivePolicy(clarityFPS, maxBitrateBps) else {
+        guard applyLivePolicy(clarityFPS, maxBitrateBps, staticMaxQp) else {
             lock.withLock { failedRefreshes += 1 }
             return false
         }
         guard forceKeyFrame() else {
-            _ = applyLivePolicy(motionFPS, maxBitrateBps)
+            _ = applyLivePolicy(motionFPS, maxBitrateBps, motionMaxQp)
             lock.withLock {
                 mode = .motion
                 failedRefreshes += 1
@@ -84,7 +90,7 @@ final class StaticClarityRefreshController: @unchecked Sendable {
 
     private func restoreMotionPolicy() -> Bool {
         guard snapshot().mode == .staticClarity else { return true }
-        guard applyLivePolicy(motionFPS, maxBitrateBps) else {
+        guard applyLivePolicy(motionFPS, maxBitrateBps, motionMaxQp) else {
             lock.withLock { failedRefreshes += 1 }
             return false
         }

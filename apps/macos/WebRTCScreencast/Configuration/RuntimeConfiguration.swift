@@ -16,6 +16,7 @@ enum RuntimeConfigurationError: Error, LocalizedError, Equatable {
     case invalidTURNURL
     case missingTURNCredentials
     case receiverExclusionRequiresDirectBaseline
+    case invalidStaticMaxQp
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +27,7 @@ enum RuntimeConfigurationError: Error, LocalizedError, Equatable {
         case .invalidTURNURL: "Production relay requires an explicit turn: URL with transport=udp"
         case .missingTURNCredentials: "Production relay requires non-empty TURN credentials"
         case .receiverExclusionRequiresDirectBaseline: "Receiver exclusion is available only in direct baseline"
+        case .invalidStaticMaxQp: "static_max_qp must be between 0 and 51"
         }
     }
 }
@@ -36,6 +38,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
     let turn: TURNCredentials?
     let metricsDirectory: URL
     let excludedReceiverPID: pid_t?
+    let staticMaxQp: Int
 
     enum CodingKeys: String, CodingKey {
         case signalingURL = "signaling_url"
@@ -43,6 +46,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         case turn
         case metricsDirectory = "metrics_directory"
         case excludedReceiverPID = "excluded_receiver_pid"
+        case staticMaxQp = "static_max_qp"
     }
 
     init(
@@ -50,13 +54,15 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         iceProfile: ICEProfile,
         turn: TURNCredentials?,
         metricsDirectory: URL,
-        excludedReceiverPID: pid_t?
+        excludedReceiverPID: pid_t?,
+        staticMaxQp: Int = 24
     ) {
         self.signalingURL = signalingURL
         self.iceProfile = iceProfile
         self.turn = turn
         self.metricsDirectory = metricsDirectory
         self.excludedReceiverPID = excludedReceiverPID
+        self.staticMaxQp = staticMaxQp
     }
 
     init(from decoder: Decoder) throws {
@@ -67,6 +73,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         let metricsPath = try container.decode(String.self, forKey: .metricsDirectory)
         metricsDirectory = URL(filePath: (metricsPath as NSString).expandingTildeInPath, directoryHint: .isDirectory)
         excludedReceiverPID = try container.decodeIfPresent(pid_t.self, forKey: .excludedReceiverPID)
+        staticMaxQp = try container.decodeIfPresent(Int.self, forKey: .staticMaxQp) ?? 24
     }
 
     var debugDescription: String {
@@ -102,6 +109,9 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
     }
 
     func validate() throws {
+        guard (0...51).contains(staticMaxQp) else {
+            throw RuntimeConfigurationError.invalidStaticMaxQp
+        }
         guard let scheme = signalingURL.scheme?.lowercased(), scheme == "ws" || scheme == "wss" else {
             throw RuntimeConfigurationError.invalidSignalingURL
         }
@@ -148,7 +158,8 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
             iceProfile: iceProfile ?? self.iceProfile,
             turn: turn,
             metricsDirectory: metricsDirectory,
-            excludedReceiverPID: excludedReceiverPID ?? self.excludedReceiverPID
+            excludedReceiverPID: excludedReceiverPID ?? self.excludedReceiverPID,
+            staticMaxQp: staticMaxQp
         )
     }
 }
