@@ -83,6 +83,7 @@ server_pid=""
 sender_pid=""
 caffeinate_pid=""
 started_emulator=0
+receiver_screenshot_captured=0
 pairing_code=""
 fresh_code=""
 local_xml_backup=""
@@ -333,38 +334,62 @@ done
 if (( STATIC_QP_EVIDENCE )); then
   static_max_qp="$(jq -er '.static_max_qp | numbers' "$CONFIG_FILE")"
   static_qp_ready=0
-  for _ in {1..200}; do
-    if jq -s -e --argjson max_qp "$static_max_qp" '
-      [ .[]
-        | select(.event == "rtc_stats")
-        | .fields.sender_media_boundary
-        | select(
-            .clarity_mode == "static_clarity" and
-            .requested_max_qp == $max_qp and
-            .effective_max_qp == $max_qp and
-            .max_qp_apply_state == "applied" and
-            .last_qp_sample_generation == .max_qp_generation and
-            .last_qp_sample_encoder_session_id == .max_qp_applied_encoder_session_id and
-            .last_key_frame_qp != null and
-            .last_key_frame_qp <= $max_qp and
-            .last_key_frame_bytes > 0
-          )
-      ] | length > 0
-    ' "$sender_directory/metrics.jsonl" >/dev/null 2>&1; then
+  candidate_evidence="$RUN_ROOT/.static-qp-candidate.json"
+  before_evidence="$RUN_ROOT/.static-qp-before.json"
+  after_evidence="$RUN_ROOT/.static-qp-after.json"
+  captured_evidence="$RUN_ROOT/static-qp-evidence.json"
+  for _ in {1..80}; do
+    if ! "$ROOT/scripts/static_qp_evidence.py" latest \
+        --metrics "$sender_directory/metrics.jsonl" \
+        --requested "$static_max_qp" \
+        --output "$candidate_evidence" >/dev/null 2>&1; then
+      kill -0 "$sender_pid" 2>/dev/null || break
+      sleep 0.1
+      continue
+    fi
+
+    # Give the matching IDR time to reach Android, then require the same
+    # generation/session before and after both screenshots. A concurrent
+    # clarity refresh invalidates the window and retries with the new sample.
+    sleep 0.25
+    "$ROOT/scripts/static_qp_evidence.py" latest \
+      --metrics "$sender_directory/metrics.jsonl" \
+      --requested "$static_max_qp" \
+      --output "$before_evidence" >/dev/null 2>&1 || continue
+    "$ROOT/scripts/static_qp_evidence.py" same-window \
+      --before "$candidate_evidence" --after "$before_evidence" || continue
+
+    screencapture -x "$RUN_ROOT/macos-main-source.png"
+    adb exec-out screencap -p >"$ANDROID_EVIDENCE/receiver-playing.png"
+    "$ROOT/scripts/static_qp_evidence.py" latest \
+      --metrics "$sender_directory/metrics.jsonl" \
+      --requested "$static_max_qp" \
+      --output "$after_evidence" >/dev/null 2>&1 || continue
+    if "$ROOT/scripts/static_qp_evidence.py" same-window \
+        --before "$before_evidence" --after "$after_evidence"; then
+      jq --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+        . + {
+          evidence_binding: "generation-session-stable-across-screenshot",
+          android_screenshot_captured_at: $captured_at
+        }
+      ' "$before_evidence" >"$captured_evidence"
+      chmod 600 "$captured_evidence"
+      receiver_screenshot_captured=1
       static_qp_ready=1
       break
     fi
     kill -0 "$sender_pid" 2>/dev/null || break
     sleep 0.1
   done
+  rm -f "$candidate_evidence" "$before_evidence" "$after_evidence"
   (( static_qp_ready )) || {
-    print -u2 "static max-QP evidence did not become ready"
+    print -u2 "stable static max-QP screenshot evidence did not become ready"
     exit 1
   }
-  sleep 0.5
-  screencapture -x "$RUN_ROOT/macos-main-source.png"
 fi
-adb exec-out screencap -p >"$ANDROID_EVIDENCE/receiver-playing.png"
+if (( ! receiver_screenshot_captured )); then
+  adb exec-out screencap -p >"$ANDROID_EVIDENCE/receiver-playing.png"
+fi
 
 set +e
 wait "$sender_pid"
