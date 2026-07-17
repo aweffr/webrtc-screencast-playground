@@ -207,6 +207,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
                 role: role,
                 ice: ice,
                 castTuningJSON: tuningData,
+                videoCodecPolicy: configuration.videoCodecPolicy,
                 staticMaxQp: configuration.staticMaxQp,
                 displayRenderer: role == .receiver ? videoViewStore.renderer : nil,
                 baselineProbe: baselineProbe,

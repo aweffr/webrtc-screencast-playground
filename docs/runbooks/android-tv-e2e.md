@@ -45,7 +45,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 17) \
 ```
 
 Runner 会依次完成：启动本地 Go signaling、安装匹配 flavor、先启动 TV Receiver 并读取
-app-private 投屏码、启动同一 macOS `.app` 的 CLI Sender、校验 H.264 1920×1080 media 与
+app-private 投屏码、启动同一 macOS `.app` 的 CLI Sender、以 `h265-only` 校验 HEVC 1920×1080 media 与
 selected ICE path、保存双方 metrics/TV screenshot、停止 Sender、验证 TV 自动注册新码，
 最后扫描 pairing code 和配置中的实际 TURN credential。
 
@@ -87,7 +87,7 @@ permission identity：
 ```bash
 ./scripts/run-static-qp-experiment.sh \
   --runtime-config "$PWD/secrets/runtime.json" \
-  --xcframework /absolute/path/to/WebRTC-m150-macos-arm64.xcframework.zip \
+  --macos-archive /absolute/path/to/webrtc-m150-macos-arm64.tar.gz \
   --skip-macos-build
 ```
 
@@ -110,14 +110,13 @@ permission identity：
 Raw evidence 保存在 ignored `artifacts/android-tv-e2e/`；正式聚合报告保存在
 `baselines/*-android-tv.{json,md}`。关键文件包括：
 
-- `macos/*-sender/metrics.jsonl`：capture、sender media boundary、H.264、RTCStats、path；
+- `macos/*-sender/metrics.jsonl`：capture、sender media boundary、HEVC encoder/QP、RTCStats、path；
 - `android/receiver.jsonl`：signaling、render marker、decoder、RTCStats、path；
 - `android/receiver-waiting.png`、`android/receiver-playing.png`；
 - `source-reference-*`、`sender-capture-*`、`android-decoded-seq-*`、heatmap、VMAF JSON；
 - `signaling-metrics.txt`、redacted logcat 和 host/run context。
 
 `capture.callback_frames > 0` 但 outbound frames 为 0 时，先检查 sender media boundary 的
-pixel format、VideoToolbox session/error 和 negotiated H.264 level。当前 1080p contract
-使用 NV12 full-range (`420f`)；Android answer 会显式把选中的 packetization-mode=1 H.264
-fmtp normalization 到 level 4.1，并记录日志，避免 M150 Android capability 仅声明 level
-3.1 时造成 VideoToolbox `kVTParameterErr`。
+pixel format、VideoToolbox session/error、HEVC encoder ID 和 keyframe QP。当前 1080p contract
+使用 NV12 full-range (`420f`)；验证器同时要求 Sender 的 Apple HEVC encoder/QP 证据和
+Android decoder implementation，避免只凭 SDP 把未真正编解码的会话判为成功。

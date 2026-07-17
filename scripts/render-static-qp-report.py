@@ -98,7 +98,7 @@ def render_report(experiment_root, output):
         "静态 1 fps、动态 15 fps、5 Mbps；只改变静态 `MaxAllowedFrameQP`。",
         "",
         f"- 生成时间：`{manifest.get('generated_at', 'UNKNOWN')}`",
-        f"- XCFramework SHA-256：`{manifest.get('xcframework_sha256', 'UNKNOWN')}`",
+        f"- macOS artifact SHA-256：`{manifest.get('macos_archive_sha256', manifest.get('xcframework_sha256', 'UNKNOWN'))}`",
         f"- macOS app commit：`{manifest.get('app_commit', 'UNKNOWN')}`",
         f"- 发送端：`{manifest.get('hardware_model', 'UNKNOWN')}` / macOS "
         f"`{manifest.get('macos_version', 'UNKNOWN')}`",

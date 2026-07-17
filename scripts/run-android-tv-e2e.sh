@@ -225,6 +225,7 @@ if [[ "$PROFILE" == production-relay ]]; then
     | .ice_profile = "production-relay"
     | .metrics_directory = $metrics
     | .excluded_receiver_pid = null
+    | .video_codec_policy = "h265-only"
   ' "$RUNTIME_CONFIG" >"$CONFIG_FILE"
   GRADLE_TASK=:app:assembleProductionRelayDebug
   APK="$ROOT/apps/android-tv/app/build/outputs/apk/productionRelay/debug/app-productionRelay-debug.apk"
@@ -234,7 +235,8 @@ else
     ice_profile:"direct-baseline",
     turn:null,
     metrics_directory:$metrics,
-    excluded_receiver_pid:null
+    excluded_receiver_pid:null,
+    video_codec_policy:"h265-only"
   }' >"$CONFIG_FILE"
   GRADLE_TASK=:app:assembleDirectBaselineDebug
   APK="$ROOT/apps/android-tv/app/build/outputs/apk/directBaseline/debug/app-directBaseline-debug.apk"

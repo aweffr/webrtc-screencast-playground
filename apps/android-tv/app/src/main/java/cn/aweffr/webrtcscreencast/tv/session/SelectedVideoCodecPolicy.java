@@ -4,35 +4,32 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.webrtc.RtpCapabilities;
 
-/** Selects the single interoperable video codec contract for the reference receiver. */
-public final class H264CodecPolicy {
-  public static final class H264UnavailableException extends IllegalStateException {
-    public H264UnavailableException() {
-      super("h264_packetization_mode_1_unavailable");
+/** Selects the HEVC video codec required by the reference cast session. */
+public final class SelectedVideoCodecPolicy {
+  public static final class CodecUnavailableException extends IllegalStateException {
+    public CodecUnavailableException() {
+      super("h265_unavailable");
     }
   }
 
-  private H264CodecPolicy() {}
+  private SelectedVideoCodecPolicy() {}
 
   public static List<RtpCapabilities.CodecCapability> requireReceiverCodecs(
       List<RtpCapabilities.CodecCapability> capabilities) {
     List<RtpCapabilities.CodecCapability> compatible = capabilities.stream()
-        .filter(H264CodecPolicy::isCompatible)
+        .filter(SelectedVideoCodecPolicy::isCompatible)
         .collect(Collectors.toList());
     if (compatible.isEmpty()) {
-      throw new H264UnavailableException();
+      throw new CodecUnavailableException();
     }
     return compatible;
   }
 
   private static boolean isCompatible(RtpCapabilities.CodecCapability codec) {
-    if (codec == null || codec.parameters == null) {
+    if (codec == null) {
       return false;
     }
     String name = codec.name == null ? "" : codec.name;
-    if (!"H264".equalsIgnoreCase(name)) {
-      return false;
-    }
-    return "1".equals(codec.parameters.get("packetization-mode"));
+    return "H265".equalsIgnoreCase(name);
   }
 }

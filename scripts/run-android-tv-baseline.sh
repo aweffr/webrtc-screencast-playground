@@ -122,8 +122,8 @@ jq -n \
   --arg ffmpeg_version "$(ffmpeg -version | head -1)" \
   --arg libvmaf_version "$(pkg-config --modversion libvmaf 2>/dev/null || print unknown)" \
   --arg aar_sha256 "$(shasum -a 256 "$ROOT/artifacts/webrtc-m150-android-arm64-v8a.aar" | awk '{print $1}')" \
-  --arg xcframework_sha256 "$(shasum -a 256 "$ROOT/artifacts/WebRTC-m150-macos-universal.xcframework.zip" | awk '{print $1}')" \
-  '{recorded_at:$recorded_at,git_commit:$git_commit,git_dirty:($git_dirty=="true"),host:{mac_model:$mac_model,memory_bytes:($memory_bytes|tonumber),macos_version:$macos_version,macos_build:$macos_build},tools:{java:$java_version,ffmpeg:$ffmpeg_version,libvmaf_version:$libvmaf_version,libvmaf_model:"vmaf_v0.6.1"},inputs:{android_aar_sha256:$aar_sha256,macos_xcframework_zip_sha256:$xcframework_sha256},capture:{shows_cursor:true},environment:{android_tv_avd:"WebRTCScreencast_TV_API_31",api:31,abi:"arm64-v8a",display:"1920x1080"}}' \
+  --arg macos_archive_sha256 "$(shasum -a 256 "$ROOT/artifacts/webrtc-m150-macos-arm64.tar.gz" | awk '{print $1}')" \
+  '{recorded_at:$recorded_at,git_commit:$git_commit,git_dirty:($git_dirty=="true"),host:{mac_model:$mac_model,memory_bytes:($memory_bytes|tonumber),macos_version:$macos_version,macos_build:$macos_build},tools:{java:$java_version,ffmpeg:$ffmpeg_version,libvmaf_version:$libvmaf_version,libvmaf_model:"vmaf_v0.6.1"},inputs:{android_aar_sha256:$aar_sha256,macos_archive_sha256:$macos_archive_sha256},capture:{shows_cursor:true},environment:{android_tv_avd:"WebRTCScreencast_TV_API_31",api:31,abi:"arm64-v8a",display:"1920x1080"}}' \
   >"$artifact_root/host-context.json"
 
 run_case() {

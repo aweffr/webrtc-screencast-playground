@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "profile": "DETAIL_ACTIVE",
   "sender": {
     "max_width": 1920,
@@ -25,11 +25,10 @@
     "hardware_policy": "PREFER_HARDWARE",
     "realtime": true,
     "allow_frame_reordering": false,
-    "h264_profile": "CONSTRAINED_BASELINE",
-    "h264_level": "4.1",
     "max_frame_delay_count": 1,
     "max_qp": 32,
-    "video_toolbox_low_latency_rate_control": false
+    "video_toolbox_low_latency_rate_control": false,
+    "video_toolbox_spatial_adaptive_qp": "DEFAULT"
   },
   "receiver": {
     "jitter_minimum_ms": 0,

@@ -21,7 +21,7 @@ import org.webrtc.SessionDescription;
 import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
-/** One receiver-first cast session with a single recv-only H.264 video transceiver. */
+/** One receiver-first cast session with a single recv-only HEVC video transceiver. */
 public final class WebRtcReceiverSession implements AutoCloseable {
   public interface Listener {
     void onLocalAnswer(String sdp);
@@ -71,7 +71,7 @@ public final class WebRtcReceiverSession implements AutoCloseable {
       close();
       throw new IllegalStateException("recv_transceiver_creation_failed");
     }
-    transceiver.setCodecPreferences(H264CodecPolicy.requireReceiverCodecs(
+    transceiver.setCodecPreferences(SelectedVideoCodecPolicy.requireReceiverCodecs(
         runtime.peerConnectionFactory()
             .getRtpReceiverCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
             .codecs)).throwError();
@@ -114,12 +114,12 @@ public final class WebRtcReceiverSession implements AutoCloseable {
             listener.onNegotiationStage("create_answer_succeeded");
             final String normalizedSdp;
             try {
-              normalizedSdp = H264AnswerPolicy.normalizeFor1080p(answer.description);
+              normalizedSdp = SelectedVideoAnswerPolicy.requireSelectedCodec(answer.description);
             } catch (IllegalArgumentException error) {
-              listener.onFailure("answer_h264_level_failed", error.getMessage());
+              listener.onFailure("answer_h265_missing", error.getMessage());
               return;
             }
-            listener.onNegotiationStage("answer_h264_level_4_1_applied");
+            listener.onNegotiationStage("answer_h265_selected");
             SessionDescription normalizedAnswer = new SessionDescription(
                 SessionDescription.Type.ANSWER, normalizedSdp);
             peerConnection.setLocalDescription(new ChainedSdpObserver("set_local_answer") {

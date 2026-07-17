@@ -15,7 +15,7 @@ jq -nc '[
   {event:"local_answer",fields:{}},
   {event:"remote_video_track",fields:{}},
   {event:"selected_path",fields:{status:"verified",local_candidate_type:"host",remote_candidate_type:"host",protocol:"udp"}},
-  {event:"rtc_stats",fields:{selected_path:{status:"verified",local_candidate_type:"host",remote_candidate_type:"host",protocol:"udp"},inbound_video:{frames:2,codec:"video/H264"},render:{frames_rendered:2}}}
+  {event:"rtc_stats",fields:{selected_path:{status:"verified",local_candidate_type:"host",remote_candidate_type:"host",protocol:"udp"},inbound_video:{frames:2,codec:"video/H265",decoder:"VideoToolbox"},render:{frames_rendered:2}}}
 ] | .[] | . + {session_id:"server-session-1"}' >"$WORK/receiver/metrics.jsonl"
 
 jq -nc '[
@@ -27,7 +27,7 @@ jq -nc '[
   {event:"remote_answer",fields:{}},
   {event:"capture_started",fields:{}},
   {event:"selected_path",fields:{status:"verified",local_candidate_type:"host",remote_candidate_type:"host",protocol:"udp"}},
-  {event:"rtc_stats",fields:{selected_path:{status:"verified",local_candidate_type:"host",remote_candidate_type:"host",protocol:"udp"},outbound_video:{frames:2,codec:"video/H264"},render:{frames_rendered:0}}}
+  {event:"rtc_stats",fields:{selected_path:{status:"verified",local_candidate_type:"host",remote_candidate_type:"host",protocol:"udp"},outbound_video:{frames:2,codec:"video/H265"},sender_media_boundary:{video_toolbox_encoder_id:"com.apple.videotoolbox.videoencoder.ave.hevc",last_key_frame_qp:22},render:{frames_rendered:0}}}
 ] | .[] | . + {session_id:"server-session-1"}' >"$WORK/sender/metrics.jsonl"
 
 "$ROOT/scripts/verify-diagnostics.sh" "$WORK/receiver" "$WORK/sender" direct-baseline >/dev/null
@@ -42,7 +42,7 @@ jq -nc '[
   {event:"sdp_offer_received",fields:{}},
   {event:"sdp_answer_sent",fields:{}},
   {event:"remote_video_playing",fields:{}},
-  {event:"rtc_stats",fields:{frames_decoded:2,codec:"video/H264",frame_width:1920,frame_height:1080,path_status:"accepted",local_path_type:"host",remote_path_type:"host",path_protocol:"udp"}}
+  {event:"rtc_stats",fields:{frames_decoded:2,codec:"video/H265",decoder:"c2.android.hevc.decoder",frame_width:1920,frame_height:1080,path_status:"accepted",local_path_type:"host",remote_path_type:"host",path_protocol:"udp"}}
 ] | .[] | . + {schema_version:1,run_id:"android-run-1",monotonic_ns:1}' \
   >"$WORK/android-receiver/receiver.jsonl"
 "$ROOT/scripts/verify-diagnostics.sh" \
@@ -129,21 +129,17 @@ fi
 bootstrap_root="$WORK/bootstrap"
 bootstrap_artifacts="$bootstrap_root/artifacts"
 bootstrap_vendor="$bootstrap_root/Vendor"
-bootstrap_release="$bootstrap_root/release"
 bootstrap_bin="$bootstrap_root/bin"
-framework_stage="$bootstrap_root/framework-stage/WebRTC.xcframework"
+framework_stage="$bootstrap_root/framework-stage/webrtc/Frameworks/WebRTC.framework"
 aar_stage="$bootstrap_root/aar-stage"
 mkdir -p \
   "$bootstrap_artifacts" \
-  "$bootstrap_release" \
   "$bootstrap_bin" \
-  "$framework_stage/macos-arm64_x86_64/WebRTC.framework/Versions/A" \
+  "$framework_stage/Versions/A" \
   "$aar_stage/jni/arm64-v8a"
-print '<plist version="1.0"><dict/></plist>' >"$framework_stage/Info.plist"
-print 'universal-framework-binary' >"$framework_stage/macos-arm64_x86_64/WebRTC.framework/WebRTC"
-print 'versioned-framework-binary' >"$framework_stage/macos-arm64_x86_64/WebRTC.framework/Versions/A/WebRTC"
-(cd "$bootstrap_root/framework-stage" && zip -qry \
-  "$bootstrap_artifacts/WebRTC-m150-macos-universal.xcframework.zip" WebRTC.xcframework)
+print 'arm64-framework-binary' >"$framework_stage/Versions/A/WebRTC"
+(cd "$bootstrap_root/framework-stage" && tar -czf \
+  "$bootstrap_artifacts/webrtc-m150-macos-arm64.tar.gz" webrtc)
 print '<manifest package="org.webrtc"/>' >"$aar_stage/AndroidManifest.xml"
 print 'classes' >"$aar_stage/classes.jar"
 print 'jni' >"$aar_stage/jni/arm64-v8a/libjingle_peerconnection_so.so"
@@ -151,51 +147,39 @@ print 'jni' >"$aar_stage/jni/arm64-v8a/libjingle_peerconnection_so.so"
   "$bootstrap_artifacts/webrtc-m150-android-arm64-v8a.aar" \
   AndroidManifest.xml classes.jar jni/arm64-v8a/libjingle_peerconnection_so.so)
 (cd "$bootstrap_artifacts" && shasum -a 256 \
-  WebRTC-m150-macos-universal.xcframework.zip \
+  webrtc-m150-macos-arm64.tar.gz \
   webrtc-m150-android-arm64-v8a.aar >SHA256SUMS)
-mv "$bootstrap_artifacts"/*.zip "$bootstrap_release/"
-mv "$bootstrap_artifacts"/*.aar "$bootstrap_release/"
 cat >"$bootstrap_bin/lipo" <<'SH'
 #!/bin/zsh
 [[ "$1" == "-archs" && -f "$2" ]] || exit 2
-if [[ "$2" == *'/macos-arm64/'* ]]; then
-  print 'arm64'
-else
-  print 'arm64 x86_64'
-fi
+print 'arm64'
 SH
 chmod +x "$bootstrap_bin/lipo"
+cat >"$bootstrap_bin/xcodebuild" <<'SH'
+#!/bin/zsh
+while (( $# > 0 )); do
+  case "$1" in
+    -framework) source_framework="$2"; shift 2 ;;
+    -output) output="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+mkdir -p "$output/macos-arm64"
+cp -R "$source_framework" "$output/macos-arm64/WebRTC.framework"
+print '<plist version="1.0"><dict/></plist>' >"$output/Info.plist"
+SH
+chmod +x "$bootstrap_bin/xcodebuild"
 
 PATH="$bootstrap_bin:$PATH" \
 ARTIFACTS_DIR="$bootstrap_artifacts" \
 VENDOR_DIR="$bootstrap_vendor" \
-WEBRTC_RELEASE_BASE_URL="file://$bootstrap_release" \
   "$ROOT/scripts/bootstrap-webrtc.sh" >/dev/null
 [[ -f "$bootstrap_vendor/WebRTC.xcframework/Info.plist" ]] || {
   print -u2 "bootstrap ignored the isolated vendor destination"
   exit 1
 }
-[[ -f "$bootstrap_artifacts/webrtc-m150-android-arm64-v8a.aar" ]] || {
-  print -u2 "bootstrap did not preserve the verified Android AAR"
-  exit 1
-}
-
-arm_framework_stage="$bootstrap_root/arm-framework-stage/WebRTC.xcframework"
-mkdir -p "$arm_framework_stage/macos-arm64/WebRTC.framework/Versions/A"
-print '<plist version="1.0"><dict/></plist>' >"$arm_framework_stage/Info.plist"
-print 'arm-framework-binary' \
-  >"$arm_framework_stage/macos-arm64/WebRTC.framework/Versions/A/WebRTC"
-ln -s Versions/A/WebRTC \
-  "$arm_framework_stage/macos-arm64/WebRTC.framework/WebRTC"
-(cd "$bootstrap_root/arm-framework-stage" && zip -qry \
-  "$bootstrap_root/WebRTC-m150-macos-arm64.xcframework.zip" WebRTC.xcframework)
-PATH="$bootstrap_bin:$PATH" \
-ARTIFACTS_DIR="$bootstrap_artifacts" \
-VENDOR_DIR="$bootstrap_vendor" \
-WEBRTC_XCFRAMEWORK_ZIP="$bootstrap_root/WebRTC-m150-macos-arm64.xcframework.zip" \
-  "$ROOT/scripts/bootstrap-webrtc.sh" >/dev/null
 [[ -f "$bootstrap_vendor/WebRTC.xcframework/macos-arm64/WebRTC.framework/Versions/A/WebRTC" ]] || {
-  print -u2 "bootstrap rejected the local arm64-only XCFramework override"
+  print -u2 "bootstrap did not install the arm64 framework"
   exit 1
 }
 
@@ -203,7 +187,6 @@ print 'corrupt' >>"$bootstrap_artifacts/webrtc-m150-android-arm64-v8a.aar"
 if PATH="$bootstrap_bin:$PATH" \
   ARTIFACTS_DIR="$bootstrap_artifacts" \
   VENDOR_DIR="$bootstrap_vendor" \
-  WEBRTC_RELEASE_BASE_URL="file://$bootstrap_release" \
     "$ROOT/scripts/bootstrap-webrtc.sh" >/dev/null 2>&1; then
   print -u2 "bootstrap accepted an AAR with a mismatched checksum"
   exit 1

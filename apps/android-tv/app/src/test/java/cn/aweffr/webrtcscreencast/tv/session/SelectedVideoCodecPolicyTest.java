@@ -9,25 +9,23 @@ import org.junit.Test;
 import org.webrtc.MediaStreamTrack;
 import org.webrtc.RtpCapabilities;
 
-public final class H264CodecPolicyTest {
+public final class SelectedVideoCodecPolicyTest {
   @Test
-  public void keepsOnlyH264PacketizationModeOne() {
+  public void keepsOnlyH265() {
     RtpCapabilities.CodecCapability vp8 = codec("VP8", Map.of());
-    RtpCapabilities.CodecCapability h264ModeZero = codec(
-        "H264", Map.of("packetization-mode", "0"));
-    RtpCapabilities.CodecCapability h264ModeOne = codec(
-        "H264", Map.of("packetization-mode", "1", "profile-level-id", "42e01f"));
+    RtpCapabilities.CodecCapability h264 = codec("H264", Map.of("packetization-mode", "1"));
+    RtpCapabilities.CodecCapability h265 = codec("H265", Map.of());
 
-    List<RtpCapabilities.CodecCapability> filtered = H264CodecPolicy.requireReceiverCodecs(
-        List.of(vp8, h264ModeZero, h264ModeOne));
+    List<RtpCapabilities.CodecCapability> filtered = SelectedVideoCodecPolicy.requireReceiverCodecs(
+        List.of(vp8, h264, h265));
 
-    assertEquals(List.of(h264ModeOne), filtered);
+    assertEquals(List.of(h265), filtered);
   }
 
   @Test
-  public void failsWhenCompatibleH264IsUnavailable() {
-    assertThrows(H264CodecPolicy.H264UnavailableException.class,
-        () -> H264CodecPolicy.requireReceiverCodecs(List.of(codec("VP9", Map.of()))));
+  public void failsWhenH265IsUnavailable() {
+    assertThrows(SelectedVideoCodecPolicy.CodecUnavailableException.class,
+        () -> SelectedVideoCodecPolicy.requireReceiverCodecs(List.of(codec("VP9", Map.of()))));
   }
 
   private static RtpCapabilities.CodecCapability codec(

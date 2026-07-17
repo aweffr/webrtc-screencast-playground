@@ -4,15 +4,15 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class RuntimeConfigurationTests: XCTestCase {
-    func testBundledCastTuningDefersAppleRateControlButKeepsReceiverLowLatency() throws {
+    func testBundledCastTuningUsesOrdinaryHEVCWithSpatialAQDefault() throws {
         let data = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
         let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let encoder = try XCTUnwrap(root["encoder"] as? [String: Any])
         let receiver = try XCTUnwrap(root["receiver"] as? [String: Any])
 
-        XCTAssertEqual(root["schema_version"] as? Int, 2)
-        XCTAssertEqual(encoder["h264_profile"] as? String, "CONSTRAINED_BASELINE")
+        XCTAssertEqual(root["schema_version"] as? Int, 3)
         XCTAssertEqual(encoder["video_toolbox_low_latency_rate_control"] as? Bool, false)
+        XCTAssertEqual(encoder["video_toolbox_spatial_adaptive_qp"] as? String, "DEFAULT")
         XCTAssertEqual(receiver["android_decoder_low_latency"] as? Bool, true)
         XCTAssertEqual(receiver["prerender_smoothing"] as? Bool, false)
         XCTAssertNoThrow(try RTCCastTuningConfiguration(jsonData: data))
@@ -33,7 +33,23 @@ final class RuntimeConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.iceProfile, .directBaseline)
         XCTAssertNil(configuration.turn)
         XCTAssertEqual(configuration.excludedReceiverPID, 123)
+        XCTAssertEqual(configuration.videoCodecPolicy, .default)
         XCTAssertNoThrow(try configuration.validate())
+    }
+
+    func testVideoCodecPolicyDecodesAllSupportedStrategies() throws {
+        for policy in VideoCodecPolicy.allCases {
+            let data = Data(#"""
+            {
+              "signaling_url":"ws://127.0.0.1:8080/ws",
+              "ice_profile":"direct-baseline",
+              "turn":null,
+              "metrics_directory":"/tmp/metrics",
+              "video_codec_policy":"\#(policy.rawValue)"
+            }
+            """#.utf8)
+            XCTAssertEqual(try RuntimeConfiguration.decode(data).videoCodecPolicy, policy)
+        }
     }
 
     func testProductionRelayRequiresExplicitUDPAndCredentials() throws {

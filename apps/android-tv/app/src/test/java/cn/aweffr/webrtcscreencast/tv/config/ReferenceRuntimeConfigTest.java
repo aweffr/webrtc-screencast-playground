@@ -6,7 +6,7 @@ import static org.junit.Assert.assertThrows;
 import org.junit.Test;
 
 public final class ReferenceRuntimeConfigTest {
-  private static final String TUNING_JSON = "{\"schema_version\":2}";
+  private static final String TUNING_JSON = "{\"schema_version\":3}";
 
   @Test
   public void directBaselineDoesNotRequireTurnCredentials() {

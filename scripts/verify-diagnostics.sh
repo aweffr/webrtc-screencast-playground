@@ -72,15 +72,19 @@ if (( android_receiver )); then
   jq -se 'any(.[];
     .event == "rtc_stats"
     and (.fields.outbound_video.frames // 0) > 0
-    and ((.fields.outbound_video.codec // "") | ascii_downcase | contains("h264")))' \
-    "$sender" >/dev/null || { print -u2 "missing sender H.264 encode evidence"; exit 1; }
+    and ((.fields.outbound_video.codec // "") | ascii_downcase | contains("h265"))
+    and ((.fields.sender_media_boundary.video_toolbox_encoder_id // "")
+      | ascii_downcase | contains("hevc"))
+    and (.fields.sender_media_boundary.last_key_frame_qp // -1) >= 0)' \
+    "$sender" >/dev/null || { print -u2 "missing sender HEVC encoder/QP evidence"; exit 1; }
   jq -se 'any(.[];
     .event == "rtc_stats"
     and (.fields.frames_decoded // 0) > 0
-    and ((.fields.codec // "") | ascii_downcase | contains("h264"))
+    and ((.fields.codec // "") | ascii_downcase | contains("h265"))
+    and ((.fields.decoder // "") | length > 0)
     and .fields.frame_width == 1920
     and .fields.frame_height == 1080)' "$receiver" >/dev/null \
-    || { print -u2 "missing Android H.264 1920x1080 decode evidence"; exit 1; }
+    || { print -u2 "missing Android HEVC 1920x1080 decoder evidence"; exit 1; }
 
   jq -se 'any(.[]; .event == "selected_path" and .fields.status == "verified")' \
     "$sender" >/dev/null || { print -u2 "missing sender selected-path evidence"; exit 1; }
@@ -128,7 +132,7 @@ if (( android_receiver )); then
       fi
     done
   fi
-  print "diagnostics verified: Android H.264 1920x1080 media and $PROFILE selected path"
+  print "diagnostics verified: Android HEVC 1920x1080 media and $PROFILE selected path"
   exit 0
 fi
 
@@ -163,16 +167,20 @@ jq -se '
   any(.[];
     .event == "rtc_stats"
     and (.fields.outbound_video.frames // 0) > 0
-    and ((.fields.outbound_video.codec // "") | ascii_downcase | contains("h264")))
-' "$sender" >/dev/null || { print -u2 "missing sender H.264 encode evidence"; exit 1; }
+    and ((.fields.outbound_video.codec // "") | ascii_downcase | contains("h265"))
+    and ((.fields.sender_media_boundary.video_toolbox_encoder_id // "")
+      | ascii_downcase | contains("hevc"))
+    and (.fields.sender_media_boundary.last_key_frame_qp // -1) >= 0)
+' "$sender" >/dev/null || { print -u2 "missing sender HEVC encoder/QP evidence"; exit 1; }
 
 jq -se '
   any(.[];
     .event == "rtc_stats"
     and (.fields.inbound_video.frames // 0) > 0
-    and ((.fields.inbound_video.codec // "") | ascii_downcase | contains("h264"))
+    and ((.fields.inbound_video.codec // "") | ascii_downcase | contains("h265"))
+    and ((.fields.inbound_video.decoder // "") | length > 0)
     and (.fields.render.frames_rendered // 0) > 0)
-' "$receiver" >/dev/null || { print -u2 "missing receiver H.264 decode/render evidence"; exit 1; }
+' "$receiver" >/dev/null || { print -u2 "missing receiver HEVC decoder/render evidence"; exit 1; }
 
 for file in "$receiver" "$sender"; do
   jq -se 'any(.[];
@@ -229,4 +237,4 @@ if [[ -n "$CONFIG" ]]; then
   done
 fi
 
-print "diagnostics verified: H.264 media, render metrics and $PROFILE selected path"
+print "diagnostics verified: HEVC media, encoder/QP, decoder/render and $PROFILE selected path"

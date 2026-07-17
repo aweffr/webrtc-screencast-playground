@@ -66,6 +66,7 @@ jq -n \
     turn: {url: $turn_url, username: $username, password: $password},
     metrics_directory: $metrics,
     excluded_receiver_pid: null,
+    video_codec_policy: "h265-only",
     static_max_qp: 24
   }' >"$temporary"
 chmod 600 "$temporary"

@@ -34,7 +34,7 @@ public final class ReceiverStateMachine {
 
   public enum FatalError {
     INVALID_CONFIG,
-    H264_UNAVAILABLE
+    CODEC_UNAVAILABLE
   }
 
   public record Transition(State state, List<Command> commands, long retryDelaySeconds) {

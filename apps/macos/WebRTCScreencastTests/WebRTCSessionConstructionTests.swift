@@ -3,11 +3,16 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class WebRTCSessionConstructionTests: XCTestCase {
-    func testSenderAndReceiverFactoriesAcceptCastTuningAndH264Policy() throws {
+    func testSenderAndReceiverFactoriesAcceptCastTuningAndH265Policy() throws {
         let tuningData = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
         let ice = try IceServerProvider.make(profile: .directBaseline, turn: nil)
 
-        let sender = try WebRTCSession(role: .sender, ice: ice, castTuningJSON: tuningData)
+        let sender = try WebRTCSession(
+            role: .sender,
+            ice: ice,
+            castTuningJSON: tuningData,
+            videoCodecPolicy: .h265Only
+        )
         let receiver = try WebRTCSession(role: .receiver, ice: ice, castTuningJSON: tuningData)
 
         XCTAssertEqual(sender.role, .sender)
@@ -23,22 +28,46 @@ final class WebRTCSessionConstructionTests: XCTestCase {
         _ = try WebRTCSession(role: .sender, ice: ice, castTuningJSON: tuningData)
     }
 
-    func testSenderOfferAdvertisesH264AndNoAlternativeVideoCodec() async throws {
+    func testSenderOfferAdvertisesOnlyH265Video() async throws {
         let tuningData = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
         let ice = try IceServerProvider.make(profile: .directBaseline, turn: nil)
-        let sender = try WebRTCSession(role: .sender, ice: ice, castTuningJSON: tuningData)
+        let sender = try WebRTCSession(
+            role: .sender,
+            ice: ice,
+            castTuningJSON: tuningData,
+            videoCodecPolicy: .h265Only
+        )
         defer { sender.close() }
 
         let offer = try await sender.createOffer()
-        let levelIDs = try NSRegularExpression(pattern: "profile-level-id=([0-9a-fA-F]{6})")
-            .matches(in: offer, range: NSRange(offer.startIndex..., in: offer))
-            .compactMap { Range($0.range(at: 1), in: offer).map { String(offer[$0]).lowercased() } }
-
-        XCTAssertTrue(offer.contains(" H264/90000"))
-        XCTAssertTrue(levelIDs.contains("42e029"), "advertised H.264 level IDs: \(levelIDs)")
+        XCTAssertTrue(offer.localizedCaseInsensitiveContains(" H265/90000"), "offer: \(offer)")
+        XCTAssertFalse(offer.contains(" H264/90000"))
         XCTAssertFalse(offer.contains(" VP8/90000"))
         XCTAssertFalse(offer.contains(" VP9/90000"))
         XCTAssertFalse(offer.contains(" AV1/90000"))
+    }
+
+    func testSenderCodecPreferencePoliciesAffectOfferOrder() async throws {
+        let tuningData = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
+        let ice = try IceServerProvider.make(profile: .directBaseline, turn: nil)
+
+        for (policy, first, second) in [
+            (VideoCodecPolicy.preferH265, "H265/90000", "H264/90000"),
+            (VideoCodecPolicy.default, "H264/90000", "H265/90000"),
+        ] {
+            let sender = try WebRTCSession(
+                role: .sender,
+                ice: ice,
+                castTuningJSON: tuningData,
+                videoCodecPolicy: policy
+            )
+            let offer = try await sender.createOffer()
+            sender.close()
+
+            let firstRange = try XCTUnwrap(offer.range(of: first, options: .caseInsensitive))
+            let secondRange = try XCTUnwrap(offer.range(of: second, options: .caseInsensitive))
+            XCTAssertLessThan(firstRange.lowerBound, secondRange.lowerBound)
+        }
     }
 
     func testDiagnosticsDoNotCreateRawLibWebRTCLogs() throws {

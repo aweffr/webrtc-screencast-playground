@@ -85,6 +85,7 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
         role: CastingRole,
         ice: IceConfigurationResult,
         castTuningJSON: Data,
+        videoCodecPolicy: VideoCodecPolicy = .default,
         staticMaxQp: Int = 24,
         displayRenderer: (any RTCVideoRenderer)? = nil,
         baselineProbe: MediaBaselineFrameProbe? = nil,
@@ -101,8 +102,8 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
 
         let tuningConfiguration = try RTCCastTuningConfiguration(jsonData: castTuningJSON)
         tuningConfiguration.apply(to: ice.configuration)
-        let encoderFactory = H264OnlyVideoEncoderFactory()
-        let decoderFactory = H264OnlyVideoDecoderFactory()
+        let encoderFactory = SelectedVideoEncoderFactory(policy: videoCodecPolicy)
+        let decoderFactory = SelectedVideoDecoderFactory(policy: videoCodecPolicy)
         let factory = try RTCCastTuningFactoryBuilder.peerConnectionFactory(
             with: encoderFactory,
             decoderFactory: decoderFactory,

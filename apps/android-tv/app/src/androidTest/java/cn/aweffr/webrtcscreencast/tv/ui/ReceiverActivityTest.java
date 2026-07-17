@@ -72,7 +72,7 @@ public final class ReceiverActivityTest {
     String encoded = ApplicationProvider.getApplicationContext()
         .getString(R.string.reference_cast_tuning_json);
 
-    assertEquals(2, new JSONObject(encoded).getInt("schema_version"));
+    assertEquals(3, new JSONObject(encoded).getInt("schema_version"));
   }
 
   @Test

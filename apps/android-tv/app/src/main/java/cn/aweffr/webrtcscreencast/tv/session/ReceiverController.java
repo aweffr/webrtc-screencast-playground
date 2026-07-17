@@ -428,8 +428,8 @@ public final class ReceiverController implements ReceiverSessionController {
             }
           });
       metrics.record("peer_connection_created");
-    } catch (H264CodecPolicy.H264UnavailableException error) {
-      fatal(ReceiverStateMachine.FatalError.H264_UNAVAILABLE, error.getMessage());
+    } catch (SelectedVideoCodecPolicy.CodecUnavailableException error) {
+      fatal(ReceiverStateMachine.FatalError.CODEC_UNAVAILABLE, error.getMessage());
     } catch (RuntimeException error) {
       recover("peer_connection_creation_failed");
     }

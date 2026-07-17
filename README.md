@@ -2,7 +2,7 @@
 
 [简体中文](README_CN.md)
 
-A reference implementation for low-latency, one-way H.264 desktop casting from a native macOS
+A reference implementation for low-latency, one-way HEVC/H.264 desktop casting from a native macOS
 Sender to an Android TV Receiver. A small Go WebSocket service issues one-time pairing codes and
 relays WebRTC signaling; media travels directly over ICE or through a configured TURN/UDP relay.
 
@@ -13,9 +13,10 @@ inspect: ScreenCaptureKit → VideoToolbox/WebRTC M150 → UDP → Android WebRT
 
 - **macOS app (Swift 6):** GUI Sender, same-app CLI launch mode, main-display mirror, and a private
   1920×1080 virtual extended display. Main-display mirror uses a luma-based static-clarity mode
-  that requests a fresh H.264 keyframe and runs the stable picture at about 1 fps.
+  with H264-only, H265-only, prefer-H265, and default prefer-H264 sender policies. Static clarity
+  requests a fresh keyframe and runs the stable picture at about 1 fps.
 - **Android TV app (Java 8-compatible source):** TV-only launcher, receiver-first registration,
-  one-time pairing-code screen, H.264 playback, D-pad-safe recovery, and app-private telemetry.
+  one-time pairing-code screen, HEVC playback, D-pad-safe recovery, and app-private telemetry.
 - **Signaling server (Go):** `/ws`, `/clock`, `/healthz`, and Prometheus `/metrics`; it never carries
   media or TURN credentials.
 - **Network profiles:** `direct-baseline` for local comparison and `production-relay` for forced
@@ -35,9 +36,8 @@ inspect: ScreenCaptureKit → VideoToolbox/WebRTC M150 → UDP → Android WebRT
 - Cursor capture is always enabled.
 - Global keyboard/mouse forwarding, TURN/TCP, public signaling deployment, and Apple
   `EnableLowLatencyRateControl` activation are out of the initial scope.
-- H.264 is the only video codec. The Android answer explicitly raises the selected
-  packetization-mode=1 Baseline level to 4.1 for 1080p VideoToolbox compatibility and records the
-  compatibility adjustment.
+- The automated macOS-to-Android path explicitly uses `h265-only`. Without a
+  `video_codec_policy`, the Sender prefers H264 and retains H265 as fallback.
 
 ## Repository layout
 
@@ -63,13 +63,13 @@ docs/              Architecture decisions, research, runbooks, plans, and follow
 
 ## Bootstrap and verify
 
-The bootstrap downloads the pinned M150 macOS XCFramework and Android AAR from
-[`aweffr/my-webrtc-builds`](https://github.com/aweffr/my-webrtc-builds), verifies their SHA-256
-checksums, and extracts only ignored local dependencies.
+The bootstrap verifies the pinned M150 macOS arm64 archive and Android AAR produced by
+[`aweffr/my-webrtc-builds`](https://github.com/aweffr/my-webrtc-builds), then stages only ignored
+local dependencies.
 
-For a locally built experiment artifact, set `WEBRTC_XCFRAMEWORK_ZIP` to an
-absolute zip path. The override remains machine-local; bootstrap still verifies
-the pinned Android AAR and validates the extracted framework layout.
+For a locally built experiment artifact, set `WEBRTC_MACOS_TAR_GZ` to an
+absolute tar path. The override remains machine-local; bootstrap still verifies
+both pinned checksums and validates the extracted arm64 framework layout.
 
 ```bash
 git clone https://github.com/aweffr/webrtc-screencast-playground.git

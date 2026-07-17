@@ -10,6 +10,7 @@ struct EffectiveConfiguration: Sendable {
     let turnURL: URL?
     let metricsDirectory: URL
     let excludedReceiverPID: pid_t?
+    let videoCodecPolicy: VideoCodecPolicy
     let hash: String
 
     private let canonicalData: Data
@@ -22,6 +23,7 @@ struct EffectiveConfiguration: Sendable {
         let turnURL: String?
         let metricsDirectory: String
         let excludedReceiverPID: pid_t?
+        let videoCodecPolicy: VideoCodecPolicy
 
         enum CodingKeys: String, CodingKey {
             case signalingURL = "signaling_url"
@@ -31,6 +33,7 @@ struct EffectiveConfiguration: Sendable {
             case turnURL = "turn_url"
             case metricsDirectory = "metrics_directory"
             case excludedReceiverPID = "excluded_receiver_pid"
+            case videoCodecPolicy = "video_codec_policy"
         }
     }
 
@@ -41,7 +44,8 @@ struct EffectiveConfiguration: Sendable {
         source: CaptureSourceKind?,
         turnURL: URL?,
         metricsDirectory: URL,
-        excludedReceiverPID: pid_t?
+        excludedReceiverPID: pid_t?,
+        videoCodecPolicy: VideoCodecPolicy
     ) throws {
         self.signalingURL = signalingURL
         self.iceProfile = iceProfile
@@ -50,6 +54,7 @@ struct EffectiveConfiguration: Sendable {
         self.turnURL = turnURL
         self.metricsDirectory = metricsDirectory
         self.excludedReceiverPID = excludedReceiverPID
+        self.videoCodecPolicy = videoCodecPolicy
         let sanitized = Sanitized(
             signalingURL: signalingURL.absoluteString,
             iceProfile: iceProfile,
@@ -57,7 +62,8 @@ struct EffectiveConfiguration: Sendable {
             source: source,
             turnURL: turnURL?.absoluteString,
             metricsDirectory: metricsDirectory.path,
-            excludedReceiverPID: excludedReceiverPID
+            excludedReceiverPID: excludedReceiverPID,
+            videoCodecPolicy: videoCodecPolicy
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]

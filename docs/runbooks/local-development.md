@@ -29,7 +29,7 @@ The environment-dependent automated media baseline is deliberately separate:
 RUNTIME_CONFIG="$PWD/secrets/runtime.json" make media-baseline
 ```
 
-It requires Screen Recording permission, FFmpeg with `libvmaf`, and a runtime file whose TURN URL explicitly selects UDP. The runner alternates Direct and forced TURN/UDP three times with fresh processes and writes raw evidence to `artifacts/media-baseline/<run-id>/`. It refuses to start or continue when either managed virtual-display name remains online, so one failed cleanup cannot contaminate later rounds. High latency or low image scores are data, not failure thresholds; missing H.264 media, an invalid selected path, missing marker correlation, virtual-display residue, or report-generation failure returns non-zero.
+It requires Screen Recording permission, FFmpeg with `libvmaf`, and a runtime file whose TURN URL explicitly selects UDP. The runner alternates Direct and forced TURN/UDP three times with fresh processes and writes raw evidence to `artifacts/media-baseline/<run-id>/`. It refuses to start or continue when either managed virtual-display name remains online, so one failed cleanup cannot contaminate later rounds. High latency or low image scores are data, not failure thresholds; missing HEVC media, an invalid selected path, missing marker correlation, virtual-display residue, or report-generation failure returns non-zero.
 
 Inspect the lifecycle invariant without changing display or power state:
 
@@ -76,10 +76,9 @@ mutually exclusive. A direct `--pairing-code` value is normalized before the ses
 invalid or missing values fail with a launch error rather than opening a partially configured
 Sender.
 
-The bundled CastTuning config uses schema 2, requests H.264 Constrained Baseline, and explicitly
-keeps Apple VideoToolbox low-latency rate control disabled for the documented follow-up. If an
-experiment enables it, the compatibility policy permits High-profile output only with the
-corresponding structured profile-mismatch warning.
+The bundled CastTuning config uses schema 3 and keeps Apple VideoToolbox low-latency rate control
+disabled while requesting the ordinary HEVC encoder with spatial adaptive QP at its system default.
+Select the sender codec set and order separately with `video_codec_policy` in runtime JSON.
 
 ## Screen capture permission
 

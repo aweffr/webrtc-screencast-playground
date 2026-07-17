@@ -8,5 +8,6 @@
   },
   "metrics_directory": "~/Library/Application Support/WebRTCScreencast/Diagnostics",
   "excluded_receiver_pid": null,
+  "video_codec_policy": "h265-only",
   "static_max_qp": 24
 }

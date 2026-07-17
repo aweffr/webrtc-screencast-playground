@@ -3,21 +3,21 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 RUNTIME_CONFIG=""
-XCFRAMEWORK=""
+MACOS_ARCHIVE=""
 OUTPUT_ROOT="$ROOT/artifacts/static-max-qp"
 RUN_SECONDS=30
 DEPENDENCY_ARTIFACTS_DIR="${ARTIFACTS_DIR:-$ROOT/artifacts}"
 SKIP_MACOS_BUILD=0
 
 usage() {
-  print -u2 "usage: $0 --runtime-config path --xcframework path [--output-root path] [--run-seconds n] [--skip-macos-build]"
+  print -u2 "usage: $0 --runtime-config path --macos-archive path [--output-root path] [--run-seconds n] [--skip-macos-build]"
   exit 2
 }
 
 while (( $# )); do
   case "$1" in
     --runtime-config) [[ $# -ge 2 ]] || usage; RUNTIME_CONFIG="$2"; shift 2 ;;
-    --xcframework) [[ $# -ge 2 ]] || usage; XCFRAMEWORK="$2"; shift 2 ;;
+    --macos-archive) [[ $# -ge 2 ]] || usage; MACOS_ARCHIVE="$2"; shift 2 ;;
     --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
     --run-seconds) [[ $# -ge 2 ]] || usage; RUN_SECONDS="$2"; shift 2 ;;
     --skip-macos-build) SKIP_MACOS_BUILD=1; shift ;;
@@ -25,7 +25,7 @@ while (( $# )); do
   esac
 done
 
-[[ -r "$RUNTIME_CONFIG" && -f "$XCFRAMEWORK" ]] || usage
+[[ -r "$RUNTIME_CONFIG" && -f "$MACOS_ARCHIVE" ]] || usage
 [[ "$RUN_SECONDS" == <-> && "$RUN_SECONDS" -ge 20 ]] || usage
 for tool in adb ffmpeg git jq sips shasum sw_vers sysctl; do
   command -v "$tool" >/dev/null || { print -u2 "$tool is required"; exit 2; }
@@ -42,7 +42,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-xcframework_sha256="$(shasum -a 256 "$XCFRAMEWORK" | awk '{print $1}')"
+macos_archive_sha256="$(shasum -a 256 "$MACOS_ARCHIVE" | awk '{print $1}')"
 skip_build=$SKIP_MACOS_BUILD
 for max_qp in 24 22 20 18; do
   case_root="$experiment_root/qp-$max_qp"
@@ -69,7 +69,7 @@ for max_qp in 24 22 20 18; do
       --static-qp-evidence
     )
     (( skip_build )) && e2e_args+=(--skip-macos-build)
-    if WEBRTC_XCFRAMEWORK_ZIP="$XCFRAMEWORK" \
+    if WEBRTC_MACOS_TAR_GZ="$MACOS_ARCHIVE" \
         ARTIFACTS_DIR="$DEPENDENCY_ARTIFACTS_DIR" \
         "$ROOT/scripts/run-android-tv-e2e.sh" "${e2e_args[@]}" \
           | tee "$attempt_log"; then
@@ -134,7 +134,7 @@ jq -e '.android.avd and .android.api and .android.abi and .android.display' \
   "$android_context" >/dev/null
 jq -n \
   --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --arg xcframework_sha256 "$xcframework_sha256" \
+  --arg macos_archive_sha256 "$macos_archive_sha256" \
   --arg app_commit "$(git -C "$ROOT" rev-parse HEAD)" \
   --arg hardware_model "$(sysctl -n hw.model)" \
   --arg macos_version "$(sw_vers -productVersion)" \
@@ -146,7 +146,7 @@ jq -n \
   '{
     schema_version: 1,
     generated_at: $generated_at,
-    xcframework_sha256: $xcframework_sha256,
+    macos_archive_sha256: $macos_archive_sha256,
     app_commit: $app_commit,
     hardware_model: $hardware_model,
     macos_version: $macos_version,

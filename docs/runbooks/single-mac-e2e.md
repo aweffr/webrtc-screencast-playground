@@ -22,7 +22,7 @@ The script:
 3. starts Receiver first and waits for an atomically written mode-`0600` pairing-code file;
 4. starts Sender as a second PID and consumes that code once;
 5. gives the session a bounded run window, performs graceful app teardown, and preserves all artifacts;
-6. requires diagnostics to prove H.264 encode/decode/render and a valid selected path.
+6. requires diagnostics to prove HEVC encode/decode/render and a valid selected path.
 
 Every run prints its temporary artifact root, process exit statuses and both session directories. Artifacts are preserved on success and failure.
 
@@ -53,7 +53,7 @@ Re-run verification for preserved artifacts with:
   direct-baseline
 ```
 
-The verifier fails on missing pairing, negotiation, capture, H.264 encode, H.264 decode, render or selected-path evidence. It also requires both processes to contain exactly one identical canonical `session_id` and rejects raw libwebrtc log artifacts. For a virtual source it requires creation and removal events. When a runtime config is passed as the fourth argument, both directories are scanned for the configured TURN values without printing them.
+The verifier fails on missing pairing, negotiation, capture, HEVC encoder/QP, HEVC decoder, render or selected-path evidence. It also requires both processes to contain exactly one identical canonical `session_id` and rejects raw libwebrtc log artifacts. For a virtual source it requires creation and removal events. When a runtime config is passed as the fourth argument, both directories are scanned for the configured TURN values without printing them.
 
 ## Permission blocker
 

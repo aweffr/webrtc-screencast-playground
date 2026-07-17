@@ -22,7 +22,7 @@ class StaticQpReportTests(unittest.TestCase):
             experiment.mkdir()
             (experiment / "manifest.json").write_text(json.dumps({
                 "generated_at": "2026-07-16T00:00:00Z",
-                "xcframework_sha256": "abc123",
+                "macos_archive_sha256": "abc123",
                 "profile": "production-relay",
                 "source": "main",
                 "run_seconds": 30,

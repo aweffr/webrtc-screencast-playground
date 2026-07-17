@@ -81,6 +81,7 @@ if [[ "$PROFILE" == production-relay ]]; then
     | .ice_profile = "production-relay"
     | .metrics_directory = $metrics
     | .excluded_receiver_pid = null
+    | .video_codec_policy = "h265-only"
   ' "$RUNTIME_CONFIG" >"$CONFIG_FILE"
 else
   jq -n --arg url "$SIGNALING_URL" --arg metrics "$METRICS_ROOT" '{
@@ -88,7 +89,8 @@ else
     ice_profile: "direct-baseline",
     turn: null,
     metrics_directory: $metrics,
-    excluded_receiver_pid: null
+    excluded_receiver_pid: null,
+    video_codec_policy: "h265-only"
   }' >"$CONFIG_FILE"
 fi
 chmod 600 "$CONFIG_FILE"

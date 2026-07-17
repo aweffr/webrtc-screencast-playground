@@ -87,10 +87,10 @@ public final class ReceiverStateMachineTest {
   }
 
   @Test
-  public void invalidConfigAndMissingH264AreFatalUntilManualRetry() {
+  public void invalidConfigAndMissingSelectedCodecAreFatalUntilManualRetry() {
     for (ReceiverStateMachine.FatalError error : List.of(
         ReceiverStateMachine.FatalError.INVALID_CONFIG,
-        ReceiverStateMachine.FatalError.H264_UNAVAILABLE)) {
+        ReceiverStateMachine.FatalError.CODEC_UNAVAILABLE)) {
       ReceiverStateMachine machine = new ReceiverStateMachine();
       machine.reduce(ReceiverStateMachine.Event.start());
 

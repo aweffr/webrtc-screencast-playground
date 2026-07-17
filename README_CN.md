@@ -2,14 +2,14 @@
 
 [English](README.md)
 
-这是一个从原生 macOS Sender 向 Android TV Receiver 进行低延迟、单向 H.264 桌面投屏的参考实现。项目使用一个小型 Go WebSocket 服务发放一次性配对码并转发 WebRTC 信令；媒体通过 ICE 直连传输，或经过配置的 TURN/UDP relay。
+这是一个从原生 macOS Sender 向 Android TV Receiver 进行低延迟、单向 HEVC/H.264 桌面投屏的参考实现。项目使用一个小型 Go WebSocket 服务发放一次性配对码并转发 WebRTC 信令；媒体通过 ICE 直连传输，或经过配置的 TURN/UDP relay。
 
 本仓库是便于理解和验证完整链路的示例，不是生产 SDK。链路保持清晰可查：ScreenCaptureKit → VideoToolbox/WebRTC M150 → UDP → Android WebRTC decoder → TV renderer。
 
 ## 项目提供什么
 
-- **macOS app（Swift 6）：** GUI Sender、同一 app 的 CLI 启动模式、主屏复制，以及一个私有的 1920×1080 虚拟扩展屏。主屏复制使用基于亮度的静态清晰度模式；画面稳定时，该模式请求新的 H.264 keyframe，并以约 1 fps 发送稳定画面。
-- **Android TV app（兼容 Java 8 的源码）：** TV-only launcher、Receiver 优先注册、一次性配对码界面、H.264 播放、适配 D-pad 操作的恢复流程，以及 app 私有 telemetry。
+- **macOS app（Swift 6）：** GUI Sender、同一 app 的 CLI 启动模式、主屏复制，以及一个私有的 1920×1080 虚拟扩展屏。Sender 支持仅 H264、仅 H265、优先 H265 和默认优先 H264 四种策略；画面稳定时请求新的 keyframe，并以约 1 fps 发送稳定画面。
+- **Android TV app（兼容 Java 8 的源码）：** TV-only launcher、Receiver 优先注册、一次性配对码界面、HEVC 播放、适配 D-pad 操作的恢复流程，以及 app 私有 telemetry。
 - **信令服务（Go）：** 提供 `/ws`、`/clock`、`/healthz` 和 Prometheus `/metrics`；不承载媒体或 TURN credentials。
 - **网络 profile：** `direct-baseline` 用于本地对照，`production-relay` 强制使用 `relay/relay + UDP`。项目不支持 TURN/TCP。
 - **可观测性：** 信令时序、时钟校准、capture/encode/decode/render 事件、标准化 RTCStats、selected path 验证、静态清晰度状态切换和 keyframe，以及脱敏 JSONL 诊断记录。
@@ -21,7 +21,7 @@
 - 虚拟显示器使用私有的 `CGVirtualDisplay` compatibility declarations，不适合 App Store 分发。
 - 始终采集鼠标指针。
 - 全局键盘/鼠标转发、TURN/TCP、公开信令部署和 Apple `EnableLowLatencyRateControl` 不在首期范围内。
-- H.264 是唯一的视频 codec。Android 端会在 SDP answer 中把选定的 packetization-mode=1 Baseline level 显式提升到 4.1，以兼容 1080p VideoToolbox，并记录这项兼容性调整。
+- 当前 macOS→Android 自动化链路显式使用 `h265-only`；未配置 `video_codec_policy` 时，Sender 默认优先 H264，并保留 H265 fallback。
 
 ## 仓库结构
 
@@ -47,9 +47,9 @@ docs/              架构决策、研究、runbook、plan 和 follow-up
 
 ## Bootstrap 与验证
 
-Bootstrap 会从 [`aweffr/my-webrtc-builds`](https://github.com/aweffr/my-webrtc-builds) 下载固定版本的 M150 macOS XCFramework 和 Android AAR，校验 SHA-256 checksum，并仅解压到不纳入版本管理的本地依赖目录。
+Bootstrap 会校验由 [`aweffr/my-webrtc-builds`](https://github.com/aweffr/my-webrtc-builds) 生成的固定版本 M150 macOS arm64 archive 和 Android AAR，并仅安装到不纳入版本管理的本地依赖目录。
 
-如需使用本地构建的实验产物，将 `WEBRTC_XCFRAMEWORK_ZIP` 设置为 zip 文件的绝对路径。该 override 仅在本机生效；bootstrap 仍会验证固定版本的 Android AAR 和解压后的 framework 结构。
+如需使用本地构建的实验产物，将 `WEBRTC_MACOS_TAR_GZ` 设置为 macOS arm64 tar 文件的绝对路径。bootstrap 仍会验证固定 checksum、arm64 framework 结构和 Android AAR。
 
 ```bash
 git clone https://github.com/aweffr/webrtc-screencast-playground.git

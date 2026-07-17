@@ -38,6 +38,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
     let turn: TURNCredentials?
     let metricsDirectory: URL
     let excludedReceiverPID: pid_t?
+    let videoCodecPolicy: VideoCodecPolicy
     let staticMaxQp: Int
 
     enum CodingKeys: String, CodingKey {
@@ -46,6 +47,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         case turn
         case metricsDirectory = "metrics_directory"
         case excludedReceiverPID = "excluded_receiver_pid"
+        case videoCodecPolicy = "video_codec_policy"
         case staticMaxQp = "static_max_qp"
     }
 
@@ -55,6 +57,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         turn: TURNCredentials?,
         metricsDirectory: URL,
         excludedReceiverPID: pid_t?,
+        videoCodecPolicy: VideoCodecPolicy = .default,
         staticMaxQp: Int = 24
     ) {
         self.signalingURL = signalingURL
@@ -62,6 +65,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         self.turn = turn
         self.metricsDirectory = metricsDirectory
         self.excludedReceiverPID = excludedReceiverPID
+        self.videoCodecPolicy = videoCodecPolicy
         self.staticMaxQp = staticMaxQp
     }
 
@@ -73,6 +77,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
         let metricsPath = try container.decode(String.self, forKey: .metricsDirectory)
         metricsDirectory = URL(filePath: (metricsPath as NSString).expandingTildeInPath, directoryHint: .isDirectory)
         excludedReceiverPID = try container.decodeIfPresent(pid_t.self, forKey: .excludedReceiverPID)
+        videoCodecPolicy = try container.decodeIfPresent(VideoCodecPolicy.self, forKey: .videoCodecPolicy) ?? .default
         staticMaxQp = try container.decodeIfPresent(Int.self, forKey: .staticMaxQp) ?? 24
     }
 
@@ -143,7 +148,8 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
             source: source,
             turnURL: iceProfile == .productionRelay ? turn?.url : nil,
             metricsDirectory: metricsDirectory,
-            excludedReceiverPID: excludedReceiverPID
+            excludedReceiverPID: excludedReceiverPID,
+            videoCodecPolicy: videoCodecPolicy
         )
     }
 
@@ -159,6 +165,7 @@ struct RuntimeConfiguration: Decodable, Sendable, CustomDebugStringConvertible {
             turn: turn,
             metricsDirectory: metricsDirectory,
             excludedReceiverPID: excludedReceiverPID ?? self.excludedReceiverPID,
+            videoCodecPolicy: videoCodecPolicy,
             staticMaxQp: staticMaxQp
         )
     }
