@@ -9,6 +9,9 @@ RUNTIME_CONFIG="${RUNTIME_CONFIG:-}"
 RUN_SECONDS=20
 OUTPUT_ROOT="$ROOT/artifacts/android-tv-e2e"
 MEDIA_BASELINE=0
+MARKER_EVIDENCE=0
+CAST_TUNING_CONFIG=""
+WORKLOAD_START_FILE=""
 SKIP_MACOS_BUILD=0
 STATIC_QP_EVIDENCE=0
 PACKAGE="cn.aweffr.webrtcscreencast.tv"
@@ -17,7 +20,7 @@ AVD_NAME="${ANDROID_TV_AVD_NAME:-WebRTCScreencast_TV_API_31}"
 LOCAL_XML="$ROOT/apps/android-tv/app/src/debug/res/values/reference_runtime.local.xml"
 
 usage() {
-  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--run-seconds n] [--output-root path] [--media-baseline] [--static-qp-evidence] [--skip-macos-build]"
+  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--cast-tuning-config path] [--run-seconds n] [--output-root path] [--media-baseline|--marker-evidence] [--workload-start-file path] [--static-qp-evidence] [--skip-macos-build]"
   exit 2
 }
 
@@ -26,9 +29,12 @@ while (( $# )); do
     --profile) [[ $# -ge 2 ]] || usage; PROFILE="$2"; shift 2 ;;
     --source) [[ $# -ge 2 ]] || usage; SOURCE="$2"; shift 2 ;;
     --runtime-config) [[ $# -ge 2 ]] || usage; RUNTIME_CONFIG="$2"; shift 2 ;;
+    --cast-tuning-config) [[ $# -ge 2 ]] || usage; CAST_TUNING_CONFIG="$2"; shift 2 ;;
     --run-seconds) [[ $# -ge 2 ]] || usage; RUN_SECONDS="$2"; shift 2 ;;
     --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
     --media-baseline) MEDIA_BASELINE=1; shift ;;
+    --marker-evidence) MARKER_EVIDENCE=1; shift ;;
+    --workload-start-file) [[ $# -ge 2 ]] || usage; WORKLOAD_START_FILE="$2"; shift 2 ;;
     --static-qp-evidence) STATIC_QP_EVIDENCE=1; shift ;;
     --skip-macos-build) SKIP_MACOS_BUILD=1; shift ;;
     *) usage ;;
@@ -43,6 +49,18 @@ done
 }
 (( ! MEDIA_BASELINE )) || [[ "$SOURCE" == virtual ]] || {
   print -u2 "--media-baseline requires --source virtual"
+  exit 2
+}
+(( ! MARKER_EVIDENCE )) || [[ "$SOURCE" == main ]] || {
+  print -u2 "--marker-evidence requires --source main"
+  exit 2
+}
+(( ! MEDIA_BASELINE || ! MARKER_EVIDENCE )) || {
+  print -u2 "--media-baseline and --marker-evidence are mutually exclusive"
+  exit 2
+}
+[[ -z "$CAST_TUNING_CONFIG" || -r "$CAST_TUNING_CONFIG" ]] || {
+  print -u2 "--cast-tuning-config must be readable"
   exit 2
 }
 if [[ "$PROFILE" == production-relay ]]; then
@@ -275,7 +293,8 @@ curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null
 
 adb install -r "$APK" >/dev/null
 adb shell pm clear "$PACKAGE" >/dev/null
-adb shell am start -n "$ACTIVITY" --ez baseline_mode "$([[ $MEDIA_BASELINE == 1 ]] && print true || print false)" >/dev/null
+adb shell am start -n "$ACTIVITY" --ez baseline_mode \
+  "$([[ $MEDIA_BASELINE == 1 || $MARKER_EVIDENCE == 1 ]] && print true || print false)" >/dev/null
 
 automation_path=files/automation/automation.jsonl
 for _ in {1..300}; do
@@ -302,6 +321,8 @@ sender_args=(
   --run-seconds "$RUN_SECONDS"
 )
 (( MEDIA_BASELINE )) && sender_args+=(--media-baseline)
+(( MARKER_EVIDENCE )) && sender_args+=(--marker-evidence)
+[[ -n "$CAST_TUNING_CONFIG" ]] && sender_args+=(--cast-tuning-config "$CAST_TUNING_CONFIG")
 "$APP_EXECUTABLE" "${sender_args[@]}" >"$RUN_ROOT/sender.log" 2>&1 &
 sender_pid=$!
 
@@ -336,6 +357,9 @@ done
   print -u2 "cross-platform media/path evidence did not become ready"
   exit 1
 }
+if [[ -n "$WORKLOAD_START_FILE" ]]; then
+  print 'media-ready' >"$WORKLOAD_START_FILE"
+fi
 if (( STATIC_QP_EVIDENCE )); then
   static_max_qp="$(jq -er '.static_max_qp | numbers' "$CONFIG_FILE")"
   static_qp_ready=0
@@ -430,6 +454,18 @@ done
 adb shell run-as "$PACKAGE" rm -f "$automation_path"
 
 "$ROOT/scripts/pull-android-tv-evidence.sh" --output-dir "$ANDROID_EVIDENCE" >/dev/null
+if (( MARKER_EVIDENCE )); then
+  for sequence in 000001 000004 000008; do
+    [[ -s "$sender_directory/sender-capture-$sequence.png" ]] || {
+      print -u2 "missing sender marker-bound image $sequence"
+      exit 1
+    }
+    [[ -s "$ANDROID_EVIDENCE/android-decoded-seq-$sequence.png" ]] || {
+      print -u2 "missing Android marker-bound image $sequence"
+      exit 1
+    }
+  done
+fi
 curl -fsS "http://127.0.0.1:$PORT/metrics" >"$RUN_ROOT/signaling-metrics.txt"
 "$ROOT/scripts/verify-diagnostics.sh" \
   "$ANDROID_EVIDENCE" "$sender_directory" "$PROFILE" "$CONFIG_FILE"
@@ -460,11 +496,12 @@ jq -n \
   --arg git_commit "$(git -C "$ROOT" rev-parse HEAD)" \
   --arg profile "$PROFILE" \
   --arg source "$SOURCE" \
+  --argjson marker_evidence "$MARKER_EVIDENCE" \
   --arg avd "$AVD_NAME" \
   --arg api "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" \
   --arg abi "$(adb shell getprop ro.product.cpu.abi | tr -d '\r')" \
   --arg display "$(adb shell wm size | tr -d '\r')" \
-  '{recorded_at:$recorded_at,git_commit:$git_commit,profile:$profile,source:$source,android:{avd:$avd,api:$api,abi:$abi,display:$display}}' \
+  '{recorded_at:$recorded_at,git_commit:$git_commit,profile:$profile,source:$source,marker_evidence:($marker_evidence == 1),android:{avd:$avd,api:$api,abi:$abi,display:$display}}' \
   >"$RUN_ROOT/context.json"
 
 if LC_ALL=C grep -R -a -F -q -- "$pairing_code" "$RUN_ROOT" \

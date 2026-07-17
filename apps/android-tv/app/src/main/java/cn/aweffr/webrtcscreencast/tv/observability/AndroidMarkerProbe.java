@@ -23,9 +23,13 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
   private static final int MARKER_LEFT = 64;
   private static final int MARKER_TOP = 64;
   private static final int MARKER_SIZE = 192;
-  private static final Set<Integer> PNG_SEQUENCES = Set.of(30, 80, 130);
+  private static final Set<Integer> PNG_SEQUENCES = Set.of(1, 4, 8, 30, 80, 130);
 
   public record Marker(int version, int sequence) {}
+
+  static boolean retainsPngForSequence(int sequence) {
+    return PNG_SEQUENCES.contains(sequence);
+  }
 
   public static final class MarkerException extends IllegalArgumentException {
     public MarkerException(String message) {
@@ -73,7 +77,7 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
           "frame_width", i420.getWidth(),
           "frame_height", i420.getHeight(),
           "rotation", frame.getRotation()));
-      if (PNG_SEQUENCES.contains(marker.sequence())) {
+      if (retainsPngForSequence(marker.sequence())) {
         i420.retain();
         imageExecutor.execute(() -> writePng(marker.sequence(), i420));
       }

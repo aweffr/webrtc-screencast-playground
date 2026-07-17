@@ -10,6 +10,9 @@ import time
 from typing import NamedTuple
 
 
+QUALITY_EVIDENCE_SEQUENCES = (1, 4, 8)
+
+
 class ScrollBurst(NamedTuple):
     sequence: int
     planned_seconds: int
@@ -140,6 +143,8 @@ def run_workload(
     time_scale: float,
     fullscreen: bool,
     executable: str,
+    ready_file: pathlib.Path | None = None,
+    start_file: pathlib.Path | None = None,
 ) -> bool:
     schedule = default_schedule()
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -212,6 +217,15 @@ def run_workload(
                 path=initial_path.name,
                 sha256=sha256(initial_path),
             )
+            if ready_file is not None:
+                ready_file.write_text("ready\n", encoding="utf-8")
+            if start_file is not None:
+                writer.write("workload_waiting_for_media", monotonic_ns=time.monotonic_ns())
+                deadline = time.monotonic() + 120
+                while not start_file.is_file():
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("timed out waiting for media start gate")
+                    time.sleep(0.1)
             start_ns = time.monotonic_ns()
             for burst in schedule.bursts:
                 planned_ns = start_ns + round(burst.planned_seconds * time_scale * 1_000_000_000)
@@ -253,6 +267,22 @@ def run_workload(
             wait_until(
                 start_ns + round(schedule.total_seconds * time_scale * 1_000_000_000)
             )
+            epoch_to_monotonic_ns = time.monotonic_ns() - time.time_ns()
+            final_marker = controller.run_code(
+                f"""async page => await page.evaluate(() => {{
+  window.__experimentMarker.setSequence({QUALITY_EVIDENCE_SEQUENCES[-1]});
+  return {{ marker_epoch_ms: performance.timeOrigin + performance.now() }};
+}})"""
+            )
+            final_marker_monotonic_ns = (
+                round(final_marker["marker_epoch_ms"] * 1_000_000) + epoch_to_monotonic_ns
+            )
+            writer.write(
+                "final_marker",
+                sequence=QUALITY_EVIDENCE_SEQUENCES[-1],
+                marker_monotonic_ns=final_marker_monotonic_ns,
+            )
+            time.sleep(1)
             final_state = controller.run_code(
                 "async page => await page.evaluate(() => ({scroll_y: scrollY, marker_sequence: Number(document.getElementById('experiment-marker').dataset.sequence)}))"
             )
@@ -261,7 +291,7 @@ def run_workload(
             valid = (
                 validate_burst_evidence(burst_rows)
                 and abs(round(final_state["scroll_y"]) - 4320) <= 1
-                and final_state["marker_sequence"] == 7
+                and final_state["marker_sequence"] == QUALITY_EVIDENCE_SEQUENCES[-1]
             )
             writer.write(
                 "screenshot",
@@ -285,6 +315,8 @@ def main() -> None:
     parser.add_argument("--session", default="hmw")
     parser.add_argument("--time-scale", type=float, default=1.0)
     parser.add_argument("--no-fullscreen", action="store_true")
+    parser.add_argument("--ready-file", type=pathlib.Path)
+    parser.add_argument("--start-file", type=pathlib.Path)
     args = parser.parse_args()
     if not 0 < args.time_scale <= 1:
         parser.error("--time-scale must be in (0, 1]")
@@ -299,6 +331,8 @@ def main() -> None:
         time_scale=args.time_scale,
         fullscreen=not args.no_fullscreen,
         executable=executable,
+        ready_file=args.ready_file,
+        start_file=args.start_file,
     )
     raise SystemExit(0 if valid else 1)
 

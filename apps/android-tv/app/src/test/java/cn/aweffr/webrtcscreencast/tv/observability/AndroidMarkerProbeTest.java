@@ -2,10 +2,18 @@ package cn.aweffr.webrtcscreencast.tv.observability;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 public final class AndroidMarkerProbeTest {
+  @Test
+  public void retainsMeetingDocumentPhaseImages() {
+    assertTrue(AndroidMarkerProbe.retainsPngForSequence(1));
+    assertTrue(AndroidMarkerProbe.retainsPngForSequence(4));
+    assertTrue(AndroidMarkerProbe.retainsPngForSequence(8));
+  }
+
   @Test
   public void decodesMacCompatibleVersionSequenceAndCrc() {
     byte[] luma = markerLuma(0x1020_3040, 8);

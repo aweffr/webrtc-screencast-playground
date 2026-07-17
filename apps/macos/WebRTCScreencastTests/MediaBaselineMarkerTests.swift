@@ -4,6 +4,10 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class MediaBaselineMarkerTests: XCTestCase {
+    func testQualityEvidenceIncludesMeetingDocumentPhases() {
+        XCTAssertTrue(MediaBaselineLayout.qualitySampleSequences.isSuperset(of: [1, 4, 8]))
+    }
+
     func testBinaryGridRoundTripsSequenceFromLumaPlane() throws {
         let marker = MediaBaselineMarker(sequence: 0x1020_3040)
         let image = marker.makeLumaImage(cellSize: 8)

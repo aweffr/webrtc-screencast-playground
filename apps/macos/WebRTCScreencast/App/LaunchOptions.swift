@@ -19,12 +19,16 @@ struct LaunchOptions: Equatable, Sendable {
     var role: CastingRole?
     var profile: ICEProfile?
     var configPath: String?
+    var castTuningConfigPath: String?
     var pairingCode: String?
     var pairingCodeFile: String?
     var source: CaptureSourceKind?
     var excludedReceiverPID: pid_t?
     var runSeconds: Double?
     var mediaBaseline = false
+    var markerEvidence = false
+
+    var usesMarkerProbe: Bool { mediaBaseline || markerEvidence }
 
     static func parse(_ arguments: [String]) throws -> LaunchOptions {
         var result = LaunchOptions()
@@ -34,6 +38,11 @@ struct LaunchOptions: Equatable, Sendable {
             guard option.hasPrefix("--") else { index += 1; continue }
             if option == "--media-baseline" {
                 result.mediaBaseline = true
+                index += 1
+                continue
+            }
+            if option == "--marker-evidence" {
+                result.markerEvidence = true
                 index += 1
                 continue
             }
@@ -48,6 +57,8 @@ struct LaunchOptions: Equatable, Sendable {
                 result.profile = profile
             case "--config":
                 result.configPath = value
+            case "--cast-tuning-config":
+                result.castTuningConfigPath = value
             case "--pairing-code-file":
                 result.pairingCodeFile = value
             case "--pairing-code":

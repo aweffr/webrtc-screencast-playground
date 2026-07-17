@@ -184,9 +184,9 @@ final class SessionCoordinator: NSObject, ObservableObject {
             try await recorder.record(event: "clock_calibration_unavailable", fields: [
                 "error": .string(String(describing: error)),
             ])
-            if launchOptions?.mediaBaseline == true {
+            if launchOptions?.usesMarkerProbe == true {
                 throw SessionCoordinatorStartupError.configuration(
-                    "Media baseline requires server clock calibration"
+                    "Marker evidence requires server clock calibration"
                 )
             }
         }
@@ -196,7 +196,7 @@ final class SessionCoordinator: NSObject, ObservableObject {
         do {
             let ice = try IceServerProvider.make(profile: selectedProfile, turn: configuration.turn)
             let tuningData = try loadCastTuning()
-            let baselineProbe = launchOptions?.mediaBaseline == true
+            let baselineProbe = launchOptions?.usesMarkerProbe == true
                 ? MediaBaselineFrameProbe(
                     stage: role == .sender ? .capture : .decode,
                     recorder: recorder,
@@ -299,6 +299,9 @@ final class SessionCoordinator: NSObject, ObservableObject {
     }
 
     private func loadCastTuning() throws -> Data {
+        if let path = launchOptions?.castTuningConfigPath {
+            return try Data(contentsOf: URL(filePath: path))
+        }
         guard let url = Bundle.main.url(forResource: "cast-tuning.default", withExtension: "json") else {
             throw CocoaError(.fileReadNoSuchFile)
         }

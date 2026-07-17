@@ -6,7 +6,7 @@ enum MediaBaselineLayout {
     static let canvasWidth = 1_920
     static let canvasHeight = 1_080
     static let markerROI = CGRect(x: 64, y: 64, width: 192, height: 192)
-    static let qualitySampleSequences: Set<UInt32> = [30, 80, 130]
+    static let qualitySampleSequences: Set<UInt32> = [1, 4, 8, 30, 80, 130]
 }
 
 struct MediaBaselineChartImage: Sendable {

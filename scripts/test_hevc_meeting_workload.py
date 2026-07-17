@@ -36,6 +36,7 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
             self.assertEqual(burst.steps, 12)
             self.assertEqual(burst.step_pixels, 60)
             self.assertEqual(burst.step_interval_seconds, 0.05)
+        self.assertEqual(module.QUALITY_EVIDENCE_SEQUENCES, (1, 4, 8))
 
     def test_offset_mismatch_or_missing_burst_invalidates_evidence(self):
         module = load_module()

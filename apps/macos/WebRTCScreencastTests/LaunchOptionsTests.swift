@@ -49,6 +49,18 @@ final class LaunchOptionsTests: XCTestCase {
         XCTAssertTrue(options.mediaBaseline)
     }
 
+    func testParsesMainScreenMarkerEvidenceAndExternalCastTuning() throws {
+        let options = try LaunchOptions.parse([
+            "app", "--role", "sender", "--source", "main",
+            "--marker-evidence", "--cast-tuning-config", "/tmp/hevc-case.json",
+        ])
+
+        XCTAssertTrue(options.markerEvidence)
+        XCTAssertTrue(options.usesMarkerProbe)
+        XCTAssertFalse(options.mediaBaseline)
+        XCTAssertEqual(options.castTuningConfigPath, "/tmp/hevc-case.json")
+    }
+
     func testPairingCodeFileIsMode0600AndReadable() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
