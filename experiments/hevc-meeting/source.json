@@ -1,0 +1,8 @@
+{
+  "repository": "kubernetes/website",
+  "commit": "be897babb9149b808e2ab8ed5367e5d0651b3dca",
+  "path": "content/zh-cn/docs/concepts/workloads/controllers/deployment.md",
+  "git_blob": "817964c16c50546a73820e762446ca3e126d67a3",
+  "sha256": "04ad31b16459a5a6f4d56868967b9d35303d9b7e1ea20300bfc826082fc2292f",
+  "license": "CC-BY-4.0"
+}

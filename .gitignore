@@ -22,6 +22,7 @@ apps/android-tv/.gradle/
 apps/android-tv/local.properties
 apps/android-tv/**/build/
 __pycache__/
+.playwright-cli/
 server/signaling-server
 
 # Local runtime configuration and collected diagnostics.
