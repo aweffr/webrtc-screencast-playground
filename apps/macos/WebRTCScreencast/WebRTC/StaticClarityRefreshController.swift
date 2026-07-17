@@ -10,14 +10,14 @@ struct StaticClarityRefreshSnapshot: Equatable, Sendable {
 /// Applies the rare live encoder transition used to refresh a stable desktop.
 /// The capture queue serializes transitions; the lock only protects metrics reads.
 final class StaticClarityRefreshController: @unchecked Sendable {
-    typealias ApplyLivePolicy = (_ maxFPS: Int, _ maxBitrateBps: Int, _ maxQp: Int) -> Bool
+    typealias ApplyLivePolicy = (_ maxFPS: Int, _ maxBitrateBps: Int, _ maxQp: Int?) -> Bool
     typealias ForceKeyFrame = () -> Bool
 
     private let motionFPS: Int
     private let clarityFPS: Int
     private let maxBitrateBps: Int
-    private let motionMaxQp: Int
-    private let staticMaxQp: Int
+    private let motionMaxQp: Int?
+    private let staticMaxQp: Int?
     private let applyLivePolicy: ApplyLivePolicy
     private let forceKeyFrame: ForceKeyFrame
     private let lock = NSLock()
@@ -30,8 +30,8 @@ final class StaticClarityRefreshController: @unchecked Sendable {
         motionFPS: Int,
         clarityFPS: Int,
         maxBitrateBps: Int,
-        motionMaxQp: Int,
-        staticMaxQp: Int,
+        motionMaxQp: Int?,
+        staticMaxQp: Int?,
         applyLivePolicy: @escaping ApplyLivePolicy,
         forceKeyFrame: @escaping ForceKeyFrame
     ) {

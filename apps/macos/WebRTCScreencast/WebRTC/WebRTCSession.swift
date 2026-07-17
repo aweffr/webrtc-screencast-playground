@@ -46,6 +46,31 @@ struct SenderMediaBoundarySnapshot: Equatable, Sendable {
     let clarityMotionRestores: UInt64
 }
 
+struct SenderContentAwarePolicy: Equatable, Sendable {
+    let maxFPS: Int
+    let maxBitrateBps: Int
+    let motionMaxQp: Int?
+    let staticMaxQp: Int?
+
+    init(jsonData: Data, staticMaxQp: Int) {
+        let root = (try? JSONSerialization.jsonObject(with: jsonData)) as? [String: Any]
+        let sender = root?["sender"] as? [String: Any]
+        let encoder = root?["encoder"] as? [String: Any]
+        maxFPS = (sender?["max_fps"] as? NSNumber)?.intValue ?? 15
+        maxBitrateBps = (sender?["max_bitrate_bps"] as? NSNumber)?.intValue ?? 5_000_000
+
+        let lowLatencyRateControl =
+            (encoder?["video_toolbox_low_latency_rate_control"] as? NSNumber)?.boolValue ?? false
+        if lowLatencyRateControl {
+            motionMaxQp = nil
+            self.staticMaxQp = nil
+        } else {
+            motionMaxQp = (encoder?["max_qp"] as? NSNumber)?.intValue ?? 32
+            self.staticMaxQp = staticMaxQp
+        }
+    }
+}
+
 final class SenderMediaBoundaryTelemetry: @unchecked Sendable {
     private let lock = NSLock()
     private var sourceFramesForwarded: UInt64 = 0
@@ -135,19 +160,24 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             videoSource = source
             videoCapturer = RTCVideoCapturer(delegate: source)
             tuningController.attach(created.sender, track: track, source: source)
-            let senderPolicy = Self.senderPolicy(from: castTuningJSON)
+            let senderPolicy = SenderContentAwarePolicy(
+                jsonData: castTuningJSON,
+                staticMaxQp: staticMaxQp
+            )
             staticClarityRefreshController = StaticClarityRefreshController(
                 motionFPS: senderPolicy.maxFPS,
                 clarityFPS: 1,
                 maxBitrateBps: senderPolicy.maxBitrateBps,
-                motionMaxQp: senderPolicy.maxQp,
-                staticMaxQp: staticMaxQp,
+                motionMaxQp: senderPolicy.motionMaxQp,
+                staticMaxQp: senderPolicy.staticMaxQp,
                 applyLivePolicy: { maxFPS, maxBitrateBps, maxQp in
                     tuningAccessLock.withLock {
                         let patch = RTCCastTuningLivePatch()
                         patch.maxFps = NSNumber(value: maxFPS)
                         patch.maxBitrateBps = NSNumber(value: maxBitrateBps)
-                        patch.maxQp = NSNumber(value: maxQp)
+                        if let maxQp {
+                            patch.maxQp = NSNumber(value: maxQp)
+                        }
                         return tuningController.apply(patch).status == .applied
                     }
                 },
@@ -309,19 +339,6 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
                 peerConnection.answer(for: constraints, completionHandler: completion)
             }
         }
-    }
-
-    private static func senderPolicy(from jsonData: Data) -> (maxFPS: Int, maxBitrateBps: Int, maxQp: Int) {
-        guard let root = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-              let sender = root["sender"] as? [String: Any]
-        else {
-            return (15, 5_000_000, 32)
-        }
-        let maxFPS = (sender["max_fps"] as? NSNumber)?.intValue ?? 15
-        let maxBitrateBps = (sender["max_bitrate_bps"] as? NSNumber)?.intValue ?? 5_000_000
-        let encoder = root["encoder"] as? [String: Any]
-        let maxQp = (encoder?["max_qp"] as? NSNumber)?.intValue ?? 32
-        return (maxFPS, maxBitrateBps, maxQp)
     }
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}

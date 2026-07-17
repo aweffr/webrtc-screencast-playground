@@ -3,6 +3,24 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class WebRTCSessionConstructionTests: XCTestCase {
+    func testContentAwarePolicyOmitsMaxQpOnlyForRTVC() {
+        let ordinary = SenderContentAwarePolicy(
+            jsonData: Data(#"{"sender":{"max_fps":15,"max_bitrate_bps":5000000},"encoder":{"max_qp":39,"video_toolbox_low_latency_rate_control":false}}"#.utf8),
+            staticMaxQp: 30
+        )
+        XCTAssertEqual(ordinary.motionMaxQp, 39)
+        XCTAssertEqual(ordinary.staticMaxQp, 30)
+
+        let rtvc = SenderContentAwarePolicy(
+            jsonData: Data(#"{"sender":{"max_fps":15,"max_bitrate_bps":5000000},"encoder":{"video_toolbox_low_latency_rate_control":true}}"#.utf8),
+            staticMaxQp: 30
+        )
+        XCTAssertNil(rtvc.motionMaxQp)
+        XCTAssertNil(rtvc.staticMaxQp)
+        XCTAssertEqual(rtvc.maxFPS, 15)
+        XCTAssertEqual(rtvc.maxBitrateBps, 5_000_000)
+    }
+
     func testSenderAndReceiverFactoriesAcceptCastTuningAndH265Policy() throws {
         let tuningData = try Data(contentsOf: repositoryRoot().appending(path: "config/cast-tuning.default.json"))
         let ice = try IceServerProvider.make(profile: .directBaseline, turn: nil)
