@@ -12,9 +12,10 @@ inspect: ScreenCaptureKit → VideoToolbox/WebRTC M150 → UDP → Android WebRT
 ## What is included
 
 - **macOS app (Swift 6):** GUI Sender, same-app CLI launch mode, main-display mirror, and a private
-  1920×1080 virtual extended display. Main-display mirror uses a luma-based static-clarity mode
+  1920×1080 virtual extended display. Both capture sources use a luma-based static-clarity mode
   with H264-only, H265-only, prefer-H265, and default prefer-H264 sender policies. Static clarity
-  requests a fresh keyframe and runs the stable picture at about 1 fps.
+  requests a fresh keyframe, applies the configured static max QP, and runs the stable picture at
+  about 1 fps.
 - **Android TV app (Java 8-compatible source):** TV-only launcher, receiver-first registration,
   one-time pairing-code screen, HEVC playback, D-pad-safe recovery, and app-private telemetry.
 - **Signaling server (Go):** `/ws`, `/clock`, `/healthz`, and Prometheus `/metrics`; it never carries

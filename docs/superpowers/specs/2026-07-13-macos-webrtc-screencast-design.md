@@ -111,7 +111,7 @@ Virtual display object 必须被强引用到 session 结束。退出、失败或
 - idle 收到任意变化立即恢复 15 fps。
 - Gate 只控制向 `RTCVideoSource` 的提交，不动态修改 ScreenCaptureKit cadence。
 
-通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。复制主屏幕另用 96×54 luma grid 判断视觉稳定性：连续 600 ms 的 changed-sample ratio 不超过 2% 时，通过 CastTuning live patch 把 WebRTC source/sender 限到 1 fps、保持 5 Mbps，并把 VideoToolbox runtime max QP 切到 machine-local `static_max_qp`（默认 24），然后在提交刷新帧前请求 IDR；变化超过 8% 时恢复 15 fps、5 Mbps 和 bundled motion max QP 32。2%/8% hysteresis 允许 cursor 和局部 UI 微动而不反复切档。这条清晰度策略不修改 ScreenCaptureKit cadence，也不用于 virtual display。
+通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。主屏复制和虚拟扩展屏均使用 96×54 luma grid 判断视觉稳定性：连续 600 ms 的 changed-sample ratio 不超过 2% 时，通过 CastTuning live patch 把 WebRTC source/sender 限到 1 fps、保持 5 Mbps，并把 VideoToolbox runtime max QP 切到 machine-local `static_max_qp`（默认 24），然后在提交刷新帧前请求 IDR；变化超过 8% 时恢复 15 fps、5 Mbps 和 bundled motion max QP 32。2%/8% hysteresis 允许 cursor 和局部 UI 微动而不反复切档。这条清晰度策略不修改 ScreenCaptureKit cadence，普通虚拟屏和 `media-baseline` 虚拟屏不作例外。
 
 M150 zero-hertz adapter 在 idle 期间约每秒重发最后一帧，这种行为可以接受，因此不另造 heartbeat。当前 ObjC/CastTuning 接入尚未把 `min_fps=0` 应用到 source constraints；static-clarity 模式实际由 live `max_fps=1` 产生约 1 fps 输出，补齐 zero-hertz adapter 仍记入 follow-up。
 

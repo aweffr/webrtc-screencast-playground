@@ -97,7 +97,7 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             iceProfile: iceProfile,
             excludedReceiverPID: excludedReceiverPID
         )
-        staticClarityEnabled = source == .mainDisplayMirror
+        staticClarityEnabled = source.enablesStaticClarity
         let stream = SCStream(
             filter: resolved.filter,
             configuration: resolved.configuration.makeStreamConfiguration(),

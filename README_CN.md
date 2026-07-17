@@ -8,7 +8,7 @@
 
 ## 项目提供什么
 
-- **macOS app（Swift 6）：** GUI Sender、同一 app 的 CLI 启动模式、主屏复制，以及一个私有的 1920×1080 虚拟扩展屏。Sender 支持仅 H264、仅 H265、优先 H265 和默认优先 H264 四种策略；画面稳定时请求新的 keyframe，并以约 1 fps 发送稳定画面。
+- **macOS app（Swift 6）：** GUI Sender、同一 app 的 CLI 启动模式、主屏复制，以及一个私有的 1920×1080 虚拟扩展屏。两种采集源都使用基于亮度的 static-clarity 模式；画面稳定时应用配置的 static max QP、请求新的 keyframe，并以约 1 fps 发送稳定画面。Sender 支持仅 H264、仅 H265、优先 H265 和默认优先 H264 四种策略。
 - **Android TV app（兼容 Java 8 的源码）：** TV-only launcher、Receiver 优先注册、一次性配对码界面、HEVC 播放、适配 D-pad 操作的恢复流程，以及 app 私有 telemetry。
 - **信令服务（Go）：** 提供 `/ws`、`/clock`、`/healthz` 和 Prometheus `/metrics`；不承载媒体或 TURN credentials。
 - **网络 profile：** `direct-baseline` 用于本地对照，`production-relay` 强制使用 `relay/relay + UDP`。项目不支持 TURN/TCP。

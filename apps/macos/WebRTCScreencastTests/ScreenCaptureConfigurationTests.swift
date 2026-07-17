@@ -4,6 +4,11 @@ import XCTest
 @testable import WebRTCScreencast
 
 final class ScreenCaptureConfigurationTests: XCTestCase {
+    func testEveryCaptureSourceEnablesStaticClarity() {
+        XCTAssertTrue(CaptureSourceKind.mainDisplayMirror.enablesStaticClarity)
+        XCTAssertTrue(CaptureSourceKind.virtualExtendedDisplay.enablesStaticClarity)
+    }
+
     func testCaptureUsesFixedLowLatency1080pNV12Values() throws {
         let values = try ScreenCaptureConfigurationValues.make(
             source: .virtualExtendedDisplay,
