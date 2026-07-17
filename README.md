@@ -1,5 +1,7 @@
 # WebRTC Screencast Playground
 
+[简体中文](README_CN.md)
+
 A reference implementation for low-latency, one-way H.264 desktop casting from a native macOS
 Sender to an Android TV Receiver. A small Go WebSocket service issues one-time pairing codes and
 relays WebRTC signaling; media travels directly over ICE or through a configured TURN/UDP relay.
@@ -130,8 +132,12 @@ APP="$PWD/DerivedData/Build/Products/Debug/WebRTCScreencast.app/Contents/MacOS/W
   --source main
 ```
 
-Use `--source virtual` for the managed 1920×1080 extended display. Use
-`--profile production-relay --config /absolute/path/to/runtime.json` for forced TURN/UDP.
+`--source main` captures the complete main display without changing the Mac desktop layout. The
+stream canvas remains 1920×1080. When the source is not 16:9, ScreenCaptureKit scales it
+proportionally and centers it on a black background, producing pillarbox or letterbox bars as
+needed without stretching or cropping the desktop. Use `--source virtual` for the managed
+1920×1080 extended display. Use `--profile production-relay --config /absolute/path/to/runtime.json`
+for forced TURN/UDP.
 
 ## Runtime configuration
 
