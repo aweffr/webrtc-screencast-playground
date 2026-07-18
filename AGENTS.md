@@ -17,3 +17,7 @@ WebRTC 投屏交付链：
 ### 配置格式与 parser 验证
 
 新增或修改配置格式时，测试数据必须以 parser 明确定义的公开字段为准，不能根据内部配置对象的成员猜测 JSON 字段。提交前必须实际运行包含 parser 的 contract test；只运行未覆盖该 parser 的外围测试，不能作为配置格式验证通过的依据。
+
+### Framework 更换与 build cache
+
+更换 WebRTC framework 后，再次编译前必须删除或隔离所有依赖旧 framework 的可再生 build cache，包括 Xcode `DerivedData` 中的 module cache、PCM 和已复制的 framework。不能假设 incremental build 会自动识别 framework header 或 binary 已经更换。
