@@ -21,14 +21,17 @@ public final class AndroidMarkerProbeTest {
   public void tracksFrameGapsOnlyInScrollActiveWindows() {
     AndroidMarkerProbe.ActiveWindowGapTracker tracker =
         new AndroidMarkerProbe.ActiveWindowGapTracker();
-    tracker.observe(1, 950_000_000L);
-    tracker.observe(2, 1_000_000_000L);
-    tracker.observe(2, 1_070_000_000L);
-    tracker.observe(2, 1_570_000_000L);
-    tracker.observe(2, 2_100_000_000L); // Outside the one-second ACTIVE window.
-    tracker.observe(2, 5_950_000_000L);
-    tracker.observe(3, 6_000_000_000L);
-    tracker.observe(3, 6_080_000_000L);
+    tracker.observeMarker(1, 950_000_000L);
+    tracker.observeFrame(950_000_000L);
+    tracker.observeMarker(2, 1_000_000_000L);
+    tracker.observeFrame(1_000_000_000L);
+    tracker.observeFrame(1_070_000_000L);
+    tracker.observeFrame(1_570_000_000L);
+    tracker.observeFrame(2_100_000_000L); // Outside the one-second ACTIVE window.
+    tracker.observeFrame(5_950_000_000L);
+    tracker.observeMarker(3, 6_000_000_000L);
+    tracker.observeFrame(6_000_000_000L);
+    tracker.observeFrame(6_080_000_000L);
 
     AndroidMarkerProbe.ActiveWindowGapTracker.Snapshot snapshot = tracker.snapshot();
     assertEquals(2, snapshot.windowCount());
@@ -37,11 +40,30 @@ public final class AndroidMarkerProbeTest {
   }
 
   @Test
+  public void countsEveryRenderCallbackAfterAnActiveMarker() {
+    AndroidMarkerProbe.ActiveWindowGapTracker tracker =
+        new AndroidMarkerProbe.ActiveWindowGapTracker();
+    tracker.observeFrame(900_000_000L);
+    tracker.observeMarker(2, 1_000_000_000L);
+    tracker.observeFrame(1_000_000_000L);
+    // These frames represent callbacks where marker decoding failed.
+    tracker.observeFrame(1_080_000_000L);
+    tracker.observeFrame(1_160_000_000L);
+
+    AndroidMarkerProbe.ActiveWindowGapTracker.Snapshot snapshot = tracker.snapshot();
+    assertEquals(1, snapshot.windowCount());
+    assertEquals(3, snapshot.frameCount());
+    assertEquals(100_000_000L, snapshot.maxFrameGapNs());
+  }
+
+  @Test
   public void includesTheGapEnteringAnActiveWindow() {
     AndroidMarkerProbe.ActiveWindowGapTracker tracker =
         new AndroidMarkerProbe.ActiveWindowGapTracker();
-    tracker.observe(1, 900_000_000L);
-    tracker.observe(2, 1_600_000_000L);
+    tracker.observeMarker(1, 900_000_000L);
+    tracker.observeFrame(900_000_000L);
+    tracker.observeMarker(2, 1_600_000_000L);
+    tracker.observeFrame(1_600_000_000L);
 
     assertEquals(700_000_000L, tracker.snapshot().maxFrameGapNs());
   }
@@ -50,9 +72,10 @@ public final class AndroidMarkerProbeTest {
   public void includesTheGapFromTheLastFrameToTheActiveWindowEnd() {
     AndroidMarkerProbe.ActiveWindowGapTracker tracker =
         new AndroidMarkerProbe.ActiveWindowGapTracker();
-    tracker.observe(2, 1_000_000_000L);
-    tracker.observe(2, 1_100_000_000L);
-    tracker.observe(2, 2_200_000_000L);
+    tracker.observeMarker(2, 1_000_000_000L);
+    tracker.observeFrame(1_000_000_000L);
+    tracker.observeFrame(1_100_000_000L);
+    tracker.observeFrame(2_200_000_000L);
 
     assertEquals(900_000_000L, tracker.snapshot().maxFrameGapNs());
   }

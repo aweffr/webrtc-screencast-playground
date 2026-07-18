@@ -64,7 +64,7 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
           i420.getHeight(),
           i420.getStrideY(),
           MARKER_ROIS);
-      activeGapTracker.observe(marker.sequence(), renderEntryNs);
+      activeGapTracker.observeMarker(marker.sequence(), renderEntryNs);
       if (!observedSequences.add(marker.sequence())) {
         return;
       }
@@ -83,6 +83,7 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
     } catch (MarkerException | ArithmeticException ignored) {
       // Ordinary content is not a marker; malformed/uncalibrated frames are not evidence.
     } finally {
+      activeGapTracker.observeFrame(renderEntryNs);
       i420.release();
     }
   }
@@ -158,33 +159,30 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
 
     record Snapshot(int windowCount, int frameCount, long maxFrameGapNs) {}
 
-    void observe(int sequence, long frameNs) {
+    void observeMarker(int sequence, long frameNs) {
       if (sequence == currentSequence) {
-        if (windowOpen) {
-          recordActiveFrame(frameNs);
-        }
-        lastObservedFrameNs = frameNs;
         return;
       }
 
       if (windowOpen) {
         finishWindow(frameNs);
       }
-      long priorFrameNs = lastObservedFrameNs;
       currentSequence = sequence;
-      lastObservedFrameNs = frameNs;
       if (sequence < 2 || sequence > 7) {
         return;
       }
 
       windowStartNs = frameNs;
-      previousFrameNs = frameNs;
+      previousFrameNs = lastObservedFrameNs == 0 ? frameNs : lastObservedFrameNs;
       windowOpen = true;
       windowCount++;
-      frameCount++;
-      if (priorFrameNs != 0) {
-        maxFrameGapNs = Math.max(maxFrameGapNs, frameNs - priorFrameNs);
+    }
+
+    void observeFrame(long frameNs) {
+      if (windowOpen) {
+        recordActiveFrame(frameNs);
       }
+      lastObservedFrameNs = frameNs;
     }
 
     Snapshot snapshot() {

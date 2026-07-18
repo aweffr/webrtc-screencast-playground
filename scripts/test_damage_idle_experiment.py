@@ -47,7 +47,7 @@ class DamageIdleExperimentTests(unittest.TestCase):
         self.assertEqual((cases["H1"].codec_policy, cases["H1"].static_qp, cases["H1"].active_qp),
                          ("h265-only", 33, 39))
 
-    def test_exact_damage_transitions_pass_six_active_and_seven_static_contract(self):
+    def test_each_business_episode_restores_active_and_settles_static(self):
         start = 1_000_000_000
         markers = [start + second * 1_000_000_000 for second in (20, 28, 36, 44, 52, 60)]
         workload = [{"event": "workload_started", "monotonic_ns": start}]
@@ -94,15 +94,67 @@ class DamageIdleExperimentTests(unittest.TestCase):
         self.assertEqual(result["active_latencies_ms"], [80.0] * 6)
         self.assertEqual(result["static_quiet_latencies_ms"], [650.0] * 7)
 
-    def test_detector_rejects_slow_active_and_extra_or_missing_transitions(self):
+    def test_real_extra_damage_is_allowed_with_a_bounded_transition_count(self):
+        start = 1_000_000_000
+        markers = [start + second * 1_000_000_000 for second in (20, 28, 36, 44, 52, 60)]
+        workload = [
+            {"event": "activity_episode", "sequence": index + 2, "marker_monotonic_ns": marker}
+            for index, marker in enumerate(markers)
+        ]
+        records = [capture_record(
+            start + 700_000_000,
+            last_damage_monotonic_ns=start + 50_000_000,
+            last_static_transition_monotonic_ns=start + 700_000_000,
+            static_transition_count=1,
+            synthetic_clarity_refreshes=1,
+        )]
+        active_count = 0
+        static_count = 1
+        for marker in markers:
+            for offset in (80_000_000, 1_500_000_000):
+                active_count += 1
+                active = marker + offset
+                damage = active + 100_000_000
+                static = damage + 650_000_000
+                records.append(capture_record(
+                    active,
+                    last_active_transition_monotonic_ns=active,
+                    active_transition_count=active_count,
+                    static_transition_count=static_count,
+                    synthetic_clarity_refreshes=static_count,
+                ))
+                static_count += 1
+                records.append(capture_record(
+                    static,
+                    last_damage_monotonic_ns=damage,
+                    last_active_transition_monotonic_ns=active,
+                    last_static_transition_monotonic_ns=static,
+                    active_transition_count=active_count,
+                    static_transition_count=static_count,
+                    synthetic_clarity_refreshes=static_count,
+                ))
+        records[-1]["fields"]["sender_media_boundary"] = {
+            "clarity_active_restores": active_count,
+            "clarity_successful_refreshes": static_count,
+            "clarity_failed_refreshes": 0,
+        }
+
+        result = self.experiment.evaluate_detector_evidence(workload, records)
+
+        self.assertTrue(result["eligible"], result["failures"])
+        self.assertEqual(result["active_transition_count"], 12)
+        self.assertEqual(result["static_transition_count"], 13)
+        self.assertEqual(result["active_latencies_ms"], [80.0] * 6)
+
+    def test_detector_rejects_missing_episode_and_excessive_transitions(self):
         workload = [
             {"event": "workload_started", "monotonic_ns": 1_000},
             {"event": "activity_episode", "sequence": 2, "marker_monotonic_ns": 2_000},
         ]
         records = [capture_record(
-            2_300,
-            last_active_transition_monotonic_ns=2_300,
-            active_transition_count=1,
+            300_002_000,
+            last_active_transition_monotonic_ns=300_002_000,
+            active_transition_count=4,
             static_transition_count=1,
             synthetic_clarity_refreshes=1,
         )]
@@ -110,8 +162,9 @@ class DamageIdleExperimentTests(unittest.TestCase):
         result = self.experiment.evaluate_detector_evidence(workload, records)
 
         self.assertFalse(result["eligible"])
-        self.assertIn("active_transition_count", result["failures"])
-        self.assertIn("static_transition_count", result["failures"])
+        self.assertIn("active_episode_latency", result["failures"])
+        self.assertIn("static_episode_coverage", result["failures"])
+        self.assertIn("transition_bound", result["failures"])
 
     def test_head_to_head_gates_compare_three_d1_runs_to_three_d0_runs(self):
         baseline = [self.experiment_run() for _ in range(3)]

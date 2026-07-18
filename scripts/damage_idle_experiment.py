@@ -62,18 +62,40 @@ def evaluate_detector_evidence(
     static_transitions = unique_transition_values(
         samples, "last_static_transition_monotonic_ns")
 
+    observation_end = max(
+        (record.get("monotonic_ns", 0) for record in sender_records),
+        default=0,
+    )
     active_latencies = []
-    for marker in markers:
-        transition = next((value for value in active_transitions if value >= marker), None)
-        if transition is not None:
-            active_latencies.append((transition - marker) / 1_000_000)
+    episode_active_transitions = []
+    episode_static_transitions = []
+    for index, marker in enumerate(markers):
+        interval_end = markers[index + 1] if index + 1 < len(markers) else observation_end + 1
+        active = next((
+            value for value in active_transitions
+            if marker <= value < interval_end
+        ), None)
+        if active is None:
+            continue
+        episode_active_transitions.append(active)
+        active_latencies.append((active - marker) / 1_000_000)
+        static = next((
+            value for value in static_transitions
+            if active <= value < interval_end
+        ), None)
+        if static is not None:
+            episode_static_transitions.append(static)
 
     static_pairs = {}
+    ambiguous_static_pairs = set()
     for sample in samples:
         transition = sample.get("last_static_transition_monotonic_ns")
         damage = sample.get("last_damage_monotonic_ns")
         if isinstance(transition, int) and isinstance(damage, int):
-            static_pairs.setdefault(transition, damage)
+            if transition >= damage:
+                static_pairs.setdefault(transition, damage)
+            else:
+                ambiguous_static_pairs.add(transition)
     static_quiet_latencies = [
         (transition - static_pairs[transition]) / 1_000_000
         for transition in sorted(static_pairs)
@@ -110,27 +132,40 @@ def evaluate_detector_evidence(
     )
 
     failures = []
-    if len(markers) != 6 or active_count != 6 or len(active_transitions) != 6:
-        failures.append("active_transition_count")
-    elif len(active_latencies) != 6 or any(value < 0 or value > 200 for value in active_latencies):
-        failures.append("active_transition_latency")
-    if static_count != 7 or len(static_transitions) != 7:
-        failures.append("static_transition_count")
-    elif len(static_quiet_latencies) != 7 or any(
+    if len(markers) != 6:
+        failures.append("workload_episode_count")
+    if len(episode_active_transitions) != len(markers):
+        failures.append("active_episode_coverage")
+    elif any(value < 0 or value > 200 for value in active_latencies):
+        failures.append("active_episode_latency")
+    initial_static = bool(markers) and any(value < markers[0] for value in static_transitions)
+    if not initial_static or len(episode_static_transitions) != len(markers):
+        failures.append("static_episode_coverage")
+    if not static_quiet_latencies or any(
         value < 600 or value > 900 for value in static_quiet_latencies
     ):
         failures.append("static_quiet_latency")
-    if synthetic_count != 7:
+    maximum_active_transitions = len(markers) * 3
+    if not (
+        len(markers) <= active_count <= maximum_active_transitions
+        and len(markers) + 1 <= static_count <= maximum_active_transitions + 1
+        and static_count in (active_count, active_count + 1)
+    ):
+        failures.append("transition_bound")
+    if synthetic_count != static_count:
         failures.append("synthetic_clarity_refresh_count")
-    if restores != 6:
+    if restores != active_count:
         failures.append("active_restore_count")
-    if successful != 7 or failed != 0:
+    if successful != static_count or failed != 0:
         failures.append("clarity_refresh_result")
     return {
         "eligible": not failures,
         "failures": failures,
         "active_latencies_ms": active_latencies,
         "static_quiet_latencies_ms": static_quiet_latencies,
+        "ambiguous_static_pair_count": len(ambiguous_static_pairs - set(static_pairs)),
+        "episode_active_transition_count": len(episode_active_transitions),
+        "episode_static_transition_count": len(episode_static_transitions),
         "active_transition_count": active_count,
         "static_transition_count": static_count,
         "synthetic_clarity_refreshes": synthetic_count,
