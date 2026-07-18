@@ -148,6 +148,8 @@ extension ScreenCaptureConfigurationValues {
         configuration.captureResolution = .nominal
         configuration.destinationRect = destinationRect
         configuration.backgroundColor = CGColor.black
+        configuration.colorMatrix = CGDisplayStream.yCbCrMatrix_ITU_R_709_2
+        configuration.colorSpaceName = CGColorSpace.itur_709
         configuration.capturesAudio = false
         return configuration
     }

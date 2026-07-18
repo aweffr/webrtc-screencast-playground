@@ -29,6 +29,11 @@ final class ScreenCaptureConfigurationTests: XCTestCase {
         let streamConfiguration = values.makeStreamConfiguration()
         XCTAssertEqual(streamConfiguration.captureResolution, .nominal)
         XCTAssertEqual(streamConfiguration.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+        XCTAssertEqual(
+            streamConfiguration.colorMatrix as String,
+            CGDisplayStream.yCbCrMatrix_ITU_R_709_2 as String
+        )
+        XCTAssertEqual(streamConfiguration.colorSpaceName as String, CGColorSpace.itur_709 as String)
     }
 
     func testMainDisplayUsesLetterboxGeometry() throws {
