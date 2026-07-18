@@ -282,8 +282,12 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         scheduledQuietGeneration = generation
         let now = MediaBaselineClock.nowNs
         let delayNs = deadline > now ? deadline - now : 0
-        captureQueue.asyncAfter(deadline: .now() + .nanoseconds(Int(delayNs))) { [weak self] in
-            self?.handleQuietCheck(generation: generation)
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(
+            deadline: .now() + .nanoseconds(Int(delayNs))
+        ) { [weak self] in
+            self?.captureQueue.async { [weak self] in
+                self?.handleQuietCheck(generation: generation)
+            }
         }
     }
 
