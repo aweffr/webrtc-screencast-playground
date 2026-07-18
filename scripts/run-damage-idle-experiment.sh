@@ -216,6 +216,10 @@ for case_id in "${schedule[@]}"; do
       break
     fi
     print -u2 "$case_id run $repetition attempt $attempt invalid"
+    if [[ "$completed" == true ]]; then
+      print -u2 "completed workload produced invalid media evidence; refusing infrastructure retry"
+      exit 1
+    fi
   done
   (( valid )) || { print -u2 "$case_id run $repetition exhausted its infrastructure retry"; exit 1; }
 done

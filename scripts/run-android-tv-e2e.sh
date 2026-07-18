@@ -530,8 +530,10 @@ adb shell run-as "$PACKAGE" rm -f "$automation_path"
 "$ROOT/scripts/pull-android-tv-evidence.sh" --output-dir "$ANDROID_EVIDENCE" >/dev/null
 if (( MARKER_EVIDENCE )); then
   if (( DAMAGE_IDLE_EVIDENCE )); then
-    sender_marker_sequences=(000001 000004)
-    android_marker_sequences=(000001 000002 000003 000004 000005 000006 000007)
+    # Per-episode delivery is a business gate in the experiment analyzer.
+    # The E2E harness only requires the initial image needed for quality analysis.
+    sender_marker_sequences=(000001)
+    android_marker_sequences=(000001)
   else
     sender_marker_sequences=(000001 000004 000008)
     android_marker_sequences=(000001 000004 000008)
