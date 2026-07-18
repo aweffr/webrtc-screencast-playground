@@ -10,7 +10,7 @@
 
 ## 根因
 
-问题出在 full-range 内容进入 Android decoder Surface 后，不同 codec decoder 的范围处理不一致：
+问题出在 full-range 内容进入 Android decoder 的 `ImageReader` Surface 后，不同 codec decoder 的范围处理不一致：
 
 | 输入码流 | Android decoder | output format | Surface Y 行为 |
 |---|---|---|---|
@@ -18,7 +18,7 @@
 | HEVC `420f` | `c2.android.hevc.decoder` | FULL | 保留 full-range code values |
 | H.264/HEVC `420v` | 上述 decoder | LIMITED | 两者产生相同 video-range values |
 
-旧链路对两个 codec 都发送 `420f`。生产 texture/render 阶段按 compressed-video range 解释 Surface 数据，H.264 decoder 的归一化结果能够还原，HEVC 保留的 full-range values 则被再次扩展，形成约 `1.16x - 18` 的亮度映射以及高光裁切。Android output format 同时把两个 full-range 码流报告为 FULL，因此只读 metadata 无法识别这一差异。
+旧链路对两个 codec 都发送 `420f`。direct-decode probe 证明两个 decoder 在 Surface 边界已经产生不同数值；上一轮真实 `SurfaceViewRenderer` E2E 进一步记录到 HEVC 约 `1.16x - 18` 的亮度映射及高光裁切。Android output format 同时把两个 full-range 码流报告为 FULL，因此只读 metadata 无法识别这一差异。证据能够定位 decoder Surface 的 codec-specific 分歧，并证明该分歧会穿过生产 renderer；它不把 `ImageReader` 当成生产 GLES renderer 的替身。
 
 原生 VideoToolbox 与实际 WebRTC XCFramework 的四格 probe 均排除了 sender encoder：
 
@@ -79,7 +79,7 @@ H.264/HEVC codec policy、STATIC MaxQP 24、ACTIVE MaxQP 32 与现有 content-aw
 ## 验证与证据处理
 
 - Builder：114 个 Python tests 通过；原生 VideoToolbox 与 RTC wrapper 四格 probe 均通过。
-- Android：direct `MediaCodec`/Surface instrumentation test 通过，`420v` H.264/HEVC 输出 patch values 完全一致。
+- Android：direct `MediaCodec`/`ImageReader` Surface instrumentation test 对四个码流均通过，复现 `420f` 的 codec-specific 差异，并证明 `420v` H.264/HEVC 输出 patch values 完全一致；生产 `SurfaceViewRenderer` 由两组 E2E 单独验证。
 - 下游：`make verify` 通过，包括 Go race tests、128 个 macOS tests、Android unit/lint、脚本测试和 macOS/Android builds。
 - E2E：A0/A1 各一组，2/2 valid，0 retry；执行者已查看 6 张原始关键图和 2 张发布裁剪图。
 

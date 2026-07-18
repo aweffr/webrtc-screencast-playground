@@ -27,12 +27,17 @@ public final class ColorRangeProbeTest {
   private static final String TAG = "ColorRangeProbe";
   private static final int WIDTH = 448;
   private static final int HEIGHT = 256;
+  private static final int[] FULL_CODES = {
+    0, 1, 15, 16, 17, 32, 64, 128, 180, 219, 235, 240, 254, 255
+  };
   private static final int[] VIDEO_CODES = {
     16, 17, 29, 30, 31, 43, 71, 126, 171, 204, 218, 222, 234, 235
   };
 
   @Test
-  public void videoRangeStreamsAreStableAcrossHardwareDecoderSurfaces() throws Exception {
+  public void decoderSurfaceRangeContractIsReproducible() throws Exception {
+    probe("h264_420f", "video/avc", FULL_CODES, VIDEO_CODES);
+    probe("hevc_420f", "video/hevc", FULL_CODES, FULL_CODES);
     probe("h264_420v", "video/avc", VIDEO_CODES, VIDEO_CODES);
     probe("hevc_420v", "video/hevc", VIDEO_CODES, VIDEO_CODES);
   }
