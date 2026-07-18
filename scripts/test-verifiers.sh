@@ -6,6 +6,29 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/webrtc-verifier-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/receiver" "$WORK/sender"
 
+mkdir -p "$WORK/hevc-failed-base"
+jq -n '{
+  stage:"base",
+  run_features:false,
+  winner_id:null,
+  cases:[{case_id:"B0",eligible:false}]
+}' >"$WORK/hevc-failed-base/report.json"
+if "$ROOT/scripts/run-hevc-meeting-experiment.sh" \
+  --stage features \
+  --winner-id B0 \
+  --experiment-root "$WORK/hevc-failed-base" \
+  --runtime-config "$WORK/missing-runtime.json" \
+  --macos-artifact "$WORK/missing-macos.tar.gz" \
+  2>"$WORK/hevc-feature-stage.err"; then
+  print -u2 "HEVC runner accepted feature stage after every base candidate failed"
+  exit 1
+fi
+if ! grep -F -q "base report does not authorize HEVC feature stage" \
+    "$WORK/hevc-feature-stage.err"; then
+  print -u2 "HEVC runner did not enforce the base-report feature-stage gate"
+  exit 1
+fi
+
 jq -nc '[
   {event:"session_started",fields:{source:null}},
   {event:"signaling_connected",fields:{}},

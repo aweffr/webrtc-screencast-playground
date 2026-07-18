@@ -32,13 +32,24 @@ while (( $# )); do
   esac
 done
 
-[[ -r "$RUNTIME_CONFIG" && -f "$MACOS_ARTIFACT" ]] || usage
 [[ "$STAGE" == smoke || "$STAGE" == base || "$STAGE" == features ]] || usage
 [[ "$DOCUMENT_PORT" == <-> && "$DOCUMENT_PORT" -ge 1024 && "$DOCUMENT_PORT" -le 65535 ]] || usage
 if [[ "$STAGE" == features ]]; then
   [[ "$WINNER_ID" == A1 || "$WINNER_ID" == B0 || "$WINNER_ID" == B1 ]] || usage
   [[ -n "$EXPERIMENT_ROOT" && -d "$EXPERIMENT_ROOT" ]] || usage
+  command -v jq >/dev/null || { print -u2 "jq is required"; exit 2; }
+  base_report="$EXPERIMENT_ROOT/report.json"
+  if [[ ! -r "$base_report" ]] || ! jq -e --arg winner "$WINNER_ID" '
+      .stage == "base"
+      and .run_features == true
+      and .winner_id == $winner
+      and any(.cases[]?; .case_id == $winner and .eligible == true)
+    ' "$base_report" >/dev/null; then
+    print -u2 "base report does not authorize HEVC feature stage for $WINNER_ID"
+    exit 2
+  fi
 fi
+[[ -r "$RUNTIME_CONFIG" && -f "$MACOS_ARTIFACT" ]] || usage
 for tool in adb jq playwright-cli python3 shasum; do
   command -v "$tool" >/dev/null || { print -u2 "$tool is required"; exit 2; }
 done

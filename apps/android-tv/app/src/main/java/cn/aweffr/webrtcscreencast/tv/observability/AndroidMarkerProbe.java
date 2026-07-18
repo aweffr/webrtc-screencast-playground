@@ -149,25 +149,58 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
     private int currentSequence = -1;
     private long windowStartNs;
     private long previousFrameNs;
+    private long lastObservedFrameNs;
     private long maxFrameGapNs;
     private int windowCount;
     private int frameCount;
+    private boolean windowOpen;
 
     record Snapshot(int windowCount, int frameCount, long maxFrameGapNs) {}
 
     void observe(int sequence, long frameNs) {
+      if (sequence == currentSequence) {
+        if (windowOpen) {
+          recordActiveFrame(frameNs);
+        }
+        lastObservedFrameNs = frameNs;
+        return;
+      }
+
+      if (windowOpen) {
+        finishWindow(frameNs);
+      }
+      long priorFrameNs = lastObservedFrameNs;
+      currentSequence = sequence;
+      lastObservedFrameNs = frameNs;
       if (sequence < 2 || sequence > 7) {
         return;
       }
-      if (sequence != currentSequence) {
-        currentSequence = sequence;
-        windowStartNs = frameNs;
-        previousFrameNs = frameNs;
-        windowCount++;
-        frameCount++;
-        return;
+
+      windowStartNs = frameNs;
+      previousFrameNs = frameNs;
+      windowOpen = true;
+      windowCount++;
+      frameCount++;
+      if (priorFrameNs != 0) {
+        maxFrameGapNs = Math.max(maxFrameGapNs, frameNs - priorFrameNs);
       }
-      if (frameNs - windowStartNs > WINDOW_NS) {
+    }
+
+    Snapshot snapshot() {
+      return new Snapshot(windowCount, frameCount, maxFrameGapNs);
+    }
+
+    Snapshot snapshot(long observationEndNs) {
+      if (windowOpen) {
+        finishWindow(observationEndNs);
+      }
+      return snapshot();
+    }
+
+    private void recordActiveFrame(long frameNs) {
+      long windowEndNs = windowStartNs + WINDOW_NS;
+      if (frameNs > windowEndNs) {
+        finishWindow(frameNs);
         return;
       }
       maxFrameGapNs = Math.max(maxFrameGapNs, frameNs - previousFrameNs);
@@ -175,8 +208,10 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
       frameCount++;
     }
 
-    Snapshot snapshot() {
-      return new Snapshot(windowCount, frameCount, maxFrameGapNs);
+    private void finishWindow(long observationEndNs) {
+      long measuredEndNs = Math.min(observationEndNs, windowStartNs + WINDOW_NS);
+      maxFrameGapNs = Math.max(maxFrameGapNs, measuredEndNs - previousFrameNs);
+      windowOpen = false;
     }
   }
 
@@ -363,7 +398,8 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
 
   @Override
   public synchronized void close() {
-    ActiveWindowGapTracker.Snapshot gap = activeGapTracker.snapshot();
+    ActiveWindowGapTracker.Snapshot gap =
+        activeGapTracker.snapshot(SystemClock.elapsedRealtimeNanos());
     recorder.record("baseline_android_active_gap_summary", Map.of(
         "active_window_count", gap.windowCount(),
         "active_frame_count", gap.frameCount(),
