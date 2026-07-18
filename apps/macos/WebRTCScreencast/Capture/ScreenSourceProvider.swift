@@ -66,7 +66,7 @@ struct ScreenCaptureConfigurationValues: Equatable, Sendable {
         return ScreenCaptureConfigurationValues(
             width: Int(outputSize.width),
             height: Int(outputSize.height),
-            pixelFormat: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+            pixelFormat: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
             minimumFrameInterval: CMTime(value: 1, timescale: 15),
             queueDepth: 3,
             showsCursor: true,
@@ -148,6 +148,8 @@ extension ScreenCaptureConfigurationValues {
         configuration.captureResolution = .nominal
         configuration.destinationRect = destinationRect
         configuration.backgroundColor = CGColor.black
+        configuration.colorMatrix = CGDisplayStream.yCbCrMatrix_ITU_R_709_2
+        configuration.colorSpaceName = CGColorSpace.itur_709
         configuration.capturesAudio = false
         return configuration
     }
