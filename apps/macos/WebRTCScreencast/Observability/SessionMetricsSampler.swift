@@ -93,7 +93,7 @@ actor SessionMetricsSampler {
         ]
     }
 
-    private static func fields(from stats: CaptureTelemetrySnapshot) -> [String: JSONValue] {
+    static func fields(from stats: CaptureTelemetrySnapshot) -> [String: JSONValue] {
         [
             "callback_frames": .integer(Int(stats.callbackFrames)),
             "submitted_frames": .integer(Int(stats.submittedFrames)),
@@ -102,9 +102,14 @@ actor SessionMetricsSampler {
             "dirty_rect_count": stats.lastDirtyRectCount.map(JSONValue.integer) ?? .null,
             "dirty_ratio": stats.lastDirtyRatio.map(JSONValue.number) ?? .null,
             "frame_gate_state": .string(stats.gateState.rawValue),
-            "visual_stability_mode": .string(stats.visualStabilityMode.rawValue),
-            "visual_changed_sample_ratio": stats.lastVisualChangedSampleRatio.map(JSONValue.number) ?? .null,
-            "clarity_refresh_requests": .integer(Int(stats.clarityRefreshRequests)),
+            "content_activity_mode": .string(stats.contentActivityMode.rawValue),
+            "last_damage_monotonic_ns": stats.lastDamageMonotonicNs.map { .integer(Int($0)) } ?? .null,
+            "quiet_deadline_monotonic_ns": stats.quietDeadlineMonotonicNs.map { .integer(Int($0)) } ?? .null,
+            "last_active_transition_monotonic_ns": stats.lastActiveTransitionMonotonicNs.map { .integer(Int($0)) } ?? .null,
+            "last_static_transition_monotonic_ns": stats.lastStaticTransitionMonotonicNs.map { .integer(Int($0)) } ?? .null,
+            "active_transition_count": .integer(Int(stats.activeTransitionCount)),
+            "static_transition_count": .integer(Int(stats.staticTransitionCount)),
+            "synthetic_clarity_refreshes": .integer(Int(stats.syntheticClarityRefreshes)),
         ]
     }
 
@@ -142,7 +147,7 @@ actor SessionMetricsSampler {
             "clarity_mode": .string(stats.clarityMode.rawValue),
             "clarity_successful_refreshes": .integer(Int(stats.claritySuccessfulRefreshes)),
             "clarity_failed_refreshes": .integer(Int(stats.clarityFailedRefreshes)),
-            "clarity_motion_restores": .integer(Int(stats.clarityMotionRestores)),
+            "clarity_active_restores": .integer(Int(stats.clarityActiveRestores)),
         ]
     }
 

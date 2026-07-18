@@ -13,9 +13,8 @@ struct CapturedScreenFrame {
     let dirtyRectCount: Int
     let dirtyRatio: Double
     let gateState: FrameGateState
-    let visualStabilityMode: VisualStabilityMode
-    let visualChangedSampleRatio: Double?
-    let clarityTransition: VisualStabilityTransition
+    let contentActivityMode: ContentActivityMode
+    let clarityTransition: ContentActivityTransition
 }
 
 struct CaptureTelemetrySnapshot: Equatable, Sendable {
@@ -26,9 +25,14 @@ struct CaptureTelemetrySnapshot: Equatable, Sendable {
     let lastDirtyRectCount: Int?
     let lastDirtyRatio: Double?
     let gateState: FrameGateState
-    let visualStabilityMode: VisualStabilityMode
-    let lastVisualChangedSampleRatio: Double?
-    let clarityRefreshRequests: UInt64
+    let contentActivityMode: ContentActivityMode
+    let lastDamageMonotonicNs: UInt64?
+    let quietDeadlineMonotonicNs: UInt64?
+    let lastActiveTransitionMonotonicNs: UInt64?
+    let lastStaticTransitionMonotonicNs: UInt64?
+    let activeTransitionCount: UInt64
+    let staticTransitionCount: UInt64
+    let syntheticClarityRefreshes: UInt64
 }
 
 protocol ScreenCaptureFrameSink: AnyObject {
@@ -39,9 +43,9 @@ protocol ScreenCaptureFrameSink: AnyObject {
 }
 
 struct ClarityTransitionLatch: Sendable {
-    private(set) var pending: VisualStabilityTransition = .none
+    private(set) var pending: ContentActivityTransition = .none
 
-    mutating func update(with detected: VisualStabilityTransition) -> VisualStabilityTransition {
+    mutating func update(with detected: ContentActivityTransition) -> ContentActivityTransition {
         if detected != .none { pending = detected }
         return pending
     }
@@ -56,6 +60,12 @@ enum ScreenCaptureSourceError: Error {
     case invalidFrameTimestamp
 }
 
+private struct CachedScreenFrame {
+    let pixelBuffer: CVPixelBuffer
+    let contentRect: CGRect
+    let scaleFactor: Double
+}
+
 final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private let captureQueue = DispatchQueue(
         label: "cn.aweffr.WebRTCScreencast.capture",
@@ -64,7 +74,10 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private weak var sink: ScreenCaptureFrameSink?
     private var stream: SCStream?
     private var frameGate = FrameGate()
-    private var visualStabilityDetector = VisualStabilityDetector()
+    private var damageIdleDetector = DamageIdleDetector()
+    private var damageIdleGeneration: UInt64 = 0
+    private var scheduledQuietGeneration: UInt64?
+    private var cachedScreenFrame: CachedScreenFrame?
     private var clarityTransitionLatch = ClarityTransitionLatch()
     private var staticClarityEnabled = false
     private let telemetryLock = NSLock()
@@ -75,9 +88,14 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private var lastDirtyRectCount: Int?
     private var lastDirtyRatio: Double?
     private var lastGateState: FrameGateState = .idle
-    private var lastVisualStabilityMode: VisualStabilityMode = .motion
-    private var lastVisualChangedSampleRatio: Double?
-    private var clarityRefreshRequests: UInt64 = 0
+    private var lastContentActivityMode: ContentActivityMode = .active
+    private var lastDamageMonotonicNs: UInt64?
+    private var quietDeadlineMonotonicNs: UInt64?
+    private var lastActiveTransitionMonotonicNs: UInt64?
+    private var lastStaticTransitionMonotonicNs: UInt64?
+    private var activeTransitionCount: UInt64 = 0
+    private var staticTransitionCount: UInt64 = 0
+    private var syntheticClarityRefreshes: UInt64 = 0
 
     init(sink: ScreenCaptureFrameSink) {
         self.sink = sink
@@ -98,6 +116,9 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             excludedReceiverPID: excludedReceiverPID
         )
         staticClarityEnabled = source.enablesStaticClarity
+        if staticClarityEnabled {
+            damageIdleGeneration = damageIdleDetector.start()
+        }
         let stream = SCStream(
             filter: resolved.filter,
             configuration: resolved.configuration.makeStreamConfiguration(),
@@ -109,6 +130,10 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             try await stream.startCapture()
         } catch {
             self.stream = nil
+            if staticClarityEnabled {
+                damageIdleDetector.stop()
+                staticClarityEnabled = false
+            }
             throw error
         }
     }
@@ -118,10 +143,14 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         self.stream = nil
         defer { try? stream.removeStreamOutput(self, type: .screen) }
         try await stream.stopCapture()
-        frameGate = FrameGate()
-        visualStabilityDetector = VisualStabilityDetector()
-        clarityTransitionLatch = ClarityTransitionLatch()
-        staticClarityEnabled = false
+        captureQueue.sync {
+            frameGate = FrameGate()
+            damageIdleDetector.stop()
+            scheduledQuietGeneration = nil
+            cachedScreenFrame = nil
+            clarityTransitionLatch = ClarityTransitionLatch()
+            staticClarityEnabled = false
+        }
     }
 
     func stream(
@@ -162,18 +191,29 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             dirtyRatio: dirtyRatio,
             timestamp: .nanoseconds(scaledTime.value)
         )
-        let visualDecision: VisualStabilityDecision?
+        cachedScreenFrame = CachedScreenFrame(
+            pixelBuffer: pixelBuffer,
+            contentRect: metadata.contentRect,
+            scaleFactor: metadata.scaleFactor
+        )
+        var activityDecision: DamageIdleDecision?
         if staticClarityEnabled,
-           let samples = LumaFrameSampler.sample(pixelBuffer: pixelBuffer) {
-            visualDecision = visualStabilityDetector.evaluate(
-                samples: samples,
-                timestamp: .nanoseconds(scaledTime.value)
-            )
-        } else {
-            visualDecision = nil
+           ScreenDamageClassifier.hasDamage(
+               status: metadata.status,
+               dirtyRects: metadata.dirtyRects
+           ) {
+            let detected = damageIdleDetector.observeDamage(at: callbackMonotonicNs)
+            activityDecision = detected
+            recordActivityDecision(detected, at: callbackMonotonicNs)
+            if let deadline = detected.nextQuietDeadlineMonotonicNs {
+                scheduleQuietCheckIfNeeded(
+                    at: deadline,
+                    generation: damageIdleGeneration
+                )
+            }
         }
         let clarityTransition = clarityTransitionLatch.update(
-            with: visualDecision?.transition ?? .none
+            with: activityDecision?.transition ?? .none
         )
         let shouldSubmit = decision.shouldSubmit || clarityTransition != .none
         telemetryLock.withLock {
@@ -182,19 +222,11 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             lastDirtyRectCount = dirtyRectCount
             lastDirtyRatio = dirtyRatio
             lastGateState = decision.state
-            if let visualDecision {
-                lastVisualStabilityMode = visualDecision.mode
-                lastVisualChangedSampleRatio = visualDecision.changedSampleRatio
-                if visualDecision.transition == .enterStaticClarity {
-                    clarityRefreshRequests += 1
-                }
-            }
-            if shouldSubmit { submittedFrames += 1 }
-            else { droppedFrames += 1 }
+            if !shouldSubmit { droppedFrames += 1 }
         }
         guard shouldSubmit else { return }
 
-        let transitionApplied = sink?.screenCaptureSource(
+        let frameAccepted = sink?.screenCaptureSource(
             self,
             didCapture: CapturedScreenFrame(
                 pixelBuffer: pixelBuffer,
@@ -206,13 +238,16 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
                 dirtyRectCount: dirtyRectCount,
                 dirtyRatio: dirtyRatio,
                 gateState: decision.state,
-                visualStabilityMode: visualDecision?.mode ?? .motion,
-                visualChangedSampleRatio: visualDecision?.changedSampleRatio,
+                contentActivityMode: activityDecision?.mode ?? damageIdleDetector.mode,
                 clarityTransition: clarityTransition
             )
         ) ?? false
         if clarityTransition != .none {
-            clarityTransitionLatch.recordApplied(transitionApplied)
+            clarityTransitionLatch.recordApplied(frameAccepted)
+        }
+        telemetryLock.withLock {
+            if frameAccepted { submittedFrames += 1 }
+            else { droppedFrames += 1 }
         }
     }
 
@@ -230,10 +265,91 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
                 lastDirtyRectCount: lastDirtyRectCount,
                 lastDirtyRatio: lastDirtyRatio,
                 gateState: lastGateState,
-                visualStabilityMode: lastVisualStabilityMode,
-                lastVisualChangedSampleRatio: lastVisualChangedSampleRatio,
-                clarityRefreshRequests: clarityRefreshRequests
+                contentActivityMode: lastContentActivityMode,
+                lastDamageMonotonicNs: lastDamageMonotonicNs,
+                quietDeadlineMonotonicNs: quietDeadlineMonotonicNs,
+                lastActiveTransitionMonotonicNs: lastActiveTransitionMonotonicNs,
+                lastStaticTransitionMonotonicNs: lastStaticTransitionMonotonicNs,
+                activeTransitionCount: activeTransitionCount,
+                staticTransitionCount: staticTransitionCount,
+                syntheticClarityRefreshes: syntheticClarityRefreshes
             )
+        }
+    }
+
+    private func scheduleQuietCheckIfNeeded(at deadline: UInt64, generation: UInt64) {
+        guard scheduledQuietGeneration == nil else { return }
+        scheduledQuietGeneration = generation
+        let now = MediaBaselineClock.nowNs
+        let delayNs = deadline > now ? deadline - now : 0
+        captureQueue.asyncAfter(deadline: .now() + .nanoseconds(Int(delayNs))) { [weak self] in
+            self?.handleQuietCheck(generation: generation)
+        }
+    }
+
+    private func handleQuietCheck(generation: UInt64) {
+        guard scheduledQuietGeneration == generation else { return }
+        scheduledQuietGeneration = nil
+        guard staticClarityEnabled else { return }
+
+        let now = MediaBaselineClock.nowNs
+        let decision = damageIdleDetector.settleIfDue(
+            at: now,
+            generation: generation
+        )
+        recordActivityDecision(decision, at: now)
+        if let nextDeadline = decision.nextQuietDeadlineMonotonicNs {
+            scheduleQuietCheckIfNeeded(at: nextDeadline, generation: generation)
+            return
+        }
+        guard decision.transition == .enterStaticClarity,
+              let cachedScreenFrame
+        else { return }
+
+        let transition = clarityTransitionLatch.update(with: decision.transition)
+        let accepted = sink?.screenCaptureSource(
+            self,
+            didCapture: CapturedScreenFrame(
+                pixelBuffer: cachedScreenFrame.pixelBuffer,
+                callbackMonotonicNs: now,
+                timestampNs: Int64(now),
+                status: .complete,
+                contentRect: cachedScreenFrame.contentRect,
+                scaleFactor: cachedScreenFrame.scaleFactor,
+                dirtyRectCount: 0,
+                dirtyRatio: 0,
+                gateState: lastGateState,
+                contentActivityMode: decision.mode,
+                clarityTransition: transition
+            )
+        ) ?? false
+        clarityTransitionLatch.recordApplied(accepted)
+        telemetryLock.withLock {
+            lastTimestampNs = Int64(now)
+            if accepted {
+                submittedFrames += 1
+                syntheticClarityRefreshes += 1
+            } else {
+                droppedFrames += 1
+            }
+        }
+    }
+
+    private func recordActivityDecision(_ decision: DamageIdleDecision, at monotonicNs: UInt64) {
+        telemetryLock.withLock {
+            lastContentActivityMode = decision.mode
+            lastDamageMonotonicNs = decision.lastDamageMonotonicNs
+            quietDeadlineMonotonicNs = decision.quietDeadlineMonotonicNs
+            switch decision.transition {
+            case .none:
+                break
+            case .enterStaticClarity:
+                lastStaticTransitionMonotonicNs = monotonicNs
+                staticTransitionCount += 1
+            case .exitStaticClarity:
+                lastActiveTransitionMonotonicNs = monotonicNs
+                activeTransitionCount += 1
+            }
         }
     }
 

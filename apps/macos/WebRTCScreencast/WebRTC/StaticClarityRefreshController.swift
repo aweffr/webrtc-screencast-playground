@@ -1,10 +1,10 @@
 import Foundation
 
 struct StaticClarityRefreshSnapshot: Equatable, Sendable {
-    let mode: VisualStabilityMode
+    let mode: ContentActivityMode
     let successfulRefreshes: UInt64
     let failedRefreshes: UInt64
-    let motionRestores: UInt64
+    let activeRestores: UInt64
 }
 
 /// Applies the rare live encoder transition used to refresh a stable desktop.
@@ -13,46 +13,46 @@ final class StaticClarityRefreshController: @unchecked Sendable {
     typealias ApplyLivePolicy = (_ maxFPS: Int, _ maxBitrateBps: Int, _ maxQp: Int?) -> Bool
     typealias ForceKeyFrame = () -> Bool
 
-    private let motionFPS: Int
+    private let activeFPS: Int
     private let clarityFPS: Int
     private let maxBitrateBps: Int
-    private let motionMaxQp: Int?
+    private let activeMaxQp: Int?
     private let staticMaxQp: Int?
     private let applyLivePolicy: ApplyLivePolicy
     private let forceKeyFrame: ForceKeyFrame
     private let lock = NSLock()
-    private var mode: VisualStabilityMode = .motion
+    private var mode: ContentActivityMode = .active
     private var successfulRefreshes: UInt64 = 0
     private var failedRefreshes: UInt64 = 0
-    private var motionRestores: UInt64 = 0
+    private var activeRestores: UInt64 = 0
 
     init(
-        motionFPS: Int,
+        activeFPS: Int,
         clarityFPS: Int,
         maxBitrateBps: Int,
-        motionMaxQp: Int?,
+        activeMaxQp: Int?,
         staticMaxQp: Int?,
         applyLivePolicy: @escaping ApplyLivePolicy,
         forceKeyFrame: @escaping ForceKeyFrame
     ) {
-        self.motionFPS = motionFPS
+        self.activeFPS = activeFPS
         self.clarityFPS = clarityFPS
         self.maxBitrateBps = maxBitrateBps
-        self.motionMaxQp = motionMaxQp
+        self.activeMaxQp = activeMaxQp
         self.staticMaxQp = staticMaxQp
         self.applyLivePolicy = applyLivePolicy
         self.forceKeyFrame = forceKeyFrame
     }
 
     @discardableResult
-    func handle(_ transition: VisualStabilityTransition) -> Bool {
+    func handle(_ transition: ContentActivityTransition) -> Bool {
         switch transition {
         case .none:
             return true
         case .enterStaticClarity:
             return enterStaticClarity()
         case .exitStaticClarity:
-            return restoreMotionPolicy()
+            return restoreActivePolicy()
         }
     }
 
@@ -62,7 +62,7 @@ final class StaticClarityRefreshController: @unchecked Sendable {
                 mode: mode,
                 successfulRefreshes: successfulRefreshes,
                 failedRefreshes: failedRefreshes,
-                motionRestores: motionRestores
+                activeRestores: activeRestores
             )
         }
     }
@@ -74,9 +74,9 @@ final class StaticClarityRefreshController: @unchecked Sendable {
             return false
         }
         guard forceKeyFrame() else {
-            _ = applyLivePolicy(motionFPS, maxBitrateBps, motionMaxQp)
+            _ = applyLivePolicy(activeFPS, maxBitrateBps, activeMaxQp)
             lock.withLock {
-                mode = .motion
+                mode = .active
                 failedRefreshes += 1
             }
             return false
@@ -88,15 +88,15 @@ final class StaticClarityRefreshController: @unchecked Sendable {
         return true
     }
 
-    private func restoreMotionPolicy() -> Bool {
+    private func restoreActivePolicy() -> Bool {
         guard snapshot().mode == .staticClarity else { return true }
-        guard applyLivePolicy(motionFPS, maxBitrateBps, motionMaxQp) else {
+        guard applyLivePolicy(activeFPS, maxBitrateBps, activeMaxQp) else {
             lock.withLock { failedRefreshes += 1 }
             return false
         }
         lock.withLock {
-            mode = .motion
-            motionRestores += 1
+            mode = .active
+            activeRestores += 1
         }
         return true
     }

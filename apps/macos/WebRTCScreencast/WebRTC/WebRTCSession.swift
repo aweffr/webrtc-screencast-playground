@@ -45,16 +45,16 @@ struct SenderMediaBoundarySnapshot: Equatable, Sendable {
     let videoToolboxDroppedFrames: UInt64?
     let keyFrameQpHistogram: [UInt64]?
     let deltaFrameQpHistogram: [UInt64]?
-    let clarityMode: VisualStabilityMode
+    let clarityMode: ContentActivityMode
     let claritySuccessfulRefreshes: UInt64
     let clarityFailedRefreshes: UInt64
-    let clarityMotionRestores: UInt64
+    let clarityActiveRestores: UInt64
 }
 
 struct SenderContentAwarePolicy: Equatable, Sendable {
     let maxFPS: Int
     let maxBitrateBps: Int
-    let motionMaxQp: Int?
+    let activeMaxQp: Int?
     let staticMaxQp: Int?
 
     init(jsonData: Data, staticMaxQp: Int) {
@@ -67,10 +67,10 @@ struct SenderContentAwarePolicy: Equatable, Sendable {
         let lowLatencyRateControl =
             (encoder?["video_toolbox_low_latency_rate_control"] as? NSNumber)?.boolValue ?? false
         if lowLatencyRateControl {
-            motionMaxQp = nil
+            activeMaxQp = nil
             self.staticMaxQp = nil
         } else {
-            motionMaxQp = (encoder?["max_qp"] as? NSNumber)?.intValue ?? 32
+            activeMaxQp = (encoder?["max_qp"] as? NSNumber)?.intValue ?? 32
             self.staticMaxQp = staticMaxQp
         }
     }
@@ -187,10 +187,10 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
                 staticMaxQp: staticMaxQp
             )
             staticClarityRefreshController = StaticClarityRefreshController(
-                motionFPS: senderPolicy.maxFPS,
+                activeFPS: senderPolicy.maxFPS,
                 clarityFPS: 1,
                 maxBitrateBps: senderPolicy.maxBitrateBps,
-                motionMaxQp: senderPolicy.motionMaxQp,
+                activeMaxQp: senderPolicy.activeMaxQp,
                 staticMaxQp: senderPolicy.staticMaxQp,
                 applyLivePolicy: { maxFPS, maxBitrateBps, maxQp in
                     tuningAccessLock.withLock {
@@ -311,10 +311,10 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             videoToolboxDroppedFrames: tuning.map(\.droppedFrameCount),
             keyFrameQpHistogram: tuning?.keyFrameQpHistogram.map(\.uint64Value),
             deltaFrameQpHistogram: tuning?.deltaFrameQpHistogram.map(\.uint64Value),
-            clarityMode: clarity?.mode ?? .motion,
+            clarityMode: clarity?.mode ?? .active,
             claritySuccessfulRefreshes: clarity?.successfulRefreshes ?? 0,
             clarityFailedRefreshes: clarity?.failedRefreshes ?? 0,
-            clarityMotionRestores: clarity?.motionRestores ?? 0
+            clarityActiveRestores: clarity?.activeRestores ?? 0
         )
     }
 
@@ -327,6 +327,7 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
     func screenCaptureSource(_ source: ScreenCaptureSource, didCapture frame: CapturedScreenFrame) -> Bool {
         guard role == .sender, let videoCapturer, let delegate = videoCapturer.delegate else { return false }
         let transitionApplied = staticClarityRefreshController?.handle(frame.clarityTransition) ?? false
+        guard transitionApplied else { return false }
         let buffer = RTCCVPixelBuffer(pixelBuffer: frame.pixelBuffer)
         let videoFrame = RTCVideoFrame(buffer: buffer, rotation: ._0, timeStampNs: frame.timestampNs)
         delegate.capturer(videoCapturer, didCapture: videoFrame)

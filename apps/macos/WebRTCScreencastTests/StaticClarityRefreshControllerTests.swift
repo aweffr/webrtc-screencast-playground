@@ -9,10 +9,10 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
     func testEnteringStaticModeAppliesOneFPSBeforeForcingKeyFrame() {
         var calls: [String] = []
         let controller = StaticClarityRefreshController(
-            motionFPS: 15,
+            activeFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            motionMaxQp: 32,
+            activeMaxQp: 32,
             staticMaxQp: 22,
             applyLivePolicy: { fps, bitrate, maxQp in
                 let qp = maxQp.map(String.init) ?? "none"
@@ -31,7 +31,7 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
         XCTAssertEqual(controller.snapshot().successfulRefreshes, 1)
     }
 
-    func testExitingStaticModeRestoresMotionFPSWithoutKeyFrame() {
+    func testExitingStaticModeRestoresActiveFPSWithoutKeyFrame() {
         let recorder = CallRecorder()
         let controller = makeController(recorder: recorder)
         XCTAssertTrue(controller.handle(.enterStaticClarity))
@@ -39,16 +39,16 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
 
         XCTAssertTrue(controller.handle(.exitStaticClarity))
         XCTAssertEqual(recorder.calls, ["apply:15:5000000:32"])
-        XCTAssertEqual(controller.snapshot().mode, .motion)
+        XCTAssertEqual(controller.snapshot().mode, .active)
     }
 
-    func testFailedKeyFrameRestoresMotionPolicy() {
+    func testFailedKeyFrameRestoresActivePolicy() {
         var calls: [String] = []
         let controller = StaticClarityRefreshController(
-            motionFPS: 15,
+            activeFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            motionMaxQp: 32,
+            activeMaxQp: 32,
             staticMaxQp: 22,
             applyLivePolicy: { fps, bitrate, maxQp in
                 let qp = maxQp.map(String.init) ?? "none"
@@ -67,7 +67,7 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             ["apply:1:5000000:22", "force-key-frame", "apply:15:5000000:32"]
         )
         let snapshot = controller.snapshot()
-        XCTAssertEqual(snapshot.mode, .motion)
+        XCTAssertEqual(snapshot.mode, .active)
         XCTAssertEqual(snapshot.failedRefreshes, 1)
         XCTAssertEqual(snapshot.successfulRefreshes, 0)
     }
@@ -76,10 +76,10 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
         var applyAttempts = 0
         var keyFrameRequests = 0
         let controller = StaticClarityRefreshController(
-            motionFPS: 15,
+            activeFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            motionMaxQp: 32,
+            activeMaxQp: 32,
             staticMaxQp: 22,
             applyLivePolicy: { _, _, _ in
                 applyAttempts += 1
@@ -98,17 +98,17 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
         XCTAssertEqual(controller.snapshot().mode, .staticClarity)
     }
 
-    func testRestoringMotionCanRetryAfterLivePolicyFailure() {
-        var failNextMotionRestore = true
+    func testRestoringActiveCanRetryAfterLivePolicyFailure() {
+        var failNextActiveRestore = true
         let controller = StaticClarityRefreshController(
-            motionFPS: 15,
+            activeFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            motionMaxQp: 32,
+            activeMaxQp: 32,
             staticMaxQp: 22,
             applyLivePolicy: { fps, _, _ in
-                if fps == 15, failNextMotionRestore {
-                    failNextMotionRestore = false
+                if fps == 15, failNextActiveRestore {
+                    failNextActiveRestore = false
                     return false
                 }
                 return true
@@ -119,17 +119,17 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
 
         XCTAssertFalse(controller.handle(.exitStaticClarity))
         XCTAssertTrue(controller.handle(.exitStaticClarity))
-        XCTAssertEqual(controller.snapshot().mode, .motion)
-        XCTAssertEqual(controller.snapshot().motionRestores, 1)
+        XCTAssertEqual(controller.snapshot().mode, .active)
+        XCTAssertEqual(controller.snapshot().activeRestores, 1)
     }
 
     func testWithoutMaxQpPreservesCadenceBitrateAndKeyFrameBehavior() {
         var calls: [String] = []
         let controller = StaticClarityRefreshController(
-            motionFPS: 15,
+            activeFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            motionMaxQp: nil,
+            activeMaxQp: nil,
             staticMaxQp: nil,
             applyLivePolicy: { fps, bitrate, maxQp in
                 let qp = maxQp.map(String.init) ?? "none"
@@ -149,9 +149,9 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
             ["apply:1:5000000:none", "force-key-frame", "apply:15:5000000:none"]
         )
         let snapshot = controller.snapshot()
-        XCTAssertEqual(snapshot.mode, .motion)
+        XCTAssertEqual(snapshot.mode, .active)
         XCTAssertEqual(snapshot.successfulRefreshes, 1)
-        XCTAssertEqual(snapshot.motionRestores, 1)
+        XCTAssertEqual(snapshot.activeRestores, 1)
     }
 
     func testTransitionLatchRetainsFailureUntilApplied() {
@@ -174,10 +174,10 @@ final class StaticClarityRefreshControllerTests: XCTestCase {
 
     private func makeController(recorder: CallRecorder) -> StaticClarityRefreshController {
         StaticClarityRefreshController(
-            motionFPS: 15,
+            activeFPS: 15,
             clarityFPS: 1,
             maxBitrateBps: 5_000_000,
-            motionMaxQp: 32,
+            activeMaxQp: 32,
             staticMaxQp: 22,
             applyLivePolicy: { fps, bitrate, maxQp in
                 let qp = maxQp.map(String.init) ?? "none"

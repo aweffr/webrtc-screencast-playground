@@ -50,14 +50,14 @@ final class WebRTCSessionConstructionTests: XCTestCase {
             jsonData: Data(#"{"sender":{"max_fps":15,"max_bitrate_bps":5000000},"encoder":{"max_qp":39,"video_toolbox_low_latency_rate_control":false}}"#.utf8),
             staticMaxQp: 30
         )
-        XCTAssertEqual(ordinary.motionMaxQp, 39)
+        XCTAssertEqual(ordinary.activeMaxQp, 39)
         XCTAssertEqual(ordinary.staticMaxQp, 30)
 
         let rtvc = SenderContentAwarePolicy(
             jsonData: Data(#"{"sender":{"max_fps":15,"max_bitrate_bps":5000000},"encoder":{"video_toolbox_low_latency_rate_control":true}}"#.utf8),
             staticMaxQp: 30
         )
-        XCTAssertNil(rtvc.motionMaxQp)
+        XCTAssertNil(rtvc.activeMaxQp)
         XCTAssertNil(rtvc.staticMaxQp)
         XCTAssertEqual(rtvc.maxFPS, 15)
         XCTAssertEqual(rtvc.maxBitrateBps, 5_000_000)
@@ -237,7 +237,7 @@ final class WebRTCSessionConstructionTests: XCTestCase {
             clarityMode: .staticClarity,
             claritySuccessfulRefreshes: 1,
             clarityFailedRefreshes: 0,
-            clarityMotionRestores: 0
+            clarityActiveRestores: 0
         )
     }
 
