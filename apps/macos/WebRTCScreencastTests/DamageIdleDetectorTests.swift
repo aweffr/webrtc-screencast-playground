@@ -103,17 +103,76 @@ final class DamageIdleDetectorTests: XCTestCase {
     }
 
     func testStartedMissingAndNonEmptyDirtyMetadataCountAsDamage() {
-        XCTAssertTrue(ScreenDamageClassifier.hasDamage(status: .started, dirtyRects: []))
-        XCTAssertTrue(ScreenDamageClassifier.hasDamage(status: .complete, dirtyRects: nil))
+        let contentRect = CGRect(x: 100, y: 0, width: 1_700, height: 1_080)
+        XCTAssertTrue(
+            ScreenDamageClassifier.hasDamage(
+                status: .started,
+                dirtyRects: [],
+                contentRect: contentRect
+            )
+        )
         XCTAssertTrue(
             ScreenDamageClassifier.hasDamage(
                 status: .complete,
-                dirtyRects: [CGRect(x: 10, y: 20, width: 8, height: 8)]
+                dirtyRects: nil,
+                contentRect: contentRect
+            )
+        )
+        XCTAssertTrue(
+            ScreenDamageClassifier.hasDamage(
+                status: .complete,
+                dirtyRects: [CGRect(x: 10, y: 20, width: 8, height: 8)],
+                contentRect: contentRect
             )
         )
     }
 
     func testCompleteFrameWithEmptyDirtyMetadataIsQuiet() {
-        XCTAssertFalse(ScreenDamageClassifier.hasDamage(status: .complete, dirtyRects: []))
+        XCTAssertFalse(
+            ScreenDamageClassifier.hasDamage(
+                status: .complete,
+                dirtyRects: [],
+                contentRect: CGRect(x: 0, y: 0, width: 1_920, height: 1_080)
+            )
+        )
+    }
+
+    func testFullWidthSystemStatusStripRedrawIsQuiet() {
+        let contentRect = CGRect(x: 124.5, y: 0, width: 1_671, height: 1_080)
+
+        XCTAssertFalse(
+            ScreenDamageClassifier.hasDamage(
+                status: .complete,
+                dirtyRects: [CGRect(x: 124.5, y: 0, width: 1_671, height: 33)],
+                contentRect: contentRect
+            )
+        )
+    }
+
+    func testTopBandCursorOrMenuDamageRemainsActive() {
+        let contentRect = CGRect(x: 124.5, y: 0, width: 1_671, height: 1_080)
+
+        XCTAssertTrue(
+            ScreenDamageClassifier.hasDamage(
+                status: .complete,
+                dirtyRects: [CGRect(x: 1_700, y: 4, width: 24, height: 24)],
+                contentRect: contentRect
+            )
+        )
+    }
+
+    func testStatusStripAlongsideContentDamageRemainsActive() {
+        let contentRect = CGRect(x: 124.5, y: 0, width: 1_671, height: 1_080)
+
+        XCTAssertTrue(
+            ScreenDamageClassifier.hasDamage(
+                status: .complete,
+                dirtyRects: [
+                    CGRect(x: 124.5, y: 0, width: 1_671, height: 33),
+                    CGRect(x: 500, y: 300, width: 200, height: 100),
+                ],
+                contentRect: contentRect
+            )
+        )
     }
 }

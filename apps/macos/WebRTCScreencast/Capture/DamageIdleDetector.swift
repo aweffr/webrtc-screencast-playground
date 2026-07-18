@@ -98,7 +98,28 @@ struct DamageIdleDetector: Sendable {
 }
 
 enum ScreenDamageClassifier {
-    static func hasDamage(status: SCFrameStatus, dirtyRects: [CGRect]?) -> Bool {
-        status == .started || dirtyRects == nil || dirtyRects?.isEmpty == false
+    static func hasDamage(
+        status: SCFrameStatus,
+        dirtyRects: [CGRect]?,
+        contentRect: CGRect
+    ) -> Bool {
+        guard status != .started, let dirtyRects else { return true }
+        return dirtyRects.contains { !isSystemStatusStripRedraw($0, within: contentRect) }
+    }
+
+    private static func isSystemStatusStripRedraw(
+        _ dirtyRect: CGRect,
+        within contentRect: CGRect
+    ) -> Bool {
+        guard contentRect.width > 0, contentRect.height > 0 else { return false }
+        // macOS periodically redraws its capture/status strip even when the
+        // shared content is unchanged. ScreenCaptureKit reports that repaint
+        // as a thin, nearly full-width dirty rect at the top of the content.
+        let intersection = dirtyRect.intersection(contentRect)
+        let maximumStatusStripHeight = max(48, contentRect.height * 0.04)
+        return !intersection.isNull
+            && intersection.minY <= contentRect.minY + 1
+            && intersection.maxY <= contentRect.minY + maximumStatusStripHeight
+            && intersection.width / contentRect.width >= 0.98
     }
 }

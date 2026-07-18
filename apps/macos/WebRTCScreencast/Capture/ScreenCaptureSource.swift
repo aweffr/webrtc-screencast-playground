@@ -200,7 +200,8 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
         if staticClarityEnabled,
            ScreenDamageClassifier.hasDamage(
                status: metadata.status,
-               dirtyRects: metadata.dirtyRects
+               dirtyRects: metadata.dirtyRects,
+               contentRect: metadata.contentRect
            ) {
             let detected = damageIdleDetector.observeDamage(at: callbackMonotonicNs)
             activityDecision = detected
