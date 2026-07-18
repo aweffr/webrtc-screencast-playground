@@ -384,7 +384,7 @@ def content_state_cycles(
             (
                 item for item in observations
                 if burst["planned_monotonic_ns"] <= item["monotonic_ns"] <= active_deadline
-                and item["mode"] == "motion"
+                and item["mode"] == "active"
                 and item["max_qp"] == case.active_max_qp
             ),
             None,
@@ -516,8 +516,8 @@ def analyze_run_records(
 
     boundaries = [record.get("fields", {}).get("sender_media_boundary", {})
                   for record in sender_records if record.get("event") == "rtc_stats"]
-    motion_restores = max(
-        (value.get("clarity_motion_restores", 0) for value in boundaries), default=0)
+    active_restores = max(
+        (value.get("clarity_active_restores", 0) for value in boundaries), default=0)
     static_refreshes = max(
         (value.get("clarity_successful_refreshes", 0) for value in boundaries), default=0)
     render_gaps = [
@@ -533,9 +533,8 @@ def analyze_run_records(
 
     marker_valid = len(set(active_sequences) & captures.keys() & renders.keys())
     cycles = content_state_cycles(case, workload_records, sender_records)
-    counter_cycles = min(motion_restores, max(0, static_refreshes - 1))
+    counter_cycles = min(active_restores, max(0, static_refreshes - 1))
     bound_cycle_count = sum(cycle["valid"] for cycle in cycles)
-    state_cycles = bound_cycle_count if counter_cycles == 6 else counter_cycles
     return {
         "case_id": case.case_id,
         "codec": codec,
@@ -551,7 +550,7 @@ def analyze_run_records(
         "marker_total": len(active_sequences),
         "marker_sequence_delivery_ratio": marker_valid / len(active_sequences),
         "max_bitrate_bps": max(bitrates),
-        "state_cycles": state_cycles,
+        "state_cycles": bound_cycle_count,
         "state_transition_roundtrips": counter_cycles,
         "content_state_cycles": cycles,
         "static_image_metrics": static_image_metrics,

@@ -255,7 +255,7 @@ class EvidenceAnalysisTests(unittest.TestCase):
             sender.extend([
                 self.applied_qp_record(
                     planned + 900_000_000,
-                    "motion",
+                    "active",
                     case.active_max_qp,
                     sequence * 2,
                 ),
@@ -385,7 +385,7 @@ class EvidenceAnalysisTests(unittest.TestCase):
                 for record in (
                     self.applied_qp_record(
                         (sequence + 1) * 10_000_000 + 800_000,
-                        "motion",
+                        "active",
                         32,
                         sequence * 2,
                     ),
@@ -405,8 +405,8 @@ class EvidenceAnalysisTests(unittest.TestCase):
                     "bitrate_bps": 4_000_000,
                 }
                 boundary = record["fields"]["sender_media_boundary"]
-                boundary["clarity_motion_restores"] = 6
-                boundary["clarity_successful_refreshes"] = 7
+                boundary["clarity_active_restores"] = 15
+                boundary["clarity_successful_refreshes"] = 16
         receiver = [
             {"event": "clock_calibration", "fields": {"offset_ns": 200}},
             *[
@@ -442,6 +442,7 @@ class EvidenceAnalysisTests(unittest.TestCase):
         self.assertEqual(result["marker_valid"], 6)
         self.assertEqual(result["marker_total"], 6)
         self.assertEqual(result["state_cycles"], 6)
+        self.assertEqual(result["state_transition_roundtrips"], 15)
         self.assertTrue(all(item["valid"] for item in result["content_state_cycles"]))
         self.assertEqual(result["static_ssim_y_worst"], 0.989)
         self.assertEqual(result["static_psnr_y_worst"], 41.0)
