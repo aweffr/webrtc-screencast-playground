@@ -43,20 +43,18 @@ class DamageIdleWorkloadTests(unittest.TestCase):
     def test_scroll_programs_use_fixed_steps_and_content_bound_marker(self):
         fast = self.workload.scroll_program(
             sequence=2,
-            expected_offset=720,
             steps=12,
             step_pixels=60,
             interval_ms=50,
         )
         slow = self.workload.scroll_program(
             sequence=5,
-            expected_offset=1440,
             steps=40,
             step_pixels=18,
             interval_ms=50,
         )
 
-        self.assertIn("marker.style.top = `${expectedOffset + 64}px`", fast)
+        self.assertIn("marker.style.top = `${window.scrollY + 64}px`", fast)
         self.assertIn("step < 12", fast)
         self.assertIn("page.mouse.wheel(0, 60)", fast)
         self.assertIn("step < 40", slow)

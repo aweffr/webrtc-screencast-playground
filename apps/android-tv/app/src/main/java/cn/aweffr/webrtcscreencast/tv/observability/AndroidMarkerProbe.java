@@ -151,7 +151,6 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
     private int currentSequence = -1;
     private long windowStartNs;
     private long previousFrameNs;
-    private long lastObservedFrameNs;
     private long maxFrameGapNs;
     private int windowCount;
     private int frameCount;
@@ -173,7 +172,7 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
       }
 
       windowStartNs = frameNs;
-      previousFrameNs = lastObservedFrameNs == 0 ? frameNs : lastObservedFrameNs;
+      previousFrameNs = frameNs;
       windowOpen = true;
       windowCount++;
     }
@@ -182,7 +181,6 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
       if (windowOpen) {
         recordActiveFrame(frameNs);
       }
-      lastObservedFrameNs = frameNs;
     }
 
     Snapshot snapshot() {

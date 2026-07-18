@@ -53,11 +53,11 @@ public final class AndroidMarkerProbeTest {
     AndroidMarkerProbe.ActiveWindowGapTracker.Snapshot snapshot = tracker.snapshot();
     assertEquals(1, snapshot.windowCount());
     assertEquals(3, snapshot.frameCount());
-    assertEquals(100_000_000L, snapshot.maxFrameGapNs());
+    assertEquals(80_000_000L, snapshot.maxFrameGapNs());
   }
 
   @Test
-  public void includesTheGapEnteringAnActiveWindow() {
+  public void excludesStaticIdleTimeBeforeAnActiveWindow() {
     AndroidMarkerProbe.ActiveWindowGapTracker tracker =
         new AndroidMarkerProbe.ActiveWindowGapTracker();
     tracker.observeMarker(1, 900_000_000L);
@@ -65,7 +65,7 @@ public final class AndroidMarkerProbeTest {
     tracker.observeMarker(2, 1_600_000_000L);
     tracker.observeFrame(1_600_000_000L);
 
-    assertEquals(700_000_000L, tracker.snapshot().maxFrameGapNs());
+    assertEquals(0L, tracker.snapshot().maxFrameGapNs());
   }
 
   @Test

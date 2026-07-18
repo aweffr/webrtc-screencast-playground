@@ -56,19 +56,17 @@ def default_schedule() -> WorkloadSchedule:
 def scroll_program(
     *,
     sequence: int,
-    expected_offset: int,
     steps: int,
     step_pixels: int,
     interval_ms: int,
 ) -> str:
     return f"""async page => {{
-  const expectedOffset = {expected_offset};
-  const markerEpochMs = await page.evaluate(({{ sequence, expectedOffset }}) => {{
+  const markerEpochMs = await page.evaluate((sequence) => {{
     const marker = document.getElementById("experiment-marker");
-    marker.style.top = `${{expectedOffset + 64}}px`;
+    marker.style.top = `${{window.scrollY + 64}}px`;
     window.__experimentMarker.setSequence(sequence);
     return performance.timeOrigin + performance.now();
-  }}, {{ sequence: {sequence}, expectedOffset }});
+  }}, {sequence});
   const offsets = [];
   for (let step = 0; step < {steps}; step += 1) {{
     await page.mouse.wheel(0, {step_pixels});
@@ -218,7 +216,6 @@ def run_workload(
                 if episode.kind.endswith("scroll"):
                     result = controller.run_code(scroll_program(
                         sequence=episode.sequence,
-                        expected_offset=episode.expected_offset,
                         steps=episode.steps,
                         step_pixels=episode.step_pixels,
                         interval_ms=episode.interval_ms,
