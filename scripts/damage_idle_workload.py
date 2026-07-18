@@ -67,6 +67,7 @@ def scroll_program(
     window.__experimentMarker.setSequence(sequence);
     return performance.timeOrigin + performance.now();
   }}, {sequence});
+  await page.waitForTimeout(500);
   const offsets = [];
   for (let step = 0; step < {steps}; step += 1) {{
     await page.mouse.wheel(0, {step_pixels});
@@ -80,6 +81,8 @@ def scroll_program(
 def typing_program(sequence: int) -> str:
     return f"""async page => {{
   const markerEpochMs = await page.evaluate(() => {{
+    const marker = document.getElementById("experiment-marker");
+    marker.style.top = `${{window.scrollY + 64}}px`;
     window.__experimentMarker.setSequence({sequence});
     return performance.timeOrigin + performance.now();
   }});
@@ -97,6 +100,8 @@ def typing_program(sequence: int) -> str:
 def cursor_program(sequence: int) -> str:
     return f"""async page => {{
   const markerEpochMs = await page.evaluate(() => {{
+    const marker = document.getElementById("experiment-marker");
+    marker.style.top = `${{window.scrollY + 64}}px`;
     window.__experimentMarker.setSequence({sequence});
     return performance.timeOrigin + performance.now();
   }});

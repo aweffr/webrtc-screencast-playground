@@ -55,6 +55,7 @@ class DamageIdleWorkloadTests(unittest.TestCase):
         )
 
         self.assertIn("marker.style.top = `${window.scrollY + 64}px`", fast)
+        self.assertIn("page.waitForTimeout(500)", fast)
         self.assertIn("step < 12", fast)
         self.assertIn("page.mouse.wheel(0, 60)", fast)
         self.assertIn("step < 40", slow)
@@ -66,9 +67,11 @@ class DamageIdleWorkloadTests(unittest.TestCase):
         cursor = self.workload.cursor_program(sequence=7)
 
         self.assertEqual(typing.count("setSequence(6)"), 1)
+        self.assertIn("marker.style.top = `${window.scrollY + 64}px`", typing)
         self.assertIn("waitForTimeout(80)", typing)
         self.assertIn("document.activeElement.blur()", typing)
         self.assertEqual(cursor.count("setSequence(7)"), 1)
+        self.assertIn("marker.style.top = `${window.scrollY + 64}px`", cursor)
         self.assertIn("const points =", cursor)
         self.assertIn("points.length", cursor)
         self.assertIn("waitForTimeout(50)", cursor)
