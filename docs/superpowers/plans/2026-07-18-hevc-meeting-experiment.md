@@ -203,7 +203,7 @@ git commit -m "feat(experiment): add fixed Chrome meeting document"
 
 - [ ] **Step 1: Write failing schedule and evidence tests**
 
-Assert six 720 px scrolls at five-second intervals, each decomposed into twelve 60 px steps at 50 ms, expected offsets 720…4320, 25-second initial static and 20-second final settle. Assert offset mismatch makes a run invalid.
+Assert six 720 px scrolls at eight-second intervals, each decomposed into twelve 60 px steps at 50 ms, expected offsets 720…4320, 20-second initial static and 20-second final settle. Assert offset mismatch makes a run invalid. The eight-second window is part of the experiment contract because it gives the existing STATIC/ACTIVE controller enough observable time to return to STATIC before the next burst.
 
 - [ ] **Step 2: Verify RED**
 
@@ -238,7 +238,7 @@ Assert A0=`h264-only/24/32`, A1=`h265-only/24/32`, B0=`h265-only/33/39`, B1=`h26
 
 - [ ] **Step 2: Write failing gate tests**
 
-Use small JSON fixtures to cover first-frame +100 ms, ACTIVE p95 +10 ms, freeze 500 ms, drop 1%, marker-validity -1 point, bitrate 5 Mbps, SSIM -0.002 and PSNR -0.5 dB boundaries. Test the documented winner ordering and tie behavior.
+Use small JSON fixtures to cover first-frame +100 ms, ACTIVE p95 +10 ms, freeze 500 ms, drop 1%, exact 6/6 marker sequence delivery, bitrate 5 Mbps, SSIM -0.002 and PSNR -0.5 dB boundaries. Test the documented winner ordering and tie behavior.
 
 - [ ] **Step 3: Verify RED**
 
@@ -347,3 +347,13 @@ Use at most three review/fix rounds. Reject low-value style or unrelated refacto
 - [ ] **Step 5: Completion audit**
 
 Map every design requirement to code, tests, raw runtime evidence, viewed images, report output, git commits and clean repository state before marking the long-horizon goal complete.
+
+## Execution findings
+
+The bounded base experiment completed on 2026-07-18 from app commit `5f24ad1f6e2a8eedb0b9523ffbdf7792facdbb2b`, builder commit `da7818a854bb5d227f306af9816d2b54ebc7a74e`, and Chrome `150.0.7871.129`. The accepted evidence root is `artifacts/hevc-meeting/20260718T022620Z/`; all 12 A0/A1/B0/B1 runs were valid with no infrastructure retry. The first launch correctly failed before E2E when Chrome had auto-updated from the previously pinned version, after which the version contract was updated in a clean commit and the experiment restarted in a fresh evidence root.
+
+All three HEVC base candidates failed at least the static-image-quality and content-aware state-cycle gates. A1 also exceeded the freeze threshold; B1 exceeded both the ACTIVE-latency and freeze thresholds. Per the predefined early-stop rule, C0/C1/C2 were not run. This is completion of the experiment plan, not missing coverage: feature flags do not have deployment value until an ordinary HEVC base policy passes.
+
+The operator opened the 12 original-resolution inspection sheets covering sender full view, Android full view, and Android text detail for every case across initial/middle/final samples. HEVC remained readable but showed a consistent brighter/washed Y-plane and weaker pale-border contrast relative to A0; B0 and B1 were visually indistinguishable. Direct comparison of B0 run-2 workload and sender originals also showed that the fixed overlay marker can precede the body compositor update, so marker ACTIVE p95 is retained only as directional evidence.
+
+The final tracked result and follow-up boundary are in `docs/experiments/2026-07-18-hevc-meeting.md`. The production decision is to keep the default sender policy as prefer H.264 while retaining all four explicit codec strategies. The next bounded iteration is limited to HEVC color-range consistency, STATIC/ACTIVE detector stability, and content-bound latency evidence, followed by a rerun of A0/A1/B0/B1 only.
