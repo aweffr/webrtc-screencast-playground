@@ -40,6 +40,11 @@ struct SenderMediaBoundarySnapshot: Equatable, Sendable {
     let lastKeyFrameBytes: Int?
     let lastQpSampleGeneration: UInt64?
     let lastQpSampleEncoderSessionID: String?
+    let videoToolboxSubmittedFrames: UInt64?
+    let videoToolboxEncodedFrames: UInt64?
+    let videoToolboxDroppedFrames: UInt64?
+    let keyFrameQpHistogram: [UInt64]?
+    let deltaFrameQpHistogram: [UInt64]?
     let clarityMode: VisualStabilityMode
     let claritySuccessfulRefreshes: UInt64
     let clarityFailedRefreshes: UInt64
@@ -284,6 +289,11 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
             lastKeyFrameBytes: tuning?.lastKeyFrameBytes?.intValue,
             lastQpSampleGeneration: tuning?.lastQpSampleGeneration,
             lastQpSampleEncoderSessionID: tuning?.lastQpSampleEncoderSessionId,
+            videoToolboxSubmittedFrames: tuning.map(\.submittedFrameCount),
+            videoToolboxEncodedFrames: tuning.map(\.encodedFrameCount),
+            videoToolboxDroppedFrames: tuning.map(\.droppedFrameCount),
+            keyFrameQpHistogram: tuning?.keyFrameQpHistogram.map(\.uint64Value),
+            deltaFrameQpHistogram: tuning?.deltaFrameQpHistogram.map(\.uint64Value),
             clarityMode: clarity?.mode ?? .motion,
             claritySuccessfulRefreshes: clarity?.successfulRefreshes ?? 0,
             clarityFailedRefreshes: clarity?.failedRefreshes ?? 0,

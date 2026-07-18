@@ -104,8 +104,48 @@ final class WebRTCSessionConstructionTests: XCTestCase {
         XCTAssertFalse(names.contains { $0.hasPrefix("webrtc_log") })
     }
 
-    func testSenderBoundaryMetricsUseTheExistingEncoderSessionField() {
-        let snapshot = SenderMediaBoundarySnapshot(
+    func testSenderBoundaryMetricsPreserveEncoderBindingAndDistributions() {
+        let snapshot = senderBoundarySnapshot(
+            videoToolboxSubmittedFrames: 120,
+            videoToolboxEncodedFrames: 118,
+            videoToolboxDroppedFrames: 2,
+            keyFrameQpHistogram: (0..<52).map(UInt64.init),
+            deltaFrameQpHistogram: (0..<52).map { UInt64(51 - $0) }
+        )
+
+        let fields = SessionMetricsSampler.fields(from: snapshot)
+
+        XCTAssertEqual(fields["encoder_session_id"], .string("vt-1"))
+        XCTAssertEqual(fields["requested_max_qp"], .integer(24))
+        XCTAssertEqual(fields["last_key_frame_qp"], .integer(24))
+        XCTAssertEqual(fields["max_qp_applied_encoder_session_id"], .string("vt-2"))
+        XCTAssertEqual(fields["last_qp_sample_generation"], .integer(2))
+        XCTAssertEqual(fields["last_qp_sample_encoder_session_id"], .string("vt-2"))
+        XCTAssertEqual(fields["video_toolbox_submitted_frames"], .integer(120))
+        XCTAssertEqual(fields["video_toolbox_encoded_frames"], .integer(118))
+        XCTAssertEqual(fields["video_toolbox_dropped_frames"], .integer(2))
+        XCTAssertEqual(
+            fields["key_frame_qp_histogram"],
+            .array((0..<52).map { .integer($0) })
+        )
+        XCTAssertEqual(
+            fields["delta_frame_qp_histogram"],
+            .array((0..<52).map { .integer(51 - $0) })
+        )
+
+        let unavailable = SessionMetricsSampler.fields(from: senderBoundarySnapshot())
+        XCTAssertEqual(unavailable["video_toolbox_submitted_frames"], .null)
+        XCTAssertEqual(unavailable["key_frame_qp_histogram"], .null)
+    }
+
+    private func senderBoundarySnapshot(
+        videoToolboxSubmittedFrames: UInt64? = nil,
+        videoToolboxEncodedFrames: UInt64? = nil,
+        videoToolboxDroppedFrames: UInt64? = nil,
+        keyFrameQpHistogram: [UInt64]? = nil,
+        deltaFrameQpHistogram: [UInt64]? = nil
+    ) -> SenderMediaBoundarySnapshot {
+        SenderMediaBoundarySnapshot(
             sourceFramesForwarded: 1,
             sourcePixelFormat: nil,
             castTuningSessionID: "cast-1",
@@ -126,20 +166,16 @@ final class WebRTCSessionConstructionTests: XCTestCase {
             lastKeyFrameBytes: 12_345,
             lastQpSampleGeneration: 2,
             lastQpSampleEncoderSessionID: "vt-2",
+            videoToolboxSubmittedFrames: videoToolboxSubmittedFrames,
+            videoToolboxEncodedFrames: videoToolboxEncodedFrames,
+            videoToolboxDroppedFrames: videoToolboxDroppedFrames,
+            keyFrameQpHistogram: keyFrameQpHistogram,
+            deltaFrameQpHistogram: deltaFrameQpHistogram,
             clarityMode: .staticClarity,
             claritySuccessfulRefreshes: 1,
             clarityFailedRefreshes: 0,
             clarityMotionRestores: 0
         )
-
-        let fields = SessionMetricsSampler.fields(from: snapshot)
-
-        XCTAssertEqual(fields["encoder_session_id"], .string("vt-1"))
-        XCTAssertEqual(fields["requested_max_qp"], .integer(24))
-        XCTAssertEqual(fields["last_key_frame_qp"], .integer(24))
-        XCTAssertEqual(fields["max_qp_applied_encoder_session_id"], .string("vt-2"))
-        XCTAssertEqual(fields["last_qp_sample_generation"], .integer(2))
-        XCTAssertEqual(fields["last_qp_sample_encoder_session_id"], .string("vt-2"))
     }
 
     private func repositoryRoot() -> URL {

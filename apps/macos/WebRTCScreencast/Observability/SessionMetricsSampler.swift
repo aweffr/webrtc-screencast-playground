@@ -130,6 +130,15 @@ actor SessionMetricsSampler {
             "last_key_frame_bytes": stats.lastKeyFrameBytes.map(JSONValue.integer) ?? .null,
             "last_qp_sample_generation": stats.lastQpSampleGeneration.map { .integer(Int($0)) } ?? .null,
             "last_qp_sample_encoder_session_id": stats.lastQpSampleEncoderSessionID.map(JSONValue.string) ?? .null,
+            "video_toolbox_submitted_frames": stats.videoToolboxSubmittedFrames.map { .integer(Int($0)) } ?? .null,
+            "video_toolbox_encoded_frames": stats.videoToolboxEncodedFrames.map { .integer(Int($0)) } ?? .null,
+            "video_toolbox_dropped_frames": stats.videoToolboxDroppedFrames.map { .integer(Int($0)) } ?? .null,
+            "key_frame_qp_histogram": stats.keyFrameQpHistogram.map {
+                .array($0.map { .integer(Int($0)) })
+            } ?? .null,
+            "delta_frame_qp_histogram": stats.deltaFrameQpHistogram.map {
+                .array($0.map { .integer(Int($0)) })
+            } ?? .null,
             "clarity_mode": .string(stats.clarityMode.rawValue),
             "clarity_successful_refreshes": .integer(Int(stats.claritySuccessfulRefreshes)),
             "clarity_failed_refreshes": .integer(Int(stats.clarityFailedRefreshes)),
