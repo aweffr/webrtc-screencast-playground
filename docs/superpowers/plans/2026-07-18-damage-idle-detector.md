@@ -277,3 +277,13 @@ git log --oneline main..HEAD
 ## Follow-ups deliberately excluded
 
 - A 1→10→15 fps ramp, hybrid luma fallback, more STATIC/ACTIVE states, VideoToolbox flag sweeps, codec-default changes, and Android hardware-decoder testing require separate evidence and are not part of this implementation.
+
+## Execution findings (2026-07-18)
+
+- The implementation and full static verification completed. The detector remained a two-state value type; lifecycle scheduling stays on the existing capture queue and uses generation invalidation.
+- D0 produced three analyzable H.264 runs. D1 produced two; both allowed attempts for D1 run-3 failed in Android emulator/receiver infrastructure, so the bounded runner correctly stopped without a third retry.
+- Both D1 runs restored ACTIVE for all six business actions within 79.0 ms, applied the expected 24/32 MaxQP values, and reported zero VideoToolbox drops.
+- The exact 6 ACTIVE / 7 STATIC assumption was invalid for this Chrome workload. Screenshots and compositor/scrollbar tail updates generated additional real dirty rects, producing 14/14 transitions per D1 run. Filtering those updates would contradict the approved detector contract.
+- The sole 1000 ms fallback was not used because observed tail damage could occur about 1.4 seconds after the initiating scroll, outside its allowed condition.
+- The Android gap tracker observes marker-decodable frames rather than every render callback, so its 21–22 second values cannot support the 500 ms render-gap gate. The report treats that gate as unmeasured instead of weakening it.
+- H1 was not authorized. Sanitized conclusions and key screenshots are published in `docs/experiments/2026-07-18-damage-idle-detector.md`.
