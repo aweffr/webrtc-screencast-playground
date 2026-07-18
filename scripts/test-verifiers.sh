@@ -6,6 +6,18 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/webrtc-verifier-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/receiver" "$WORK/sender"
 
+if "$ROOT/scripts/run-android-tv-e2e.sh" \
+  --macos-app-bundle relative/WebRTCScreencast.app \
+  2>"$WORK/macos-app-bundle.err"; then
+  print -u2 "Android TV runner accepted a relative macOS app bundle"
+  exit 1
+fi
+if ! grep -F -q -- "--macos-app-bundle must be an absolute readable app bundle" \
+    "$WORK/macos-app-bundle.err"; then
+  print -u2 "Android TV runner did not validate the supplied macOS app bundle"
+  exit 1
+fi
+
 mkdir -p "$WORK/hevc-failed-base"
 jq -n '{
   stage:"base",

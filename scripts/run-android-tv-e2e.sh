@@ -10,11 +10,13 @@ RUN_SECONDS=20
 OUTPUT_ROOT="$ROOT/artifacts/android-tv-e2e"
 MEDIA_BASELINE=0
 MARKER_EVIDENCE=0
+DAMAGE_IDLE_EVIDENCE=0
 CAST_TUNING_CONFIG=""
 WORKLOAD_START_FILE=""
 WORKLOAD_FULLSCREEN_TRIGGER_FILE=""
 WORKLOAD_FULLSCREEN_READY_FILE=""
 SKIP_MACOS_BUILD=0
+MACOS_APP_BUNDLE=""
 STATIC_QP_EVIDENCE=0
 PACKAGE="cn.aweffr.webrtcscreencast.tv"
 ACTIVITY="$PACKAGE/.ui.ReceiverActivity"
@@ -22,7 +24,7 @@ AVD_NAME="${ANDROID_TV_AVD_NAME:-WebRTCScreencast_TV_API_31}"
 LOCAL_XML="$ROOT/apps/android-tv/app/src/debug/res/values/reference_runtime.local.xml"
 
 usage() {
-  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--cast-tuning-config path] [--run-seconds n] [--output-root path] [--media-baseline|--marker-evidence] [--workload-start-file path] [--workload-fullscreen-trigger-file path --workload-fullscreen-ready-file path] [--static-qp-evidence] [--skip-macos-build]"
+  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--cast-tuning-config path] [--run-seconds n] [--output-root path] [--media-baseline|--marker-evidence|--damage-idle-evidence] [--workload-start-file path] [--workload-fullscreen-trigger-file path --workload-fullscreen-ready-file path] [--static-qp-evidence] [--skip-macos-build|--macos-app-bundle absolute-path]"
   exit 2
 }
 
@@ -36,14 +38,26 @@ while (( $# )); do
     --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
     --media-baseline) MEDIA_BASELINE=1; shift ;;
     --marker-evidence) MARKER_EVIDENCE=1; shift ;;
+    --damage-idle-evidence) MARKER_EVIDENCE=1; DAMAGE_IDLE_EVIDENCE=1; shift ;;
     --workload-start-file) [[ $# -ge 2 ]] || usage; WORKLOAD_START_FILE="$2"; shift 2 ;;
     --workload-fullscreen-trigger-file) [[ $# -ge 2 ]] || usage; WORKLOAD_FULLSCREEN_TRIGGER_FILE="$2"; shift 2 ;;
     --workload-fullscreen-ready-file) [[ $# -ge 2 ]] || usage; WORKLOAD_FULLSCREEN_READY_FILE="$2"; shift 2 ;;
     --static-qp-evidence) STATIC_QP_EVIDENCE=1; shift ;;
     --skip-macos-build) SKIP_MACOS_BUILD=1; shift ;;
+    --macos-app-bundle) [[ $# -ge 2 ]] || usage; MACOS_APP_BUNDLE="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
+
+if [[ -n "$MACOS_APP_BUNDLE" ]]; then
+  [[ "$MACOS_APP_BUNDLE" == /* \
+      && -d "$MACOS_APP_BUNDLE" \
+      && -x "$MACOS_APP_BUNDLE/Contents/MacOS/WebRTCScreencast" ]] || {
+    print -u2 -- "--macos-app-bundle must be an absolute readable app bundle"
+    exit 2
+  }
+  SKIP_MACOS_BUILD=1
+fi
 
 [[ "$PROFILE" == direct-baseline || "$PROFILE" == production-relay ]] || usage
 [[ "$SOURCE" == main || "$SOURCE" == virtual ]] || usage
@@ -305,8 +319,12 @@ WEBRTC_ANDROID_AAR="${WEBRTC_ANDROID_AAR:-${ARTIFACTS_DIR:-$ROOT/artifacts}/webr
 WEBRTC_ANDROID_AAR="$WEBRTC_ANDROID_AAR" \
   "$ROOT/apps/android-tv/gradlew" -p "$ROOT/apps/android-tv" "$GRADLE_TASK"
 restore_local_xml
-APP_EXECUTABLE="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app/Contents/MacOS/WebRTCScreencast"
-APP_BUNDLE="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app"
+if [[ -n "$MACOS_APP_BUNDLE" ]]; then
+  APP_BUNDLE="$MACOS_APP_BUNDLE"
+else
+  APP_BUNDLE="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app"
+fi
+APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/WebRTCScreencast"
 [[ -x "$APP_EXECUTABLE" && -f "$APK" ]] || {
   print -u2 "macOS app or Android TV APK is missing"
   exit 1
@@ -511,11 +529,20 @@ adb shell run-as "$PACKAGE" rm -f "$automation_path"
 
 "$ROOT/scripts/pull-android-tv-evidence.sh" --output-dir "$ANDROID_EVIDENCE" >/dev/null
 if (( MARKER_EVIDENCE )); then
-  for sequence in 000001 000004 000008; do
+  if (( DAMAGE_IDLE_EVIDENCE )); then
+    sender_marker_sequences=(000001 000004)
+    android_marker_sequences=(000001 000002 000003 000004 000005 000006 000007)
+  else
+    sender_marker_sequences=(000001 000004 000008)
+    android_marker_sequences=(000001 000004 000008)
+  fi
+  for sequence in "${sender_marker_sequences[@]}"; do
     [[ -s "$sender_directory/sender-capture-$sequence.png" ]] || {
       print -u2 "missing sender marker-bound image $sequence"
       exit 1
     }
+  done
+  for sequence in "${android_marker_sequences[@]}"; do
     [[ -s "$ANDROID_EVIDENCE/android-decoded-seq-$sequence.png" ]] || {
       print -u2 "missing Android marker-bound image $sequence"
       exit 1
