@@ -46,6 +46,9 @@ class DamageIdleExperimentTests(unittest.TestCase):
                          ("h264-only", 24, 32))
         self.assertEqual((cases["H1"].codec_policy, cases["H1"].static_qp, cases["H1"].active_qp),
                          ("h265-only", 33, 39))
+        self.assertFalse(self.experiment.includes_detector_evidence("D0"))
+        self.assertTrue(self.experiment.includes_detector_evidence("D1"))
+        self.assertTrue(self.experiment.includes_detector_evidence("H1"))
 
     def test_each_business_episode_restores_active_and_settles_static(self):
         start = 1_000_000_000

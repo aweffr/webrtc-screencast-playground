@@ -26,6 +26,10 @@ def formal_order() -> tuple[str, ...]:
     return ("D0", "D1", "D1", "D0", "D0", "D1")
 
 
+def includes_detector_evidence(case_id: str) -> bool:
+    return case_id in {"D1", "H1"}
+
+
 def activity_markers(records: list[dict]) -> list[int]:
     return sorted(
         record["marker_monotonic_ns"]
@@ -352,8 +356,8 @@ def analyze_run_directory(
         "static_psnr_y": min(item["psnr_y"] for item in image_metrics),
         "static_image_metrics": image_metrics,
         "manual_images_clear": manual_images_clear,
-        "detector_eligible": detector["eligible"] if case_id == "D1" else False,
-        "detector": detector if case_id == "D1" else None,
+        "detector_eligible": detector["eligible"] if includes_detector_evidence(case_id) else False,
+        "detector": detector if includes_detector_evidence(case_id) else None,
         "qp_binding_valid": qp_binding_is_valid(
             sender_records, (case.static_qp, case.active_qp)),
     }

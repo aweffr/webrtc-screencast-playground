@@ -1,5 +1,7 @@
-import XCTest
+import CoreVideo
+import Darwin
 import ScreenCaptureKit
+import XCTest
 @testable import WebRTCScreencast
 
 final class DamageIdleDetectorTests: XCTestCase {
@@ -137,14 +139,28 @@ final class DamageIdleDetectorTests: XCTestCase {
         )
     }
 
-    func testFullWidthSystemStatusStripRedrawIsQuiet() {
+    func testPixelIdenticalSystemStatusStripRedrawIsQuiet() {
         let contentRect = CGRect(x: 124.5, y: 0, width: 1_671, height: 1_080)
 
         XCTAssertFalse(
             ScreenDamageClassifier.hasDamage(
                 status: .complete,
                 dirtyRects: [CGRect(x: 124.5, y: 0, width: 1_671, height: 33)],
-                contentRect: contentRect
+                contentRect: contentRect,
+                statusStripPixelsChanged: { _ in false }
+            )
+        )
+    }
+
+    func testRealFullWidthTopContentChangeRemainsActive() {
+        let contentRect = CGRect(x: 124.5, y: 0, width: 1_671, height: 1_080)
+
+        XCTAssertTrue(
+            ScreenDamageClassifier.hasDamage(
+                status: .complete,
+                dirtyRects: [CGRect(x: 124.5, y: 0, width: 1_671, height: 33)],
+                contentRect: contentRect,
+                statusStripPixelsChanged: { _ in true }
             )
         )
     }
@@ -174,5 +190,64 @@ final class DamageIdleDetectorTests: XCTestCase {
                 contentRect: contentRect
             )
         )
+    }
+
+    func testNV12ComparatorIgnoresIdenticalFrames() throws {
+        let previous = try makeNV12Buffer(fill: 16)
+        let current = try makeNV12Buffer(fill: 16)
+
+        XCTAssertFalse(NV12PixelBufferComparator.hasChanges(
+            between: previous,
+            and: current
+        ))
+    }
+
+    func testNV12ComparatorDetectsLumaAndChromaChanges() throws {
+        let previous = try makeNV12Buffer(fill: 16)
+        let lumaChanged = try makeNV12Buffer(fill: 16)
+        setByte(17, in: lumaChanged, plane: 0)
+        XCTAssertTrue(NV12PixelBufferComparator.hasChanges(
+            between: previous,
+            and: lumaChanged
+        ))
+
+        let chromaChanged = try makeNV12Buffer(fill: 16)
+        setByte(17, in: chromaChanged, plane: 1)
+        XCTAssertTrue(NV12PixelBufferComparator.hasChanges(
+            between: previous,
+            and: chromaChanged
+        ))
+    }
+
+    private func makeNV12Buffer(fill: UInt8) throws -> CVPixelBuffer {
+        var created: CVPixelBuffer?
+        XCTAssertEqual(CVPixelBufferCreate(
+            nil,
+            16,
+            8,
+            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+            [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
+            &created
+        ), kCVReturnSuccess)
+        let buffer = try XCTUnwrap(created)
+        XCTAssertEqual(CVPixelBufferLockBaseAddress(buffer, []), kCVReturnSuccess)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        for plane in 0..<2 {
+            let base = try XCTUnwrap(CVPixelBufferGetBaseAddressOfPlane(buffer, plane))
+            memset(
+                base,
+                Int32(fill),
+                CVPixelBufferGetBytesPerRowOfPlane(buffer, plane)
+                    * CVPixelBufferGetHeightOfPlane(buffer, plane)
+            )
+        }
+        return buffer
+    }
+
+    private func setByte(_ value: UInt8, in buffer: CVPixelBuffer, plane: Int) {
+        XCTAssertEqual(CVPixelBufferLockBaseAddress(buffer, []), kCVReturnSuccess)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        CVPixelBufferGetBaseAddressOfPlane(buffer, plane)?
+            .assumingMemoryBound(to: UInt8.self).pointee = value
     }
 }

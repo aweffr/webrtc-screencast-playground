@@ -62,7 +62,8 @@ def activate_chrome_fullscreen(profile: pathlib.Path) -> None:
     program = (
         "import AppKit; import CoreGraphics; import Foundation; "
         f"guard let app = NSRunningApplication(processIdentifier: {process_id}) "
-        "else { exit(2) }; guard app.activate(options: [.activateAllWindows]) "
+        "else { exit(2) }; app.unhide(); "
+        "guard app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps]) "
         "else { exit(3) }; usleep(250000); "
         "let source = CGEventSource(stateID: .hidSystemState); "
         "let flags: CGEventFlags = [.maskControl, .maskCommand]; "

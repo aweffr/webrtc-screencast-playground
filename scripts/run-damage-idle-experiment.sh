@@ -9,9 +9,10 @@ EXPERIMENT_ROOT=""
 STAGE="h264"
 DOCUMENT_PORT=18766
 CHROME_VERSION="150.0.7871.129"
+ALLOW_H264_GATE_WAIVER=false
 
 usage() {
-  print -u2 "usage: $0 --runtime-config path [--d0-app path] [--stage h264|h265] [--experiment-root path] [--output-root path] [--document-port n]"
+  print -u2 "usage: $0 --runtime-config path [--d0-app path] [--stage h264|h265] [--allow-h264-gate-waiver] [--experiment-root path] [--output-root path] [--document-port n]"
   exit 2
 }
 
@@ -20,6 +21,7 @@ while (( $# )); do
     --runtime-config) [[ $# -ge 2 ]] || usage; RUNTIME_CONFIG="$2"; shift 2 ;;
     --d0-app) [[ $# -ge 2 ]] || usage; D0_APP="$2"; shift 2 ;;
     --stage) [[ $# -ge 2 ]] || usage; STAGE="$2"; shift 2 ;;
+    --allow-h264-gate-waiver) ALLOW_H264_GATE_WAIVER=true; shift ;;
     --experiment-root) [[ $# -ge 2 ]] || usage; EXPERIMENT_ROOT="$2"; shift 2 ;;
     --output-root) [[ $# -ge 2 ]] || usage; OUTPUT_ROOT="$2"; shift 2 ;;
     --document-port) [[ $# -ge 2 ]] || usage; DOCUMENT_PORT="$2"; shift 2 ;;
@@ -34,6 +36,10 @@ done
 for tool in adb jq playwright-cli python3 shasum; do
   command -v "$tool" >/dev/null || { print -u2 "$tool is required"; exit 2; }
 done
+if ioreg -n Root -d1 | grep -Eq '"(CGSSessionScreenIsLocked|IOConsoleLocked)" = (Yes|true)'; then
+  print -u2 "macOS console is locked; unlock it before running visual evidence"
+  exit 2
+fi
 jq -e '.turn.url | startswith("turn:") and contains("transport=udp")' "$RUNTIME_CONFIG" >/dev/null
 jq -e '.turn.username and .turn.password' "$RUNTIME_CONFIG" >/dev/null
 
@@ -48,7 +54,8 @@ else
 fi
 if [[ "$STAGE" == h265 ]]; then
   [[ -r "$EXPERIMENT_ROOT/head-to-head-report.json" ]] \
-    && jq -e '.eligible == true' "$EXPERIMENT_ROOT/head-to-head-report.json" >/dev/null || {
+    && { [[ "$ALLOW_H264_GATE_WAIVER" == true ]] \
+      || jq -e '.eligible == true' "$EXPERIMENT_ROOT/head-to-head-report.json" >/dev/null; } || {
       print -u2 "H.264 head-to-head report does not authorize H.265 smoke"
       exit 2
     }
@@ -226,9 +233,10 @@ done
 
 jq -n \
   --arg stage "$STAGE" \
+  --argjson h264_gate_waiver "$ALLOW_H264_GATE_WAIVER" \
   --arg chrome_version "$CHROME_VERSION" \
   --arg d0_sha "$(shasum -a 256 "$D0_APP/Contents/MacOS/WebRTCScreencast" | awk '{print $1}')" \
   --arg d1_sha "$(shasum -a 256 "$D1_APP/Contents/MacOS/WebRTCScreencast" | awk '{print $1}')" \
-  '{stage:$stage,chrome_version:$chrome_version,d0_executable_sha256:$d0_sha,d1_executable_sha256:$d1_sha}' \
+  '{stage:$stage,h264_gate_waiver:$h264_gate_waiver,chrome_version:$chrome_version,d0_executable_sha256:$d0_sha,d1_executable_sha256:$d1_sha}' \
   >"$EXPERIMENT_ROOT/$STAGE-context.json"
 print "$EXPERIMENT_ROOT"

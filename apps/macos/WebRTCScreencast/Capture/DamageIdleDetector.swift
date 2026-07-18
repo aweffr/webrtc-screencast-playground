@@ -1,3 +1,5 @@
+import CoreVideo
+import Darwin
 import Foundation
 import ScreenCaptureKit
 
@@ -101,13 +103,17 @@ enum ScreenDamageClassifier {
     static func hasDamage(
         status: SCFrameStatus,
         dirtyRects: [CGRect]?,
-        contentRect: CGRect
+        contentRect: CGRect,
+        statusStripPixelsChanged: (CGRect) -> Bool = { _ in true }
     ) -> Bool {
         guard status != .started, let dirtyRects else { return true }
-        return dirtyRects.contains { !isSystemStatusStripRedraw($0, within: contentRect) }
+        return dirtyRects.contains {
+            !isSystemStatusStripCandidate($0, within: contentRect)
+                || statusStripPixelsChanged($0)
+        }
     }
 
-    private static func isSystemStatusStripRedraw(
+    private static func isSystemStatusStripCandidate(
         _ dirtyRect: CGRect,
         within contentRect: CGRect
     ) -> Bool {
@@ -121,5 +127,58 @@ enum ScreenDamageClassifier {
             && intersection.minY <= contentRect.minY + 1
             && intersection.maxY <= contentRect.minY + maximumStatusStripHeight
             && intersection.width / contentRect.width >= 0.98
+    }
+}
+
+enum NV12PixelBufferComparator {
+    static func hasChanges(
+        between previous: CVPixelBuffer?,
+        and current: CVPixelBuffer
+    ) -> Bool {
+        guard let previous,
+              previous !== current,
+              CVPixelBufferGetWidth(previous) == CVPixelBufferGetWidth(current),
+              CVPixelBufferGetHeight(previous) == CVPixelBufferGetHeight(current),
+              CVPixelBufferGetPixelFormatType(previous) == CVPixelBufferGetPixelFormatType(current),
+              isNV12(CVPixelBufferGetPixelFormatType(current)),
+              CVPixelBufferGetPlaneCount(previous) == 2,
+              CVPixelBufferGetPlaneCount(current) == 2,
+              CVPixelBufferLockBaseAddress(previous, .readOnly) == kCVReturnSuccess
+        else { return true }
+        defer { CVPixelBufferUnlockBaseAddress(previous, .readOnly) }
+        guard CVPixelBufferLockBaseAddress(current, .readOnly) == kCVReturnSuccess else {
+            return true
+        }
+        defer { CVPixelBufferUnlockBaseAddress(current, .readOnly) }
+
+        for plane in 0..<2 {
+            guard let previousBase = CVPixelBufferGetBaseAddressOfPlane(previous, plane),
+                  let currentBase = CVPixelBufferGetBaseAddressOfPlane(current, plane)
+            else { return true }
+            let previousStride = CVPixelBufferGetBytesPerRowOfPlane(previous, plane)
+            let currentStride = CVPixelBufferGetBytesPerRowOfPlane(current, plane)
+            let bytesPerSample = plane == 0 ? 1 : 2
+            let rowBytes = CVPixelBufferGetWidthOfPlane(current, plane) * bytesPerSample
+            let rowCount = CVPixelBufferGetHeightOfPlane(current, plane)
+            guard rowBytes <= previousStride, rowBytes <= currentStride,
+                  rowCount == CVPixelBufferGetHeightOfPlane(previous, plane)
+            else { return true }
+
+            for row in 0..<rowCount {
+                if memcmp(
+                    previousBase.advanced(by: row * previousStride),
+                    currentBase.advanced(by: row * currentStride),
+                    rowBytes
+                ) != 0 {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func isNV12(_ pixelFormat: OSType) -> Bool {
+        pixelFormat == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+            || pixelFormat == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
     }
 }

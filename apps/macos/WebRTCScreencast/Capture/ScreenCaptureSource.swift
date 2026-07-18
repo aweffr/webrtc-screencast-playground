@@ -191,17 +191,19 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
             dirtyRatio: dirtyRatio,
             timestamp: .nanoseconds(scaledTime.value)
         )
-        cachedScreenFrame = CachedScreenFrame(
-            pixelBuffer: pixelBuffer,
-            contentRect: metadata.contentRect,
-            scaleFactor: metadata.scaleFactor
-        )
+        let previousPixelBuffer = cachedScreenFrame?.pixelBuffer
         var activityDecision: DamageIdleDecision?
         if staticClarityEnabled,
            ScreenDamageClassifier.hasDamage(
                status: metadata.status,
                dirtyRects: metadata.dirtyRects,
-               contentRect: metadata.contentRect
+               contentRect: metadata.contentRect,
+               statusStripPixelsChanged: { _ in
+                   NV12PixelBufferComparator.hasChanges(
+                       between: previousPixelBuffer,
+                       and: pixelBuffer
+                   )
+               }
            ) {
             let detected = damageIdleDetector.observeDamage(at: callbackMonotonicNs)
             activityDecision = detected
@@ -213,6 +215,11 @@ final class ScreenCaptureSource: NSObject, SCStreamOutput, SCStreamDelegate, @un
                 )
             }
         }
+        cachedScreenFrame = CachedScreenFrame(
+            pixelBuffer: pixelBuffer,
+            contentRect: metadata.contentRect,
+            scaleFactor: metadata.scaleFactor
+        )
         let clarityTransition = clarityTransitionLatch.update(
             with: activityDecision?.transition ?? .none
         )
