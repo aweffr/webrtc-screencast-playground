@@ -87,7 +87,7 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
         self.assertIn("for (let step = 0; step < 12; step += 1)", program)
         self.assertIn("page.waitForTimeout(50)", program)
         self.assertIn('window.addEventListener("scroll"', program)
-        self.assertIn("{ once: true }", program)
+        self.assertIn("if (!committed)", program)
         self.assertIn("window.__experimentMarker.setSequence(4)", program)
         self.assertIn("marker.style.top = `${window.scrollY + 64}px`", program)
         self.assertLess(
@@ -100,6 +100,20 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
         )
         with self.assertRaises(TypeError):
             module.scroll_program(sequence=4, interval_ms=1)
+
+    def test_scroll_program_keeps_marker_in_the_detection_roi_for_the_burst(self):
+        module = load_module()
+
+        program = module.scroll_program(sequence=4)
+
+        self.assertIn('window.addEventListener("scroll", followScroll)', program)
+        self.assertIn('window.removeEventListener("scroll", followScroll)', program)
+        self.assertIn("if (!committed)", program)
+        self.assertNotIn("{ once: true }", program)
+        self.assertLess(
+            program.index("const markerEpochMs = await markerCommit"),
+            program.index('window.removeEventListener("scroll", followScroll)'),
+        )
 
     def test_jsonl_writer_preserves_planned_and_actual_timing(self):
         module = load_module()

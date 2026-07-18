@@ -124,12 +124,18 @@ def validate_burst_evidence(rows: list[dict]) -> bool:
 def scroll_program(sequence: int) -> str:
     return f"""async page => {{
   const markerCommit = page.evaluate(() => new Promise((resolve) => {{
-    window.addEventListener("scroll", () => {{
+    let committed = false;
+    const followScroll = () => {{
       const marker = document.getElementById("experiment-marker");
       marker.style.top = `${{window.scrollY + 64}}px`;
-      window.__experimentMarker.setSequence({sequence});
-      resolve(performance.timeOrigin + performance.now());
-    }}, {{ once: true }});
+      if (!committed) {{
+        committed = true;
+        window.__experimentMarker.setSequence({sequence});
+        resolve(performance.timeOrigin + performance.now());
+      }}
+    }};
+    window.__experimentFollowScroll = followScroll;
+    window.addEventListener("scroll", followScroll);
   }}));
   const offsets = [];
   for (let step = 0; step < 12; step += 1) {{
@@ -138,6 +144,11 @@ def scroll_program(sequence: int) -> str:
     offsets.push(await page.evaluate(() => window.scrollY));
   }}
   const markerEpochMs = await markerCommit;
+  await page.evaluate(() => {{
+    const followScroll = window.__experimentFollowScroll;
+    window.removeEventListener("scroll", followScroll);
+    delete window.__experimentFollowScroll;
+  }});
   return {{ marker_epoch_ms: markerEpochMs, offsets, actual_offset: offsets[offsets.length - 1] }};
 }}"""
 
