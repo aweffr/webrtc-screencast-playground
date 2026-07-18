@@ -61,6 +61,8 @@ capture telemetry 固定输出：
 - `static_transition_count`
 - `synthetic_clarity_refreshes`
 
+为让 1 Hz stats sampler 仍能验证亚秒状态门槛，snapshot 额外保留最近一次 ACTIVE 与 STATIC transition 的 monotonic timestamp；analyzer 对 timestamp 去重后还原每轮切换，不提高采样频率，也不增加编码侧工作。
+
 现有 dirty rect、FrameGate、QP、VideoToolbox session、keyframe、drop、latency 与 bitrate telemetry 保留。`StaticClarityRefreshController` 和 sender boundary 使用新的两态类型，但保持 1/15 fps、active/static MaxQP 与失败重试语义不变。
 
 ## 失败语义与生命周期
@@ -85,3 +87,8 @@ D1 必须交付六段 activity、每段立即 ACTIVE、最后 damage 后 600–9
 - 新增设置 UI、专用 detector 线程或 10 fps 过渡；
 - 改造 Android decoder、signaling、FrameGate 或无关 capture 结构；
 - 为低概率边界增加与业务收益不成比例的防御代码。
+
+## Execution findings
+
+- 正式 D0/D1 需要运行相同的新 workload。实现前先归档当前 commit 构建出的 D0 app bundle；E2E runner 只增加显式 app-bundle 输入，不在最终产品中保留 legacy detector selector。
+- 最终静态截图不能通过更新一个新 marker 触发，否则会人为增加第七次 ACTIVE。六个 activity 使用 sequence 2–7；最终图在第六轮重新进入 STATIC 后直接抓取，不再修改页面。
