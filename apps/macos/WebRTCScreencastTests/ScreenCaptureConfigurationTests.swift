@@ -19,7 +19,7 @@ final class ScreenCaptureConfigurationTests: XCTestCase {
 
         XCTAssertEqual(values.width, 1_920)
         XCTAssertEqual(values.height, 1_080)
-        XCTAssertEqual(values.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+        XCTAssertEqual(values.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
         XCTAssertEqual(values.minimumFrameInterval, CMTime(value: 1, timescale: 15))
         XCTAssertEqual(values.queueDepth, 3)
         XCTAssertTrue(values.showsCursor)
@@ -28,6 +28,7 @@ final class ScreenCaptureConfigurationTests: XCTestCase {
 
         let streamConfiguration = values.makeStreamConfiguration()
         XCTAssertEqual(streamConfiguration.captureResolution, .nominal)
+        XCTAssertEqual(streamConfiguration.pixelFormat, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
     }
 
     func testMainDisplayUsesLetterboxGeometry() throws {
