@@ -36,6 +36,36 @@ public final class ReferenceRuntimeConfig {
     }
   }
 
+  public enum VideoCodec {
+    H264("h264", "H264"),
+    H265("h265", "H265");
+
+    private final String wireValue;
+    private final String sdpName;
+
+    VideoCodec(String wireValue, String sdpName) {
+      this.wireValue = wireValue;
+      this.sdpName = sdpName;
+    }
+
+    public String wireValue() {
+      return wireValue;
+    }
+
+    public String sdpName() {
+      return sdpName;
+    }
+
+    private static VideoCodec parse(String value) {
+      for (VideoCodec codec : values()) {
+        if (codec.wireValue.equals(value)) {
+          return codec;
+        }
+      }
+      throw new ConfigException("unsupported_video_codec", "Unsupported video codec");
+    }
+  }
+
   public static final class ConfigException extends IllegalArgumentException {
     private final String code;
 
@@ -55,6 +85,7 @@ public final class ReferenceRuntimeConfig {
   private final String turnUsername;
   private final String turnPassword;
   private final String castTuningJson;
+  private final VideoCodec videoCodec;
 
   private ReferenceRuntimeConfig(
       String signalingUrl,
@@ -62,13 +93,15 @@ public final class ReferenceRuntimeConfig {
       String turnUrl,
       String turnUsername,
       String turnPassword,
-      String castTuningJson) {
+      String castTuningJson,
+      VideoCodec videoCodec) {
     this.signalingUrl = signalingUrl.trim();
     this.iceProfile = iceProfile;
     this.turnUrl = turnUrl.trim();
     this.turnUsername = turnUsername.trim();
     this.turnPassword = turnPassword.trim();
     this.castTuningJson = castTuningJson.trim();
+    this.videoCodec = videoCodec;
   }
 
   public static ReferenceRuntimeConfig load(Resources resources) {
@@ -79,7 +112,8 @@ public final class ReferenceRuntimeConfig {
         resources.getString(R.string.reference_turn_url),
         resources.getString(R.string.reference_turn_username),
         resources.getString(R.string.reference_turn_password),
-        resources.getString(R.string.reference_cast_tuning_json));
+        resources.getString(R.string.reference_cast_tuning_json),
+        resources.getString(R.string.reference_video_codec));
   }
 
   public static ReferenceRuntimeConfig create(
@@ -88,14 +122,16 @@ public final class ReferenceRuntimeConfig {
       String turnUrl,
       String turnUsername,
       String turnPassword,
-      String castTuningJson) {
+      String castTuningJson,
+      String videoCodec) {
     return new ReferenceRuntimeConfig(
         Objects.requireNonNull(signalingUrl, "signalingUrl"),
         IceProfile.parse(Objects.requireNonNull(iceProfile, "iceProfile").trim()),
         Objects.requireNonNull(turnUrl, "turnUrl"),
         Objects.requireNonNull(turnUsername, "turnUsername"),
         Objects.requireNonNull(turnPassword, "turnPassword"),
-        Objects.requireNonNull(castTuningJson, "castTuningJson"));
+        Objects.requireNonNull(castTuningJson, "castTuningJson"),
+        VideoCodec.parse(Objects.requireNonNull(videoCodec, "videoCodec").trim()));
   }
 
   public void validate() {
@@ -145,6 +181,10 @@ public final class ReferenceRuntimeConfig {
     return castTuningJson;
   }
 
+  public VideoCodec videoCodec() {
+    return videoCodec;
+  }
+
   public String redactedHash() {
     String canonical = String.join("\n",
         signalingUrl,
@@ -152,7 +192,8 @@ public final class ReferenceRuntimeConfig {
         turnUrl,
         Boolean.toString(!isPlaceholder(turnUsername)),
         Boolean.toString(!isPlaceholder(turnPassword)),
-        castTuningJson);
+        castTuningJson,
+        videoCodec.wireValue);
     try {
       byte[] digest = MessageDigest.getInstance("SHA-256")
           .digest(canonical.getBytes(StandardCharsets.UTF_8));

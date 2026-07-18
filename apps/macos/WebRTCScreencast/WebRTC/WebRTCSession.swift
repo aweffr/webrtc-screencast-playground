@@ -76,6 +76,16 @@ struct SenderContentAwarePolicy: Equatable, Sendable {
     }
 }
 
+private func h264ProfileLevelIDOverride(from jsonData: Data) -> String? {
+    let root = (try? JSONSerialization.jsonObject(with: jsonData)) as? [String: Any]
+    let encoder = root?["encoder"] as? [String: Any]
+    guard (encoder?["h264_profile"] as? String)?.uppercased() == "CONSTRAINED_BASELINE",
+          encoder?["h264_level"] as? String == "4.1" else {
+        return nil
+    }
+    return "42e029"
+}
+
 final class SenderMediaBoundaryTelemetry: @unchecked Sendable {
     private let lock = NSLock()
     private var sourceFramesForwarded: UInt64 = 0
@@ -132,8 +142,15 @@ final class WebRTCSession: NSObject, RTCPeerConnectionDelegate, ScreenCaptureFra
 
         let tuningConfiguration = try RTCCastTuningConfiguration(jsonData: castTuningJSON)
         tuningConfiguration.apply(to: ice.configuration)
-        let encoderFactory = SelectedVideoEncoderFactory(policy: videoCodecPolicy)
-        let decoderFactory = SelectedVideoDecoderFactory(policy: videoCodecPolicy)
+        let h264ProfileLevelIDOverride = h264ProfileLevelIDOverride(from: castTuningJSON)
+        let encoderFactory = SelectedVideoEncoderFactory(
+            policy: videoCodecPolicy,
+            h264ProfileLevelIDOverride: h264ProfileLevelIDOverride
+        )
+        let decoderFactory = SelectedVideoDecoderFactory(
+            policy: videoCodecPolicy,
+            h264ProfileLevelIDOverride: h264ProfileLevelIDOverride
+        )
         let factory = try RTCCastTuningFactoryBuilder.peerConnectionFactory(
             with: encoderFactory,
             decoderFactory: decoderFactory,

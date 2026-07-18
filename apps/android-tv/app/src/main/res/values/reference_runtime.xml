@@ -4,6 +4,7 @@
     <string name="reference_turn_url" translatable="false">turn:turn.example.invalid:3478?transport=udp</string>
     <string name="reference_turn_username" translatable="false">REPLACE_ME</string>
     <string name="reference_turn_password" translatable="false">REPLACE_ME</string>
+    <string name="reference_video_codec" translatable="false">h265</string>
     <string name="reference_cast_tuning_json" translatable="false"><![CDATA[{
   \"schema_version\": 3,
   \"profile\": \"DETAIL_ACTIVE\",

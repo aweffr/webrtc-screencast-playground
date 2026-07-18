@@ -20,9 +20,7 @@ import org.webrtc.VideoSink;
 public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
   private static final int GRID_SIZE = 12;
   private static final int VERSION = 1;
-  private static final int MARKER_LEFT = 64;
-  private static final int MARKER_TOP = 64;
-  private static final int MARKER_SIZE = 192;
+  private static final int[][] MARKER_ROIS = {{64, 64, 192}, {195, 103, 217}};
   private static final Set<Integer> PNG_SEQUENCES = Set.of(1, 4, 8, 30, 80, 130);
 
   public record Marker(int version, int sequence) {}
@@ -59,14 +57,12 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
     long renderEntryNs = SystemClock.elapsedRealtimeNanos();
     VideoFrame.I420Buffer i420 = frame.getBuffer().toI420();
     try {
-      Marker marker = decodeLumaBuffer(
+      Marker marker = decodeLumaBufferAtCandidateRois(
           i420.getDataY(),
           i420.getWidth(),
           i420.getHeight(),
           i420.getStrideY(),
-          MARKER_LEFT,
-          MARKER_TOP,
-          MARKER_SIZE);
+          MARKER_ROIS);
       activeGapTracker.observe(marker.sequence(), renderEntryNs);
       if (!observedSequences.add(marker.sequence())) {
         return;
@@ -216,6 +212,40 @@ public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
         left,
         top,
         size);
+  }
+
+  static Marker decodeLumaAtCandidateRois(
+      byte[] luma,
+      int width,
+      int height,
+      int stride,
+      int[][] candidates) {
+    MarkerException lastError = new MarkerException("no marker ROI candidates");
+    for (int[] roi : candidates) {
+      try {
+        return decodeLuma(luma, width, height, stride, roi[0], roi[1], roi[2]);
+      } catch (MarkerException error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+
+  private static Marker decodeLumaBufferAtCandidateRois(
+      ByteBuffer luma,
+      int width,
+      int height,
+      int stride,
+      int[][] candidates) {
+    MarkerException lastError = new MarkerException("no marker ROI candidates");
+    for (int[] roi : candidates) {
+      try {
+        return decodeLumaBuffer(luma, width, height, stride, roi[0], roi[1], roi[2]);
+      } catch (MarkerException error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   }
 
   private static Marker decodeLumaBuffer(

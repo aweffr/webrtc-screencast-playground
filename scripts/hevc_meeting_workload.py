@@ -13,6 +13,67 @@ from typing import NamedTuple
 QUALITY_EVIDENCE_SEQUENCES = (1, 4, 8)
 
 
+def browser_launch_config() -> dict:
+    return {
+        "browser": {
+            "browserName": "chromium",
+            "launchOptions": {
+                "channel": "chrome",
+                "headless": False,
+                "args": ["--kiosk"],
+            },
+            "contextOptions": {
+                "screen": {"width": 1920, "height": 1080},
+                "viewport": {"width": 1920, "height": 1080},
+            },
+        }
+    }
+
+
+def find_kiosk_process_id(profile: pathlib.Path, process_table: str) -> int:
+    profile_argument = f"--user-data-dir={profile}"
+    executable = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    for row in process_table.splitlines():
+        fields = row.strip().split(maxsplit=1)
+        if len(fields) != 2:
+            continue
+        process_id, command = fields
+        if command.startswith(executable) and "--kiosk" in command and profile_argument in command:
+            return int(process_id)
+    raise RuntimeError("Chrome kiosk process was not found")
+
+
+def activate_chrome_fullscreen(profile: pathlib.Path) -> None:
+    deadline = time.monotonic() + 5
+    while True:
+        process_table = subprocess.run(
+            ["ps", "-axo", "pid=,command="],
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout
+        try:
+            process_id = find_kiosk_process_id(profile, process_table)
+            break
+        except RuntimeError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.1)
+    program = (
+        "import AppKit; import CoreGraphics; import Foundation; "
+        f"guard let app = NSRunningApplication(processIdentifier: {process_id}) "
+        "else { exit(2) }; guard app.activate(options: [.activateAllWindows]) "
+        "else { exit(3) }; usleep(250000); "
+        "let source = CGEventSource(stateID: .hidSystemState); "
+        "let flags: CGEventFlags = [.maskControl, .maskCommand]; "
+        "let down = CGEvent(keyboardEventSource: source, virtualKey: 3, keyDown: true); "
+        "down?.flags = flags; down?.post(tap: .cghidEventTap); usleep(80000); "
+        "let up = CGEvent(keyboardEventSource: source, virtualKey: 3, keyDown: false); "
+        "up?.flags = flags; up?.post(tap: .cghidEventTap)"
+    )
+    subprocess.run(["/usr/bin/swift", "-e", program], check=True, capture_output=True)
+
+
 class ScrollBurst(NamedTuple):
     sequence: int
     planned_seconds: int
@@ -35,13 +96,13 @@ class WorkloadSchedule(NamedTuple):
 
 def default_schedule() -> WorkloadSchedule:
     return WorkloadSchedule(
-        initial_static_seconds=25,
-        scroll_phase_end_seconds=55,
+        initial_static_seconds=20,
+        scroll_phase_end_seconds=68,
         final_static_seconds=20,
         bursts=tuple(
             ScrollBurst(
                 sequence=index,
-                planned_seconds=25 + (index - 1) * 5,
+                planned_seconds=20 + (index - 1) * 8,
                 expected_offset=index * 720,
             )
             for index in range(1, 7)
@@ -90,6 +151,7 @@ class PlaywrightController:
     def __init__(self, executable: str, session: str):
         self.executable = executable
         self.session = session
+        self.profile: pathlib.Path | None = None
 
     def command(self, *arguments: str, raw: bool = False) -> str:
         command = [self.executable, f"-s={self.session}"]
@@ -100,19 +162,34 @@ class PlaywrightController:
         return result.stdout.strip()
 
     def open(self, url: str, profile: pathlib.Path) -> None:
+        self.profile = profile
+        config = profile / "playwright-cli.json"
+        config.write_text(
+            json.dumps(browser_launch_config(), sort_keys=True),
+            encoding="utf-8",
+        )
         self.command(
             "open",
             url,
-            "--browser=chrome",
             "--headed",
             f"--profile={profile}",
+            f"--config={config}",
         )
+
+    def enter_native_fullscreen(self) -> None:
+        if self.profile is None:
+            raise RuntimeError("Chrome profile is not open")
+        activate_chrome_fullscreen(self.profile)
 
     def run_code(self, program: str) -> dict:
         return json.loads(self.command("run-code", program, raw=True))
 
     def screenshot(self, path: pathlib.Path) -> None:
-        self.command("screenshot", f"--filename={path}")
+        subprocess.run(
+            ["screencapture", "-x", "-D", "1", str(path)],
+            check=True,
+            capture_output=True,
+        )
 
     def close(self) -> None:
         self.command("close")
@@ -124,6 +201,49 @@ def wait_until(target_ns: int) -> None:
         if remaining <= 0:
             return
         time.sleep(min(remaining, 0.1))
+
+
+def wait_for_file(path: pathlib.Path, timeout_seconds: float = 120) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while not path.is_file():
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"timed out waiting for {path.name}")
+        time.sleep(0.1)
+
+
+def enter_capture_mode(
+    controller: PlaywrightController,
+    *,
+    fullscreen: bool,
+    trigger_file: pathlib.Path | None,
+    ready_file: pathlib.Path | None,
+    writer: JSONLWriter,
+    sleep=time.sleep,
+) -> bool:
+    if not fullscreen:
+        return True
+    if trigger_file is not None:
+        wait_for_file(trigger_file)
+    controller.enter_native_fullscreen()
+    sleep(2)
+    state = controller.run_code(
+        "async page => await page.evaluate(() => ({width: innerWidth, height: innerHeight, scroll_y: scrollY, marker_sequence: Number(document.getElementById('experiment-marker').dataset.sequence)}))"
+    )
+    valid = (
+        state["width"] == 1920
+        and state["height"] == 1080
+        and state["scroll_y"] == 0
+        and state["marker_sequence"] == 1
+    )
+    writer.write(
+        "capture_view_ready",
+        monotonic_ns=time.monotonic_ns(),
+        state=state,
+        valid=valid,
+    )
+    if valid and ready_file is not None:
+        ready_file.write_text("ready\n", encoding="utf-8")
+    return valid
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -145,6 +265,8 @@ def run_workload(
     executable: str,
     ready_file: pathlib.Path | None = None,
     start_file: pathlib.Path | None = None,
+    fullscreen_trigger_file: pathlib.Path | None = None,
+    fullscreen_ready_file: pathlib.Path | None = None,
 ) -> bool:
     schedule = default_schedule()
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -157,11 +279,7 @@ def run_workload(
     with tempfile.TemporaryDirectory(prefix="hevc-meeting-chrome-") as profile:
         controller.open(url, pathlib.Path(profile))
         try:
-            controller.command("resize", "1920", "1080")
             controller.command("press", "Meta+0")
-            if fullscreen:
-                controller.command("press", "Control+Meta+f")
-                time.sleep(2)
             readiness = controller.run_code(
                 """async page => {
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -207,6 +325,16 @@ def run_workload(
             if not ready:
                 return False
 
+            if ready_file is not None:
+                ready_file.write_text("ready\n", encoding="utf-8")
+            if not enter_capture_mode(
+                controller,
+                fullscreen=fullscreen,
+                trigger_file=fullscreen_trigger_file,
+                ready_file=fullscreen_ready_file,
+                writer=writer,
+            ):
+                return False
             initial_path = output_directory / "initial-static.png"
             controller.screenshot(initial_path)
             writer.write(
@@ -217,15 +345,9 @@ def run_workload(
                 path=initial_path.name,
                 sha256=sha256(initial_path),
             )
-            if ready_file is not None:
-                ready_file.write_text("ready\n", encoding="utf-8")
             if start_file is not None:
                 writer.write("workload_waiting_for_media", monotonic_ns=time.monotonic_ns())
-                deadline = time.monotonic() + 120
-                while not start_file.is_file():
-                    if time.monotonic() >= deadline:
-                        raise RuntimeError("timed out waiting for media start gate")
-                    time.sleep(0.1)
+                wait_for_file(start_file)
             start_ns = time.monotonic_ns()
             for burst in schedule.bursts:
                 planned_ns = start_ns + round(burst.planned_seconds * time_scale * 1_000_000_000)
@@ -317,6 +439,8 @@ def main() -> None:
     parser.add_argument("--no-fullscreen", action="store_true")
     parser.add_argument("--ready-file", type=pathlib.Path)
     parser.add_argument("--start-file", type=pathlib.Path)
+    parser.add_argument("--fullscreen-trigger-file", type=pathlib.Path)
+    parser.add_argument("--fullscreen-ready-file", type=pathlib.Path)
     args = parser.parse_args()
     if not 0 < args.time_scale <= 1:
         parser.error("--time-scale must be in (0, 1]")
@@ -333,6 +457,8 @@ def main() -> None:
         executable=executable,
         ready_file=args.ready_file,
         start_file=args.start_file,
+        fullscreen_trigger_file=args.fullscreen_trigger_file,
+        fullscreen_ready_file=args.fullscreen_ready_file,
     )
     raise SystemExit(0 if valid else 1)
 

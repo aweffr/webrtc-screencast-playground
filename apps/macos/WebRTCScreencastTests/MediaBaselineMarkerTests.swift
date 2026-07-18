@@ -67,7 +67,10 @@ final class MediaBaselineMarkerTests: XCTestCase {
 
         let decoded = try MediaBaselinePixelProbe.detect(
             pixelBuffer: buffer,
-            roi: CGRect(x: 0, y: 0, width: markerImage.width, height: markerImage.height)
+            candidateROIs: [
+                CGRect(x: 0, y: 0, width: 12, height: 12),
+                CGRect(x: 0, y: 0, width: markerImage.width, height: markerImage.height),
+            ]
         )
 
         XCTAssertEqual(decoded.sequence, 99)

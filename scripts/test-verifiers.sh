@@ -48,6 +48,19 @@ jq -nc '[
 "$ROOT/scripts/verify-diagnostics.sh" \
   "$WORK/android-receiver" "$WORK/sender" direct-baseline >/dev/null
 
+mkdir -p "$WORK/h264-android-receiver" "$WORK/h264-sender"
+jq 'if .event == "rtc_stats" then
+  .fields.codec = "video/H264"
+  | .fields.decoder = "c2.android.h264.decoder"
+  else . end' "$WORK/android-receiver/receiver.jsonl" \
+  >"$WORK/h264-android-receiver/receiver.jsonl"
+jq 'if .event == "rtc_stats" then
+  .fields.outbound_video.codec = "video/H264"
+  | .fields.sender_media_boundary.video_toolbox_encoder_id = "com.apple.videotoolbox.videoencoder.ave.avc"
+  else . end' "$WORK/sender/metrics.jsonl" >"$WORK/h264-sender/metrics.jsonl"
+"$ROOT/scripts/verify-diagnostics.sh" \
+  "$WORK/h264-android-receiver" "$WORK/h264-sender" direct-baseline >/dev/null
+
 mkdir -p "$WORK/relay-android-receiver" "$WORK/relay-sender"
 jq 'if .event == "rtc_stats" then
   .fields.local_path_type = "relay"

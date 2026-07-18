@@ -1,8 +1,50 @@
 import Foundation
 import XCTest
+@preconcurrency import WebRTC
 @testable import WebRTCScreencast
 
 final class WebRTCSessionConstructionTests: XCTestCase {
+    func testH264PolicyPreservesDefaultPacketizationModeOneCapabilities() {
+        let expectedEncoderParameters = RTCDefaultVideoEncoderFactory().supportedCodecs()
+            .filter {
+                $0.name.caseInsensitiveCompare("H264") == .orderedSame
+                    && $0.parameters["packetization-mode"] == "1"
+            }
+            .map(\.parameters)
+        let expectedDecoderParameters = RTCDefaultVideoDecoderFactory().supportedCodecs()
+            .filter {
+                $0.name.caseInsensitiveCompare("H264") == .orderedSame
+                    && $0.parameters["packetization-mode"] == "1"
+            }
+            .map(\.parameters)
+
+        XCTAssertEqual(
+            SelectedVideoEncoderFactory(policy: .h264Only).supportedCodecs().map(\.parameters),
+            expectedEncoderParameters
+        )
+        XCTAssertEqual(
+            SelectedVideoDecoderFactory(policy: .h264Only).supportedCodecs().map(\.parameters),
+            expectedDecoderParameters
+        )
+    }
+
+    func testExplicitH264ProfileOverrideAdvertisesSingleReferenceCapability() {
+        for codecs in [
+            SelectedVideoEncoderFactory(
+                policy: .h264Only,
+                h264ProfileLevelIDOverride: "42e029"
+            ).supportedCodecs(),
+            SelectedVideoDecoderFactory(
+                policy: .h264Only,
+                h264ProfileLevelIDOverride: "42e029"
+            ).supportedCodecs(),
+        ] {
+            XCTAssertEqual(codecs.count, 1)
+            XCTAssertEqual(codecs[0].parameters["packetization-mode"], "1")
+            XCTAssertEqual(codecs[0].parameters["profile-level-id"], "42e029")
+        }
+    }
+
     func testContentAwarePolicyOmitsMaxQpOnlyForRTVC() {
         let ordinary = SenderContentAwarePolicy(
             jsonData: Data(#"{"sender":{"max_fps":15,"max_bitrate_bps":5000000},"encoder":{"max_qp":39,"video_toolbox_low_latency_rate_control":false}}"#.utf8),
@@ -63,6 +105,27 @@ final class WebRTCSessionConstructionTests: XCTestCase {
         XCTAssertFalse(offer.contains(" VP8/90000"))
         XCTAssertFalse(offer.contains(" VP9/90000"))
         XCTAssertFalse(offer.contains(" AV1/90000"))
+    }
+
+    func testH264ReferenceOfferUsesConstrainedBaselineLevel41() async throws {
+        let tuningData = Data(#"{"schema_version":3,"profile":"DETAIL_ACTIVE","encoder":{"h264_profile":"CONSTRAINED_BASELINE","h264_level":"4.1"}}"#.utf8)
+        let ice = try IceServerProvider.make(profile: .directBaseline, turn: nil)
+        let sender = try WebRTCSession(
+            role: .sender,
+            ice: ice,
+            castTuningJSON: tuningData,
+            videoCodecPolicy: .h264Only
+        )
+        defer { sender.close() }
+
+        let offer = try await sender.createOffer()
+
+        XCTAssertTrue(offer.localizedCaseInsensitiveContains(" H264/90000"))
+        XCTAssertTrue(
+            offer.localizedCaseInsensitiveContains("profile-level-id=42e029"),
+            "offer profile-level-id values: \(offer.components(separatedBy: "profile-level-id=").dropFirst().map { String($0.prefix(6)) })"
+        )
+        XCTAssertFalse(offer.localizedCaseInsensitiveContains(" H265/90000"))
     }
 
     func testSenderCodecPreferencePoliciesAffectOfferOrder() async throws {

@@ -39,12 +39,12 @@ Chrome 在主屏全屏渲染本地、离线、固定的 Kubernetes 中文 Deploy
 
 准备脚本校验源哈希，去掉 front matter、Hugo shortcode 和远程资源，通过 GitHub Markdown API 一次性生成 HTML body，再与固定本地 CSS、来源说明和 marker overlay 组成 versioned self-contained fixture。正式实验只访问 localhost，不访问公网。
 
-本机使用 Google Chrome `150.0.7871.125`、临时 profile、100% zoom、无扩展和全屏。版本在整批实验中必须一致。Playwright CLI 发送真实 mouse-wheel 输入：每次 12 个 60 px step、间隔 50 ms，共 720 CSS px；每隔 5 秒一次，共 6 次。每次实际 `scrollY` 必须等于预期值 ±1 px。
+本机使用 Google Chrome `150.0.7871.125`、临时 profile、100% zoom、无扩展和全屏。版本在整批实验中必须一致。Playwright CLI 发送真实 mouse-wheel 输入：每次 12 个 60 px step、间隔 50 ms，共 720 CSS px；每隔 8 秒一次，共 6 次。每次实际 `scrollY` 必须等于预期值 ±1 px。8 秒窗口用于在 1 秒 telemetry sampling 下明确观察每轮 ACTIVE 后重新进入 STATIC，不增加实验 case 或 run 数。
 
 每个 run 在 Android 首帧后执行：
 
-1. 文档静止 25 秒；
-2. 25～55 秒执行六次固定滚动；
+1. 文档静止 20 秒；
+2. 20～68 秒执行六次固定滚动；
 3. 停止滚动 20 秒，验证静态清晰度恢复；
 4. 导出初始静态、中段滚动和最终静态三组 image evidence。
 
@@ -57,7 +57,7 @@ Chrome 在主屏全屏渲染本地、离线、固定的 Kubernetes 中文 Deploy
 - `STATIC`：1 fps、`staticMaxQP`，进入时应用 live patch 并强制 IDR；
 - `ACTIVE`：15 fps、`activeMaxQP`；输入、滚动、动画与恢复均使用该状态。
 
-现有视觉阈值、600 ms 稳定窗口和 1/15 fps 均冻结。普通 case 有效性要求：初始阶段进入 STATIC；每次 scroll 后 500 ms 内进入 ACTIVE；scroll burst 结束后 2 秒内回到 STATIC；六次切换都有 requested/effective QP、generation、encoder session 和关键帧绑定。
+现有视觉阈值、600 ms 稳定窗口和 1/15 fps 均冻结。普通 case 有效性要求：初始阶段进入 STATIC；每次 scroll 的 observation window 内先看到 ACTIVE、再在下一次 scroll 前看到 STATIC；六次切换都有 requested/effective QP、generation、encoder session 和关键帧绑定。ACTIVE 正文交互延迟由 marker E2E gate 单独约束，不用 1 秒 stats sampling 冒充亚秒状态延迟测量。
 
 RTVC 不支持动态 MaxQP。StaticClarity controller 的 QP 参数改为 optional：普通 H.264/H.265 继续切换 FPS 和 QP；RTVC 只切换 FPS。RTVC 是能力边界 case，不具备本轮上线资格。
 
@@ -73,6 +73,8 @@ RTVC 不支持动态 MaxQP。StaticClarity controller 的 QP 参数改为 option
 | A1 | H.265 | 24 | 32 |
 
 A0/A1 各运行三次，隔离 codec 本身的影响。
+
+A0 显式使用 H.264 Constrained Baseline Level 4.1；固定 Android reference decoder 与 High profile 没有 capability intersection，若使用 schema v3 的默认 Constrained High，answer 会拒绝 video m-line。这个约束来自本轮固定接收端的可部署能力，不把它包装成 H.264 与 HEVC profile 等价；其余分辨率、帧率、码率、时延策略和动态 MaxQP 保持对齐。
 
 ### HEVC 动态策略
 
@@ -95,7 +97,7 @@ C0/C1/C2 各运行两次。若最终 winner 是 C0/C1，再补一次确认；C2 
 
 ## 指标与选择规则
 
-相对 A0 的硬门槛：first rendered frame 退化不超过 100 ms；ACTIVE software E2E p95 退化不超过 10 ms；没有超过 500 ms 的无渲染区间；VideoToolbox drop ratio 不超过 1%；marker 有效率下降不超过 1 个百分点；bitrate 不突破 5 Mbps；六次滚动均正确触发状态往返。
+相对 A0 的硬门槛：first rendered frame 退化不超过 100 ms；ACTIVE software E2E p95 退化不超过 10 ms；没有超过 500 ms 的无渲染区间；VideoToolbox drop ratio 不超过 1%；六次 scroll sequence 必须全部在 sender capture 和 Android render 交付；bitrate 不突破 5 Mbps；六次滚动均正确触发状态往返。Marker gate 是 6/6 sequence delivery，不声称具备逐帧有效率或 1 个百分点的测量精度。
 
 STATIC text/fine-lines 不得同时出现 SSIM-Y 下降超过 0.002、PSNR-Y 下降超过 0.5 dB，以及 12/16 px 中英文或代码在人工检查中明显变糊。
 
@@ -105,7 +107,7 @@ STATIC text/fine-lines 不得同时出现 SSIM-Y 下降超过 0.002、PSNR-Y 下
 
 `my-webrtc-builds` 在 VideoToolbox callback 中维护 key/delta QP histogram 以及 submitted/encoded/dropped counters，通过 CastTuning snapshot 暴露。Swift JSONL 同时记录 content state、QP generation、session binding 和状态切换计数。Analyzer 聚合首帧、software marker latency、freeze、drop、bitrate、状态切换与 image metrics。
 
-所有正式 run 保存完整配置、artifact SHA、app commit、Chrome version、文档 source hash、scroll timeline、双方 JSONL 和三组 image evidence。图像指标之外，执行者必须亲自打开并检查每个正式 case 的初始静态、中段滚动与最终静态接收图；报告记录检查结论和发现，不用自动指标替代人工判断。
+所有正式 run 只允许从 clean git worktree 启动，并保存完整配置、app commit、实际传入构建的 macOS/Android WebRTC artifact SHA、macOS executable SHA、Android APK SHA、Chrome version、文档 source hash、scroll timeline、双方 JSONL 和三组 image evidence。恢复执行时必须核对同一份 manifest。图像指标之外，执行者必须亲自打开并检查每个正式 case 的初始静态、中段滚动与最终静态接收图；报告记录检查结论和发现，不用自动指标替代人工判断。
 
 ## 运行规模与停止条件
 
@@ -122,4 +124,3 @@ STATIC text/fine-lines 不得同时出现 SSIM-Y 下降超过 0.002、PSNR-Y 下
 - 四状态 content model、输入控制、VBR、BaseFrameQP、HighQuality preset、Main444；
 - 为实验新增设置 UI 或更改 `VideoCodecPolicy.default` 的语义；
 - 因实验顺手重构无关 capture、signaling 或 Android UI。
-

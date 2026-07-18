@@ -38,11 +38,15 @@ struct WebRTCScreencastApp: App {
         } catch {
             if explicitConfiguration, startupFailure == nil { startupFailure = error.localizedDescription }
         }
-        _coordinator = StateObject(wrappedValue: SessionCoordinator(
+        let coordinator = SessionCoordinator(
             configuration: configuration,
             launchOptions: options,
             startupFailure: startupFailure
-        ))
+        )
+        _coordinator = StateObject(wrappedValue: coordinator)
+        Task { @MainActor in
+            await coordinator.runLaunchOptionsIfNeeded()
+        }
     }
 
     var body: some Scene {
@@ -58,7 +62,6 @@ struct WebRTCScreencastApp: App {
                     StartView(coordinator: coordinator)
                 }
             }
-            .task { await coordinator.runLaunchOptionsIfNeeded() }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                 Task { await coordinator.stop() }
             }

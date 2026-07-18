@@ -11,10 +11,11 @@ public final class ReferenceRuntimeConfigTest {
   @Test
   public void directBaselineDoesNotRequireTurnCredentials() {
     ReferenceRuntimeConfig config = ReferenceRuntimeConfig.create(
-        "ws://10.0.2.2:8080/ws", "direct-baseline", "", "", "", TUNING_JSON);
+        "ws://10.0.2.2:8080/ws", "direct-baseline", "", "", "", TUNING_JSON, "h264");
 
     config.validate();
     assertEquals(ReferenceRuntimeConfig.IceProfile.DIRECT_BASELINE, config.iceProfile());
+    assertEquals(ReferenceRuntimeConfig.VideoCodec.H264, config.videoCodec());
   }
 
   @Test
@@ -25,7 +26,8 @@ public final class ReferenceRuntimeConfigTest {
         "turn:turn.example.invalid:3478?transport=udp",
         "REPLACE_ME",
         "REPLACE_ME",
-        TUNING_JSON);
+        TUNING_JSON,
+        "h265");
     ReferenceRuntimeConfig.ConfigException error = assertThrows(
         ReferenceRuntimeConfig.ConfigException.class, missing::validate);
     assertEquals("missing_turn_credentials", error.code());
@@ -36,7 +38,8 @@ public final class ReferenceRuntimeConfigTest {
         "turn:turn.example.invalid:3478?transport=tcp",
         "user",
         "password",
-        TUNING_JSON);
+        TUNING_JSON,
+        "h265");
     error = assertThrows(ReferenceRuntimeConfig.ConfigException.class, tcp::validate);
     assertEquals("invalid_turn_udp_url", error.code());
 
@@ -46,7 +49,8 @@ public final class ReferenceRuntimeConfigTest {
         "turn:turn.example.invalid:3478?transport=udp",
         "user",
         "password",
-        TUNING_JSON);
+        TUNING_JSON,
+        "h265");
     valid.validate();
   }
 
@@ -58,14 +62,16 @@ public final class ReferenceRuntimeConfigTest {
         "turn:turn.example.invalid:3478?transport=udp",
         "first-user",
         "first-password",
-        TUNING_JSON);
+        TUNING_JSON,
+        "h265");
     ReferenceRuntimeConfig second = ReferenceRuntimeConfig.create(
         "ws://10.0.2.2:8080/ws",
         "production-relay",
         "turn:turn.example.invalid:3478?transport=udp",
         "second-user",
         "second-password",
-        TUNING_JSON);
+        TUNING_JSON,
+        "h265");
 
     assertEquals(first.redactedHash(), second.redactedHash());
   }
@@ -73,10 +79,17 @@ public final class ReferenceRuntimeConfigTest {
   @Test
   public void signalingRequiresAWebSocketUrl() {
     ReferenceRuntimeConfig config = ReferenceRuntimeConfig.create(
-        "https://10.0.2.2:8080/ws", "direct-baseline", "", "", "", TUNING_JSON);
+        "https://10.0.2.2:8080/ws", "direct-baseline", "", "", "", TUNING_JSON, "h265");
 
     ReferenceRuntimeConfig.ConfigException error = assertThrows(
         ReferenceRuntimeConfig.ConfigException.class, config::validate);
     assertEquals("invalid_signaling_url", error.code());
+  }
+
+  @Test
+  public void rejectsUnsupportedVideoCodec() {
+    assertThrows(ReferenceRuntimeConfig.ConfigException.class, () ->
+        ReferenceRuntimeConfig.create(
+            "ws://10.0.2.2:8080/ws", "direct-baseline", "", "", "", TUNING_JSON, "vp9"));
   }
 }

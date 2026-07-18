@@ -12,6 +12,8 @@ MEDIA_BASELINE=0
 MARKER_EVIDENCE=0
 CAST_TUNING_CONFIG=""
 WORKLOAD_START_FILE=""
+WORKLOAD_FULLSCREEN_TRIGGER_FILE=""
+WORKLOAD_FULLSCREEN_READY_FILE=""
 SKIP_MACOS_BUILD=0
 STATIC_QP_EVIDENCE=0
 PACKAGE="cn.aweffr.webrtcscreencast.tv"
@@ -20,7 +22,7 @@ AVD_NAME="${ANDROID_TV_AVD_NAME:-WebRTCScreencast_TV_API_31}"
 LOCAL_XML="$ROOT/apps/android-tv/app/src/debug/res/values/reference_runtime.local.xml"
 
 usage() {
-  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--cast-tuning-config path] [--run-seconds n] [--output-root path] [--media-baseline|--marker-evidence] [--workload-start-file path] [--static-qp-evidence] [--skip-macos-build]"
+  print -u2 "usage: $0 [--profile direct-baseline|production-relay] [--source main|virtual] [--runtime-config path] [--cast-tuning-config path] [--run-seconds n] [--output-root path] [--media-baseline|--marker-evidence] [--workload-start-file path] [--workload-fullscreen-trigger-file path --workload-fullscreen-ready-file path] [--static-qp-evidence] [--skip-macos-build]"
   exit 2
 }
 
@@ -35,6 +37,8 @@ while (( $# )); do
     --media-baseline) MEDIA_BASELINE=1; shift ;;
     --marker-evidence) MARKER_EVIDENCE=1; shift ;;
     --workload-start-file) [[ $# -ge 2 ]] || usage; WORKLOAD_START_FILE="$2"; shift 2 ;;
+    --workload-fullscreen-trigger-file) [[ $# -ge 2 ]] || usage; WORKLOAD_FULLSCREEN_TRIGGER_FILE="$2"; shift 2 ;;
+    --workload-fullscreen-ready-file) [[ $# -ge 2 ]] || usage; WORKLOAD_FULLSCREEN_READY_FILE="$2"; shift 2 ;;
     --static-qp-evidence) STATIC_QP_EVIDENCE=1; shift ;;
     --skip-macos-build) SKIP_MACOS_BUILD=1; shift ;;
     *) usage ;;
@@ -61,6 +65,11 @@ done
 }
 [[ -z "$CAST_TUNING_CONFIG" || -r "$CAST_TUNING_CONFIG" ]] || {
   print -u2 "--cast-tuning-config must be readable"
+  exit 2
+}
+[[ ( -z "$WORKLOAD_FULLSCREEN_TRIGGER_FILE" && -z "$WORKLOAD_FULLSCREEN_READY_FILE" ) \
+    || ( -n "$WORKLOAD_FULLSCREEN_TRIGGER_FILE" && -n "$WORKLOAD_FULLSCREEN_READY_FILE" ) ]] || {
+  print -u2 "workload fullscreen trigger and ready files must be provided together"
   exit 2
 }
 if [[ "$PROFILE" == production-relay ]]; then
@@ -121,8 +130,19 @@ cleanup() {
   local exit_code=$?
   trap - EXIT INT TERM
   [[ -n "$sender_pid" ]] && kill "$sender_pid" >/dev/null 2>&1 || true
+  [[ -n "${CONFIG_FILE:-}" ]] && pkill -f -- "$CONFIG_FILE" >/dev/null 2>&1 || true
   [[ -n "$server_pid" ]] && kill "$server_pid" >/dev/null 2>&1 || true
   [[ -n "$caffeinate_pid" ]] && kill "$caffeinate_pid" >/dev/null 2>&1 || true
+  if (( exit_code != 0 )) && adb get-state >/dev/null 2>&1; then
+    receiver_pid="$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r' || true)"
+    if [[ "$receiver_pid" == <-> ]]; then
+      adb logcat -d --pid="$receiver_pid" >"$ANDROID_EVIDENCE/receiver-failure-logcat.txt" 2>/dev/null || true
+    fi
+    partial_evidence="$(adb shell run-as "$PACKAGE" find files/evidence -name receiver.jsonl -type f -print 2>/dev/null | tr -d '\r' | head -1)"
+    if [[ -n "$partial_evidence" ]]; then
+      adb exec-out run-as "$PACKAGE" cat "$partial_evidence" >"$ANDROID_EVIDENCE/receiver-partial.jsonl" 2>/dev/null || true
+    fi
+  fi
   adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
   rm -f "$CONFIG_FILE"
   restore_local_xml || exit_code=1
@@ -220,13 +240,26 @@ turn = {
     "username": "REPLACE_ME",
     "password": "REPLACE_ME",
 }
+video_codec = "h265"
 if profile == "production-relay":
-    turn = json.loads(pathlib.Path(runtime_path).read_text(encoding="utf-8"))["turn"]
+    runtime = json.loads(pathlib.Path(runtime_path).read_text(encoding="utf-8"))
+    turn = runtime["turn"]
+    policy = runtime.get("video_codec_policy", "h265-only")
+    receiver_codec_by_policy = {
+        "h264-only": "h264",
+        "h265-only": "h265",
+        "prefer-h265": "h265",
+        "default": "h264",
+    }
+    if policy not in receiver_codec_by_policy:
+        raise SystemExit(f"unsupported video_codec_policy: {policy}")
+    video_codec = receiver_codec_by_policy[policy]
 values = {
     "reference_signaling_url": signaling,
     "reference_turn_url": turn["url"],
     "reference_turn_username": turn["username"],
     "reference_turn_password": turn["password"],
+    "reference_video_codec": video_codec,
 }
 lines = ['<?xml version="1.0" encoding="utf-8"?>', "<resources>"]
 for name, value in values.items():
@@ -243,7 +276,7 @@ if [[ "$PROFILE" == production-relay ]]; then
     | .ice_profile = "production-relay"
     | .metrics_directory = $metrics
     | .excluded_receiver_pid = null
-    | .video_codec_policy = "h265-only"
+    | .video_codec_policy = (.video_codec_policy // "h265-only")
   ' "$RUNTIME_CONFIG" >"$CONFIG_FILE"
   GRADLE_TASK=:app:assembleProductionRelayDebug
   APK="$ROOT/apps/android-tv/app/build/outputs/apk/productionRelay/debug/app-productionRelay-debug.apk"
@@ -264,7 +297,7 @@ chmod 600 "$CONFIG_FILE"
 if (( ! SKIP_MACOS_BUILD )); then
   make -C "$ROOT" build-macos
 fi
-WEBRTC_ANDROID_AAR="${ARTIFACTS_DIR:-$ROOT/artifacts}/webrtc-m150-android-arm64-v8a.aar"
+WEBRTC_ANDROID_AAR="${WEBRTC_ANDROID_AAR:-${ARTIFACTS_DIR:-$ROOT/artifacts}/webrtc-m150-android-arm64-v8a.aar}"
 [[ -f "$WEBRTC_ANDROID_AAR" ]] || {
   print -u2 "verified Android WebRTC AAR is missing: $WEBRTC_ANDROID_AAR"
   exit 1
@@ -273,6 +306,7 @@ WEBRTC_ANDROID_AAR="$WEBRTC_ANDROID_AAR" \
   "$ROOT/apps/android-tv/gradlew" -p "$ROOT/apps/android-tv" "$GRADLE_TASK"
 restore_local_xml
 APP_EXECUTABLE="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app/Contents/MacOS/WebRTCScreencast"
+APP_BUNDLE="$ROOT/DerivedData/Build/Products/Debug/WebRTCScreencast.app"
 [[ -x "$APP_EXECUTABLE" && -f "$APK" ]] || {
   print -u2 "macOS app or Android TV APK is missing"
   exit 1
@@ -328,6 +362,28 @@ sender_pid=$!
 
 sender_directory=""
 remote_evidence=""
+if [[ -n "$WORKLOAD_FULLSCREEN_TRIGGER_FILE" ]]; then
+  for _ in {1..300}; do
+    sender_directory="$(find "$MACOS_METRICS" -mindepth 1 -maxdepth 1 -type d -name '*-sender' -print -quit)"
+    [[ -n "$sender_directory" && -s "$sender_directory/metrics.jsonl" ]] && break
+    kill -0 "$sender_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  [[ -n "$sender_directory" && -s "$sender_directory/metrics.jsonl" ]] || {
+    print -u2 "macOS Sender did not initialize before Chrome fullscreen gate"
+    exit 1
+  }
+  print 'sender-started' >"$WORKLOAD_FULLSCREEN_TRIGGER_FILE"
+  for _ in {1..300}; do
+    [[ -s "$WORKLOAD_FULLSCREEN_READY_FILE" ]] && break
+    kill -0 "$sender_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  [[ -s "$WORKLOAD_FULLSCREEN_READY_FILE" ]] || {
+    print -u2 "Chrome did not publish fullscreen capture readiness"
+    exit 1
+  }
+fi
 connected=0
 for _ in {1..600}; do
   sender_directory="$(find "$MACOS_METRICS" -mindepth 1 -maxdepth 1 -type d -name '*-sender' -print -quit)"
@@ -501,7 +557,10 @@ jq -n \
   --arg api "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" \
   --arg abi "$(adb shell getprop ro.product.cpu.abi | tr -d '\r')" \
   --arg display "$(adb shell wm size | tr -d '\r')" \
-  '{recorded_at:$recorded_at,git_commit:$git_commit,profile:$profile,source:$source,marker_evidence:($marker_evidence == 1),android:{avd:$avd,api:$api,abi:$abi,display:$display}}' \
+  --arg macos_executable_sha256 "$(shasum -a 256 "$APP_EXECUTABLE" | awk '{print $1}')" \
+  --arg android_apk_sha256 "$(shasum -a 256 "$APK" | awk '{print $1}')" \
+  --arg android_aar_sha256 "$(shasum -a 256 "$WEBRTC_ANDROID_AAR" | awk '{print $1}')" \
+  '{recorded_at:$recorded_at,git_commit:$git_commit,profile:$profile,source:$source,marker_evidence:($marker_evidence == 1),android:{avd:$avd,api:$api,abi:$abi,display:$display},build:{macos_executable_sha256:$macos_executable_sha256,android_apk_sha256:$android_apk_sha256,android_aar_sha256:$android_aar_sha256}}' \
   >"$RUN_ROOT/context.json"
 
 if LC_ALL=C grep -R -a -F -q -- "$pairing_code" "$RUN_ROOT" \

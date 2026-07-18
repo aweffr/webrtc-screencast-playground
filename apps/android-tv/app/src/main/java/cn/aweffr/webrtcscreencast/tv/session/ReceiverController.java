@@ -424,7 +424,12 @@ public final class ReceiverController implements ReceiverSessionController {
 
             @Override
             public void onFailure(String code, String message) {
-              post(callbackGeneration, () -> recover(code));
+              post(callbackGeneration, () -> {
+                metrics.record("receiver_session_failure", Map.of(
+                    "code", code,
+                    "message", message == null ? "" : message));
+                recover(code);
+              });
             }
           });
       metrics.record("peer_connection_created");

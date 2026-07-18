@@ -69,22 +69,30 @@ if (( android_receiver )); then
     remote_video_playing rtc_stats; do
     require_event "$receiver" "$event" "Android receiver"
   done
-  jq -se 'any(.[];
+  media_codec="$(jq -sr '[.[] | select(.event == "rtc_stats")
+    | .fields.outbound_video.codec // empty] | last // empty | ascii_downcase' "$sender")"
+  [[ "$media_codec" == video/h264 || "$media_codec" == video/h265 ]] \
+    || { print -u2 "sender did not publish an H.264/H.265 codec"; exit 1; }
+  jq -se --arg codec "$media_codec" 'any(.[];
     .event == "rtc_stats"
     and (.fields.outbound_video.frames // 0) > 0
-    and ((.fields.outbound_video.codec // "") | ascii_downcase | contains("h265"))
-    and ((.fields.sender_media_boundary.video_toolbox_encoder_id // "")
-      | ascii_downcase | contains("hevc"))
+    and ((.fields.outbound_video.codec // "") | ascii_downcase) == $codec
+    and ((($codec == "video/h264") and
+      ((.fields.sender_media_boundary.video_toolbox_encoder_id // "")
+        | ascii_downcase | contains("avc")))
+      or (($codec == "video/h265") and
+      ((.fields.sender_media_boundary.video_toolbox_encoder_id // "")
+        | ascii_downcase | contains("hevc"))))
     and (.fields.sender_media_boundary.last_key_frame_qp // -1) >= 0)' \
-    "$sender" >/dev/null || { print -u2 "missing sender HEVC encoder/QP evidence"; exit 1; }
-  jq -se 'any(.[];
+    "$sender" >/dev/null || { print -u2 "missing sender hardware encoder/QP evidence"; exit 1; }
+  jq -se --arg codec "$media_codec" 'any(.[];
     .event == "rtc_stats"
     and (.fields.frames_decoded // 0) > 0
-    and ((.fields.codec // "") | ascii_downcase | contains("h265"))
+    and ((.fields.codec // "") | ascii_downcase) == $codec
     and ((.fields.decoder // "") | length > 0)
     and .fields.frame_width == 1920
     and .fields.frame_height == 1080)' "$receiver" >/dev/null \
-    || { print -u2 "missing Android HEVC 1920x1080 decoder evidence"; exit 1; }
+    || { print -u2 "missing Android $media_codec 1920x1080 decoder evidence"; exit 1; }
 
   jq -se 'any(.[]; .event == "selected_path" and .fields.status == "verified")' \
     "$sender" >/dev/null || { print -u2 "missing sender selected-path evidence"; exit 1; }
@@ -132,7 +140,7 @@ if (( android_receiver )); then
       fi
     done
   fi
-  print "diagnostics verified: Android HEVC 1920x1080 media and $PROFILE selected path"
+  print "diagnostics verified: Android $media_codec 1920x1080 media and $PROFILE selected path"
   exit 0
 fi
 

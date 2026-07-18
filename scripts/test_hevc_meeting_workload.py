@@ -20,13 +20,13 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
     def test_default_schedule_matches_meeting_content_contract(self):
         module = load_module()
         schedule = module.default_schedule()
-        self.assertEqual(schedule.initial_static_seconds, 25)
-        self.assertEqual(schedule.scroll_phase_end_seconds, 55)
+        self.assertEqual(schedule.initial_static_seconds, 20)
+        self.assertEqual(schedule.scroll_phase_end_seconds, 68)
         self.assertEqual(schedule.final_static_seconds, 20)
-        self.assertEqual(schedule.total_seconds, 75)
+        self.assertEqual(schedule.total_seconds, 88)
         self.assertEqual(
             [burst.planned_seconds for burst in schedule.bursts],
-            [25, 30, 35, 40, 45, 50],
+            [20, 28, 36, 44, 52, 60],
         )
         self.assertEqual(
             [burst.expected_offset for burst in schedule.bursts],
@@ -37,6 +37,36 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
             self.assertEqual(burst.step_pixels, 60)
             self.assertEqual(burst.step_interval_seconds, 0.05)
         self.assertEqual(module.QUALITY_EVIDENCE_SEQUENCES, (1, 4, 8))
+
+    def test_browser_launch_config_requests_dedicated_chrome_kiosk(self):
+        module = load_module()
+
+        config = module.browser_launch_config()
+
+        self.assertEqual(config["browser"]["browserName"], "chromium")
+        self.assertEqual(config["browser"]["launchOptions"]["channel"], "chrome")
+        self.assertIn("--kiosk", config["browser"]["launchOptions"]["args"])
+        self.assertNotIn(
+            "--start-fullscreen",
+            config["browser"]["launchOptions"]["args"],
+        )
+        self.assertEqual(
+            config["browser"]["contextOptions"]["screen"],
+            {"width": 1920, "height": 1080},
+        )
+
+    def test_finds_the_kiosk_process_for_the_playwright_profile(self):
+        module = load_module()
+        profile = pathlib.Path("/private/tmp/hevc-profile")
+        process_table = """
+  101 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --user-data-dir=/other
+  202 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --kiosk --user-data-dir=/private/tmp/hevc-profile --remote-debugging-pipe
+  203 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper --user-data-dir=/private/tmp/hevc-profile
+"""
+
+        self.assertEqual(module.find_kiosk_process_id(profile, process_table), 202)
+        with self.assertRaises(RuntimeError):
+            module.find_kiosk_process_id(profile, process_table.replace("--kiosk", ""))
 
     def test_offset_mismatch_or_missing_burst_invalidates_evidence(self):
         module = load_module()
@@ -80,6 +110,59 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
             self.assertEqual(row["planned_monotonic_ns"], 100)
             self.assertEqual(row["actual_monotonic_ns"], 105)
             self.assertTrue(row["valid"])
+
+    def test_capture_gate_enters_fullscreen_then_publishes_fixed_geometry(self):
+        module = load_module()
+
+        class Controller:
+            def __init__(self):
+                self.commands = []
+                self.native_fullscreen_calls = 0
+
+            def command(self, *arguments):
+                self.commands.append(arguments)
+
+            def enter_native_fullscreen(self):
+                self.native_fullscreen_calls += 1
+
+            def run_code(self, _program):
+                return {
+                    "width": 1920,
+                    "height": 1080,
+                    "scroll_y": 0,
+                    "marker_sequence": 1,
+                }
+
+        class Writer:
+            def __init__(self):
+                self.rows = []
+
+            def write(self, event, **fields):
+                self.rows.append((event, fields))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = pathlib.Path(temporary)
+            trigger = directory / "enter-fullscreen"
+            ready = directory / "fullscreen-ready"
+            trigger.write_text("sender-started\n")
+            controller = Controller()
+            writer = Writer()
+
+            self.assertTrue(
+                module.enter_capture_mode(
+                    controller,
+                    fullscreen=True,
+                    trigger_file=trigger,
+                    ready_file=ready,
+                    writer=writer,
+                    sleep=lambda _seconds: None,
+                )
+            )
+            self.assertEqual(controller.commands, [])
+            self.assertEqual(controller.native_fullscreen_calls, 1)
+            self.assertEqual(ready.read_text(), "ready\n")
+            self.assertEqual(writer.rows[0][0], "capture_view_ready")
+            self.assertTrue(writer.rows[0][1]["valid"])
 
 
 if __name__ == "__main__":

@@ -4,6 +4,19 @@ import Foundation
 import SwiftUI
 @preconcurrency import WebRTC
 
+private func h264ProfileLevelIDs(in sdp: String) -> [String] {
+    var result: [String] = []
+    for line in sdp.split(whereSeparator: { $0.isNewline }) {
+        let normalized = line.lowercased()
+        guard let range = normalized.range(of: "profile-level-id=") else { continue }
+        let value = normalized[range.upperBound...].prefix(6)
+        guard value.count == 6, value.allSatisfy(\.isHexDigit) else { continue }
+        let profile = String(value)
+        if !result.contains(profile) { result.append(profile) }
+    }
+    return result
+}
+
 struct SessionMetricsSummary: Equatable, Sendable {
     var bitrateBps: Double?
     var framesPerSecond: Double?
@@ -347,7 +360,12 @@ final class SessionCoordinator: NSObject, ObservableObject {
                     guard let peer else { continue }
                     let offer = try await peer.createOffer()
                     try await signaling?.send(.sdpOffer(offer))
-                    try await recorder?.record(event: "local_offer", fields: ["sdp": .string(offer)])
+                    try await recorder?.record(event: "local_offer", fields: [
+                        "sdp": .string(offer),
+                        "offers_h264": .bool(offer.localizedCaseInsensitiveContains("H264/90000")),
+                        "offers_h265": .bool(offer.localizedCaseInsensitiveContains("H265/90000")),
+                        "h264_profile_level_ids": .array(h264ProfileLevelIDs(in: offer).map(JSONValue.string)),
+                    ])
 
                 case .setRemoteOffer(let sdp):
                     try await peer?.setRemoteDescription(type: .offer, sdp: sdp)

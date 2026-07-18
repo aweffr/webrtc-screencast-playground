@@ -43,6 +43,16 @@ public final class AndroidMarkerProbeTest {
   }
 
   @Test
+  public void decodesTheFirstValidCandidateRoi() {
+    byte[] luma = markerLuma(8, 8);
+
+    AndroidMarkerProbe.Marker marker = AndroidMarkerProbe.decodeLumaAtCandidateRois(
+        luma, 96, 96, 96, new int[][] {{0, 0, 12}, {0, 0, 96}});
+
+    assertEquals(8, marker.sequence());
+  }
+
+  @Test
   public void rejectsOneBitPayloadCorruption() {
     byte[] luma = markerLuma(42, 8);
     int cellX = 8;

@@ -2,6 +2,7 @@ package cn.aweffr.webrtcscreencast.tv.session;
 
 import cn.aweffr.webrtcscreencast.tv.config.ReferenceRuntimeConfig;
 import cn.aweffr.webrtcscreencast.tv.config.ReferenceRuntimeConfig.IceProfile;
+import cn.aweffr.webrtcscreencast.tv.config.ReferenceRuntimeConfig.VideoCodec;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -21,7 +22,7 @@ import org.webrtc.SessionDescription;
 import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
-/** One receiver-first cast session with a single recv-only HEVC video transceiver. */
+/** One receiver-first cast session with a single recv-only selected-codec video transceiver. */
 public final class WebRtcReceiverSession implements AutoCloseable {
   public interface Listener {
     void onLocalAnswer(String sdp);
@@ -43,6 +44,7 @@ public final class WebRtcReceiverSession implements AutoCloseable {
   private final Listener listener;
   private final VideoSink renderer;
   private final VideoSink evidenceSink;
+  private final VideoCodec selectedCodec;
   private final PeerConnection peerConnection;
   private final AtomicBoolean closed = new AtomicBoolean();
   private VideoTrack remoteVideoTrack;
@@ -57,6 +59,7 @@ public final class WebRtcReceiverSession implements AutoCloseable {
     this.listener = Objects.requireNonNull(listener, "listener");
     this.renderer = Objects.requireNonNull(renderer, "renderer");
     this.evidenceSink = evidenceSink;
+    this.selectedCodec = config.videoCodec();
     PeerConnection.RTCConfiguration rtcConfig = createRtcConfiguration(config);
     peerConnection = runtime.peerConnectionFactory().createPeerConnection(
         rtcConfig, new PeerObserver());
@@ -74,7 +77,8 @@ public final class WebRtcReceiverSession implements AutoCloseable {
     transceiver.setCodecPreferences(SelectedVideoCodecPolicy.requireReceiverCodecs(
         runtime.peerConnectionFactory()
             .getRtpReceiverCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
-            .codecs)).throwError();
+            .codecs,
+        selectedCodec)).throwError();
   }
 
   private PeerConnection.RTCConfiguration createRtcConfiguration(
@@ -114,12 +118,13 @@ public final class WebRtcReceiverSession implements AutoCloseable {
             listener.onNegotiationStage("create_answer_succeeded");
             final String normalizedSdp;
             try {
-              normalizedSdp = SelectedVideoAnswerPolicy.requireSelectedCodec(answer.description);
+              normalizedSdp = SelectedVideoAnswerPolicy.requireSelectedCodec(
+                  answer.description, selectedCodec);
             } catch (IllegalArgumentException error) {
-              listener.onFailure("answer_h265_missing", error.getMessage());
+              listener.onFailure("answer_selected_codec_missing", error.getMessage());
               return;
             }
-            listener.onNegotiationStage("answer_h265_selected");
+            listener.onNegotiationStage("answer_" + selectedCodec.wireValue() + "_selected");
             SessionDescription normalizedAnswer = new SessionDescription(
                 SessionDescription.Type.ANSWER, normalizedSdp);
             peerConnection.setLocalDescription(new ChainedSdpObserver("set_local_answer") {

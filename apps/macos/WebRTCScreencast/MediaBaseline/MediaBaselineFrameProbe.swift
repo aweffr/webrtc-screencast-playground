@@ -38,7 +38,10 @@ final class MediaBaselineFrameProbe: @unchecked Sendable {
         saveFirstFrameIfNeeded(pixelBuffer)
         let marker: MediaBaselineMarker
         do {
-            marker = try MediaBaselinePixelProbe.detect(pixelBuffer: pixelBuffer, roi: MediaBaselineLayout.markerROI)
+            marker = try MediaBaselinePixelProbe.detect(
+                pixelBuffer: pixelBuffer,
+                candidateROIs: MediaBaselineLayout.markerCandidateROIs
+            )
         } catch MediaBaselineMarkerError.checksumMismatch {
             recordInvalid(callbackNs: callbackNs)
             return
@@ -65,7 +68,10 @@ final class MediaBaselineFrameProbe: @unchecked Sendable {
         saveFirstI420FrameIfNeeded(i420)
         let marker: MediaBaselineMarker
         do {
-            marker = try MediaBaselinePixelProbe.detect(i420: i420, roi: MediaBaselineLayout.markerROI)
+            marker = try MediaBaselinePixelProbe.detect(
+                i420: i420,
+                candidateROIs: MediaBaselineLayout.markerCandidateROIs
+            )
         } catch MediaBaselineMarkerError.checksumMismatch {
             recordInvalid(callbackNs: callbackNs)
             return

@@ -10,6 +10,18 @@ enum MediaBaselinePixelProbeError: Error, Equatable {
 }
 
 enum MediaBaselinePixelProbe {
+    static func detect(
+        pixelBuffer: CVPixelBuffer,
+        candidateROIs: [CGRect]
+    ) throws -> MediaBaselineMarker {
+        var lastError: (any Error)?
+        for roi in candidateROIs {
+            do { return try detect(pixelBuffer: pixelBuffer, roi: roi) }
+            catch { lastError = error }
+        }
+        throw lastError ?? MediaBaselinePixelProbeError.invalidROI
+    }
+
     static func detect(pixelBuffer: CVPixelBuffer, roi: CGRect) throws -> MediaBaselineMarker {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
@@ -48,6 +60,18 @@ enum MediaBaselinePixelProbe {
             bytesPerRow: Int(i420.strideY),
             roi: roi
         )
+    }
+
+    static func detect(
+        i420: any RTCI420BufferProtocol,
+        candidateROIs: [CGRect]
+    ) throws -> MediaBaselineMarker {
+        var lastError: (any Error)?
+        for roi in candidateROIs {
+            do { return try detect(i420: i420, roi: roi) }
+            catch { lastError = error }
+        }
+        throw lastError ?? MediaBaselinePixelProbeError.invalidROI
     }
 
     private static func detect(
