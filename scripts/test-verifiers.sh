@@ -295,6 +295,16 @@ case "$*" in
     touch "$state/connect-requested"
     [[ "${FAKE_ANDROID_NETWORK_NEVER_CONNECT:-0}" == 1 ]] || touch "$state/route-ready"
     ;;
+  'shell toybox nc -w 1 10.0.2.2 43210')
+    read -r _request || true
+    attempts=0
+    [[ ! -f "$state/http-attempts" ]] || attempts="$(<"$state/http-attempts")"
+    (( attempts += 1 ))
+    print -r -- "$attempts" >"$state/http-attempts"
+    if [[ "${FAKE_ANDROID_HTTP_NEVER_READY:-0}" != 1 && "$attempts" -ge 2 ]]; then
+      print -r -- $'HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok'
+    fi
+    ;;
   *)
     print -u2 "unexpected fake adb call: $*"
     exit 2
@@ -322,6 +332,25 @@ ANDROID_TV_NETWORK_WAIT_ATTEMPTS=2 \
   print -u2 "Android TV network recovery changed an already ready route"
   exit 1
 }
+
+FAKE_ANDROID_NETWORK_STATE="$network_state" \
+ADB="$fake_tools/adb" \
+ANDROID_TV_NETWORK_WAIT_ATTEMPTS=3 \
+  "$ROOT/scripts/ensure-android-tv-network.sh" --host-http-port 43210 >/dev/null
+[[ "$(<"$network_state/http-attempts")" == 2 ]] || {
+  print -u2 "Android TV network readiness did not wait for host HTTP"
+  exit 1
+}
+
+rm -f "$network_state/http-attempts"
+if FAKE_ANDROID_NETWORK_STATE="$network_state" \
+  FAKE_ANDROID_HTTP_NEVER_READY=1 \
+  ADB="$fake_tools/adb" \
+  ANDROID_TV_NETWORK_WAIT_ATTEMPTS=2 \
+    "$ROOT/scripts/ensure-android-tv-network.sh" --host-http-port 43210 >/dev/null 2>&1; then
+  print -u2 "Android TV network readiness accepted an unreachable host HTTP endpoint"
+  exit 1
+fi
 
 rm -f "$network_state/route-ready"
 if FAKE_ANDROID_NETWORK_STATE="$network_state" \

@@ -342,6 +342,7 @@ for _ in {1..100}; do
   sleep 0.1
 done
 curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null
+"$ROOT/scripts/ensure-android-tv-network.sh" --host-http-port "$PORT" >/dev/null
 
 adb install -r "$APK" >/dev/null
 adb shell pm clear "$PACKAGE" >/dev/null
