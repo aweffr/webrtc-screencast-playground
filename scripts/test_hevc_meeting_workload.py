@@ -80,14 +80,24 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
         self.assertFalse(module.validate_burst_evidence(mismatch))
         self.assertFalse(module.validate_burst_evidence(valid[:-1]))
 
-    def test_scroll_program_uses_real_wheel_steps_and_updates_marker_once(self):
+    def test_scroll_program_commits_marker_on_first_real_scroll_event(self):
         module = load_module()
         program = module.scroll_program(sequence=4)
         self.assertEqual(program.count("page.mouse.wheel(0, 60)"), 1)
         self.assertIn("for (let step = 0; step < 12; step += 1)", program)
         self.assertIn("page.waitForTimeout(50)", program)
+        self.assertIn('window.addEventListener("scroll"', program)
+        self.assertIn("{ once: true }", program)
         self.assertIn("window.__experimentMarker.setSequence(4)", program)
-        self.assertIn("window.scrollY", program)
+        self.assertIn("marker.style.top = `${window.scrollY + 64}px`", program)
+        self.assertLess(
+            program.index('window.addEventListener("scroll"'),
+            program.index("page.mouse.wheel(0, 60)"),
+        )
+        self.assertLess(
+            program.index("page.mouse.wheel(0, 60)"),
+            program.index("await markerCommit"),
+        )
         with self.assertRaises(TypeError):
             module.scroll_program(sequence=4, interval_ms=1)
 

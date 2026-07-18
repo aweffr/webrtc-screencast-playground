@@ -123,16 +123,21 @@ def validate_burst_evidence(rows: list[dict]) -> bool:
 
 def scroll_program(sequence: int) -> str:
     return f"""async page => {{
-  const markerEpochMs = await page.evaluate(() => {{
-    window.__experimentMarker.setSequence({sequence});
-    return performance.timeOrigin + performance.now();
-  }});
+  const markerCommit = page.evaluate(() => new Promise((resolve) => {{
+    window.addEventListener("scroll", () => {{
+      const marker = document.getElementById("experiment-marker");
+      marker.style.top = `${{window.scrollY + 64}}px`;
+      window.__experimentMarker.setSequence({sequence});
+      resolve(performance.timeOrigin + performance.now());
+    }}, {{ once: true }});
+  }}));
   const offsets = [];
   for (let step = 0; step < 12; step += 1) {{
     await page.mouse.wheel(0, 60);
     await page.waitForTimeout(50);
     offsets.push(await page.evaluate(() => window.scrollY));
   }}
+  const markerEpochMs = await markerCommit;
   return {{ marker_epoch_ms: markerEpochMs, offsets, actual_offset: offsets[offsets.length - 1] }};
 }}"""
 
