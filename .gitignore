@@ -24,6 +24,7 @@ apps/android-tv/**/build/
 __pycache__/
 .playwright-cli/
 server/signaling-server
+.worktrees/
 
 # Local runtime configuration and collected diagnostics.
 runtime.json
