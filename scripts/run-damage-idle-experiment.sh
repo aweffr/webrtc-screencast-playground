@@ -113,6 +113,7 @@ for case_id in "${schedule[@]}"; do
   valid=0
   for attempt in 1 2; do
     attempt_root="$run_root/attempt-$attempt"
+    [[ ! -e "$attempt_root" ]] || continue
     mkdir -p "$attempt_root/workload"
     runtime_case="$attempt_root/runtime.json"
     tuning_case="$run_root/cast-tuning.json"
