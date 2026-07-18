@@ -37,10 +37,10 @@ git commit -m "docs: design HEVC meeting experiment"
 ### Task 2: Add VideoToolbox QP/drop telemetry in the builder
 
 **Files:**
-- Modify: `/Users/aweffr/developer/aweffr/my-webrtc-builds/tests/test_cast_tuning_overlay.py`
-- Modify: `/Users/aweffr/developer/aweffr/my-webrtc-builds/patches/m150/macos_hevc_cast_tuning.patch`
-- Modify: `/Users/aweffr/developer/aweffr/my-webrtc-builds/patches/m150/cast_tuning_hooks.patch`
-- Modify: `/Users/aweffr/developer/aweffr/my-webrtc-builds/tools/macos-videotoolbox-probe.mm`
+- Modify: `<my-webrtc-builds>/tests/test_cast_tuning_overlay.py`
+- Modify: `<my-webrtc-builds>/patches/m150/macos_hevc_cast_tuning.patch`
+- Modify: `<my-webrtc-builds>/patches/m150/cast_tuning_hooks.patch`
+- Modify: `<my-webrtc-builds>/tools/macos-videotoolbox-probe.mm`
 
 - [ ] **Step 1: Write failing overlay contract tests**
 
