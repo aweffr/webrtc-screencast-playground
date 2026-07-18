@@ -15,6 +15,23 @@ public final class AndroidMarkerProbeTest {
   }
 
   @Test
+  public void tracksFrameGapsOnlyInScrollActiveWindows() {
+    AndroidMarkerProbe.ActiveWindowGapTracker tracker =
+        new AndroidMarkerProbe.ActiveWindowGapTracker();
+    tracker.observe(2, 1_000_000_000L);
+    tracker.observe(2, 1_070_000_000L);
+    tracker.observe(2, 1_570_000_000L);
+    tracker.observe(2, 2_100_000_000L); // Outside the one-second ACTIVE window.
+    tracker.observe(3, 6_000_000_000L);
+    tracker.observe(3, 6_080_000_000L);
+
+    AndroidMarkerProbe.ActiveWindowGapTracker.Snapshot snapshot = tracker.snapshot();
+    assertEquals(2, snapshot.windowCount());
+    assertEquals(5, snapshot.frameCount());
+    assertEquals(500_000_000L, snapshot.maxFrameGapNs());
+  }
+
+  @Test
   public void decodesMacCompatibleVersionSequenceAndCrc() {
     byte[] luma = markerLuma(0x1020_3040, 8);
 
