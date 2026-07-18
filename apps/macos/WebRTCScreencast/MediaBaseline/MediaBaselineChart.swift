@@ -8,7 +8,7 @@ enum MediaBaselineLayout {
     static let markerROI = CGRect(x: 64, y: 64, width: 192, height: 192)
     static let mainScreenExperimentMarkerROI = CGRect(x: 195, y: 103, width: 217, height: 217)
     static let markerCandidateROIs = [markerROI, mainScreenExperimentMarkerROI]
-    static let qualitySampleSequences: Set<UInt32> = [1, 4, 8, 30, 80, 130]
+    static let qualitySampleSequences: Set<UInt32> = Set(1...8).union([30, 80, 130])
 }
 
 struct MediaBaselineChartImage: Sendable {

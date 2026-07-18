@@ -5,7 +5,8 @@ import XCTest
 
 final class MediaBaselineMarkerTests: XCTestCase {
     func testQualityEvidenceIncludesMeetingDocumentPhases() {
-        XCTAssertTrue(MediaBaselineLayout.qualitySampleSequences.isSuperset(of: [1, 4, 8]))
+        XCTAssertTrue(MediaBaselineLayout.qualitySampleSequences.isSuperset(of: Set(1...8)))
+        XCTAssertTrue(MediaBaselineLayout.qualitySampleSequences.isSuperset(of: [30, 80, 130]))
     }
 
     func testBinaryGridRoundTripsSequenceFromLumaPlane() throws {

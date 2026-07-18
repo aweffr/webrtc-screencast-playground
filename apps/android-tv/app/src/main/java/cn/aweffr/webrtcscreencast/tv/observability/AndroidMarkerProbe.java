@@ -16,12 +16,13 @@ import java.util.concurrent.TimeUnit;
 import org.webrtc.VideoFrame;
 import org.webrtc.VideoSink;
 
-/** Decodes baseline markers at render callback entry and retains three decoded PNGs. */
+/** Decodes baseline markers at render callback entry and retains selected decoded PNGs. */
 public final class AndroidMarkerProbe implements VideoSink, AutoCloseable {
   private static final int GRID_SIZE = 12;
   private static final int VERSION = 1;
   private static final int[][] MARKER_ROIS = {{64, 64, 192}, {195, 103, 217}};
-  private static final Set<Integer> PNG_SEQUENCES = Set.of(1, 4, 8, 30, 80, 130);
+  private static final Set<Integer> PNG_SEQUENCES =
+      Set.of(1, 2, 3, 4, 5, 6, 7, 8, 30, 80, 130);
 
   public record Marker(int version, int sequence) {}
 

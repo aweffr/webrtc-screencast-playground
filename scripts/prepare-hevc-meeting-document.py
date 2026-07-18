@@ -124,6 +124,7 @@ def build_document(rendered: str) -> str:
 </head>
 <body>
   <div id="experiment-marker" aria-hidden="true"></div>
+  <input id="experiment-input" type="text" aria-label="固定文字输入样本" autocomplete="off">
   <main id="document-content">
     <h1>Kubernetes Deployment</h1>
     <p class="source-note">固定实验内容：Kubernetes 中文文档 Deployment，来源版本和许可信息见 source.json。正式实验仅从 localhost 加载。</p>

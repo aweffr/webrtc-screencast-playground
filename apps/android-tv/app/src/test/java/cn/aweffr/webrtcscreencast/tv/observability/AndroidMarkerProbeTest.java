@@ -9,9 +9,12 @@ import org.junit.Test;
 public final class AndroidMarkerProbeTest {
   @Test
   public void retainsMeetingDocumentPhaseImages() {
-    assertTrue(AndroidMarkerProbe.retainsPngForSequence(1));
-    assertTrue(AndroidMarkerProbe.retainsPngForSequence(4));
-    assertTrue(AndroidMarkerProbe.retainsPngForSequence(8));
+    for (int sequence = 1; sequence <= 8; sequence++) {
+      assertTrue(AndroidMarkerProbe.retainsPngForSequence(sequence));
+    }
+    assertTrue(AndroidMarkerProbe.retainsPngForSequence(30));
+    assertTrue(AndroidMarkerProbe.retainsPngForSequence(80));
+    assertTrue(AndroidMarkerProbe.retainsPngForSequence(130));
   }
 
   @Test
