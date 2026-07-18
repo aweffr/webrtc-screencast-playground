@@ -6,7 +6,7 @@
 
 本轮不能宣称 D1 已通过完整产品门禁，也不运行 H.265 smoke test。两个有效 D1 run 的六个业务动作都在 16.2～79.0 ms 内恢复 ACTIVE，QP 绑定正确、VideoToolbox drop 为 0，静态画质与 D0 基本持平；但 Chrome 的 scrollbar/compositor 尾部更新和截图动作也会产生真实 dirty rect，使每轮实际发生 14 次 ACTIVE、14 次 STATIC clarity refresh，而不是预设的 6/7。过滤这些更新会违反“任意可见 damage 立即 ACTIVE”的业务契约，因此没有为了通过实验修改 detector。
 
-代码可以合入，依据是已验证的 detector 行为契约和运行时快速恢复证据；本轮结果不授权扩大 codec/QP 实验，也不作为“端到端性能已经优于 D0”的发布结论。
+当前实现不能按原计划直接合入 `main`。现有证据足以支持 detector 行为契约和运行时快速恢复，但不足以完成正式 E2E 验收：D1 缺少第三个有效 run、exact-count gate 与真实 dirty-rect 语义冲突、render-gap 未被有效测量，而且合入最新主线 color-range/Rec.709 capture metadata 后的组合二进制尚未重跑 D0/D1。除非负责人明确批准这些 gate waiver，否则 feature branch 保持未合入；本轮也不授权扩大 codec/QP 实验或宣称“端到端性能已经优于 D0”。
 
 ## 固定实验
 
@@ -89,9 +89,9 @@ SSIM/PSNR 的绝对值偏低，是因为 sender 原图与 1920×1080 Android 图
 
 提交的六张 PNG 经过重新编码、metadata 检查并以 original detail 再次检查；macOS 只保留了通用 `com.apple.provenance` 标记，不含用户数据。画面内容仅为固定开源文档、测试 marker 和模拟输入，没有用户名、本机路径、邮箱、凭据、设备标识、pairing code、私有网络地址或无关桌面内容。
 
-## 决策
+## 当前决策
 
-- 合入轻量 `DamageIdleDetector`，替换会卡在 settling 的旧 luma detector。
-- 保持两态、600 ms quiet duration、STATIC 1 fps、ACTIVE 15 fps 和现有 24/32 H.264 MaxQP；不增加线程、过渡 fps 或 damage 过滤规则。
+- 实现保留在 feature branch，未获得 gate waiver 前不合入 `main`。
+- 若批准 waiver，合入的技术范围仍保持两态、600 ms quiet duration、STATIC 1 fps、ACTIVE 15 fps 和现有 24/32 H.264 MaxQP；不增加线程、过渡 fps 或 damage 过滤规则。
 - 不运行 H.265 smoke test，不扩展 codec、QP 或 VideoToolbox feature matrix。
-- 后续若要做产品级性能结论，只修正 render callback gap 测量与非侵入式截图方式，再重复同一 D0/D1 小矩阵；不要修改 detector 来适配实验计数。
+- 若不批准 waiver，应先修正 per-render callback gap 测量与非侵入式截图方式，再用当前 HEAD 补足三次有效 D1 并重新执行同一 D0/D1 aggregate gate；不要修改 detector 来适配实验计数。

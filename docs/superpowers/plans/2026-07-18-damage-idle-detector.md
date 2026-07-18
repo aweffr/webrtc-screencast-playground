@@ -287,3 +287,4 @@ git log --oneline main..HEAD
 - The sole 1000 ms fallback was not used because observed tail damage could occur about 1.4 seconds after the initiating scroll, outside its allowed condition.
 - The Android gap tracker observes marker-decodable frames rather than every render callback, so its 21–22 second values cannot support the 500 ms render-gap gate. The report treats that gate as unmeasured instead of weakening it.
 - H1 was not authorized. Sanitized conclusions and key screenshots are published in `docs/experiments/2026-07-18-damage-idle-detector.md`.
+- The feature branch is not eligible for merge under the original gates: D1 has only two valid runs, the exact-count assumption failed, render gap is unmeasured, and the post-experiment mainline color-range merge has not been exercised by the D0/D1 workload. Merging requires an explicit gate waiver or a new current-HEAD formal run after measurement repair.
