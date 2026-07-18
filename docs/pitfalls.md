@@ -217,11 +217,24 @@ static-aware MaxQP 扩展到虚拟屏和 media baseline 后，单元测试只保
 
 以发送端真实帧为准确定分辨率、有效内容区域、延迟标记区域和质量裁剪区。至少抽查发送端采集截图与 Android 最终画面，确认两侧看到的是同一段正文、同一滚动位置和可比较的有效区域。
 
+主屏全屏实验还必须区分三种尺寸：Chrome 的页面 viewport 用于固定文档排版和滚动坐标；macOS 主屏使用 point 表示原生窗口几何，Retina 系统截图通常是其整数倍像素；ScreenCaptureKit 和编码器可以再把主屏缩放为 `1920×1080`。后两者都不能反向证明 Chrome 已经原生全屏。
+
+本项目的 Chrome 全屏准入流程如下：
+
+1. 使用独立 profile 启动实验专用 Chrome，并按 `--user-data-dir` 和 `--kiosk` 同时定位它的根进程，不能激活用户已有的其他 Chrome 窗口；
+2. sender 已启动、但媒体测量尚未开始时，精确激活该进程，至少等待一秒让 macOS 完成前台切换，再通过原生 `CGEvent` 发送 `Control+Command+F`；
+3. 从 `CGMainDisplayID` 读取真实主屏 bounds，从 `NSScreen.safeAreaInsets.top` 读取刘海屏顶部安全区，再从 `CGWindowListCopyWindowInfo` 读取该 Chrome 进程最大的 layer-0 窗口；只有窗口横向覆盖主屏、纵向覆盖顶部安全区以下至屏幕底部，才能发布 fullscreen-ready；
+4. 页面 `innerWidth/innerHeight`、固定 zoom、初始滚动位置和 marker 几何仍需检查，但只作为页面契约，不能替代原生窗口准入；
+5. fullscreen-ready 前存在自动化授权、权限、升级或其他系统弹窗时，本轮直接停止。清理弹窗后重新做短冒烟，不得把弹窗遮挡的画面纳入实验。
+
+带刘海的 MacBook 原生全屏截图顶部可能保留与 `safeAreaInsets.top` 对应的黑色安全区。该黑条本身不是失败；地址栏、标签栏、菜单栏、Dock、桌面或其他应用窗口进入截图才是失败。实现或机器环境变化后，先保存并亲自查看系统级 `initial-static` 截图，再查看 sender 的真实采集帧；两张图都只包含固定文档和允许的顶部安全区后，才能开始正式 case。
+
 ### 完成标准
 
 - fixture、HTML、浏览器、发送端程序和接收端程序的版本或 hash 已记录。
 - 页面初始位置、每次滚动距离、间隔和总次数固定。
 - 发送端原始帧证明没有地址栏、权限弹窗、锁屏、意外桌面或黑边污染目标区域。
+- fullscreen-ready 同时包含真实主屏、顶部安全区和 Chrome 原生窗口 bounds；普通窗口即使页面 viewport 为 `1920×1080` 也会被拒绝。
 - 延迟标记区域和质量裁剪区来自真实捕获几何，而不是只来自自动化 viewport。
 
 ### 项目证据

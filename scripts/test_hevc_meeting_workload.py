@@ -68,6 +68,33 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             module.find_kiosk_process_id(profile, process_table.replace("--kiosk", ""))
 
+    def test_native_fullscreen_requires_the_chrome_window_to_cover_the_real_display(self):
+        module = load_module()
+        display = {
+            "x": 0,
+            "y": 0,
+            "width": 1496,
+            "height": 967,
+            "safe_top": 28,
+        }
+
+        self.assertTrue(
+            module.window_covers_display(
+                {
+                    "display": display,
+                    "window": {"x": 0, "y": 29, "width": 1496, "height": 938},
+                }
+            )
+        )
+        self.assertFalse(
+            module.window_covers_display(
+                {
+                    "display": display,
+                    "window": {"x": 22, "y": 51, "width": 1200, "height": 808},
+                }
+            )
+        )
+
     def test_offset_mismatch_or_missing_burst_invalidates_evidence(self):
         module = load_module()
         valid = [
@@ -148,6 +175,18 @@ class HEVCMeetingWorkloadTests(unittest.TestCase):
 
             def enter_native_fullscreen(self):
                 self.native_fullscreen_calls += 1
+
+            def native_window_state(self):
+                return {
+                    "display": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 1496,
+                        "height": 967,
+                        "safe_top": 28,
+                    },
+                    "window": {"x": 0, "y": 29, "width": 1496, "height": 938},
+                }
 
             def run_code(self, _program):
                 return {

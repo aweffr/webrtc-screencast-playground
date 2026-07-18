@@ -43,7 +43,7 @@ def find_kiosk_process_id(profile: pathlib.Path, process_table: str) -> int:
     raise RuntimeError("Chrome kiosk process was not found")
 
 
-def activate_chrome_fullscreen(profile: pathlib.Path) -> None:
+def wait_for_kiosk_process_id(profile: pathlib.Path) -> int:
     deadline = time.monotonic() + 5
     while True:
         process_table = subprocess.run(
@@ -54,17 +54,78 @@ def activate_chrome_fullscreen(profile: pathlib.Path) -> None:
         ).stdout
         try:
             process_id = find_kiosk_process_id(profile, process_table)
-            break
+            return process_id
         except RuntimeError:
             if time.monotonic() >= deadline:
                 raise
             time.sleep(0.1)
+
+
+def window_covers_display(state: dict) -> bool:
+    display = state["display"]
+    window = state["window"]
+    tolerance = 1
+    return (
+        window["x"] <= display["x"] + tolerance
+        and window["y"] <= display["y"] + display["safe_top"] + tolerance
+        and window["x"] + window["width"]
+        >= display["x"] + display["width"] - tolerance
+        and window["y"] + window["height"]
+        >= display["y"] + display["height"] - tolerance
+    )
+
+
+def chrome_window_state(profile: pathlib.Path) -> dict:
+    process_id = wait_for_kiosk_process_id(profile)
+    program = f"""
+import CoreGraphics
+import AppKit
+import Foundation
+let displayID = CGMainDisplayID()
+let display = CGDisplayBounds(displayID)
+let screen = NSScreen.screens.first {{ screen in
+    (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
+}}
+let safeTop = screen?.safeAreaInsets.top ?? 0
+let rows = CGWindowListCopyWindowInfo(
+    [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+) as! [[String: Any]]
+let windows = rows.compactMap {{ row -> CGRect? in
+    guard (row[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == {process_id},
+          (row[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+          let bounds = row[kCGWindowBounds as String] as? NSDictionary
+    else {{ return nil }}
+    return CGRect(dictionaryRepresentation: bounds)
+}}
+guard let window = windows.max(by: {{ $0.width * $0.height < $1.width * $1.height }})
+else {{ exit(4) }}
+func fields(_ rect: CGRect) -> [String: Double] {{
+    ["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height]
+}}
+var displayFields = fields(display)
+displayFields["safe_top"] = safeTop
+let data = try! JSONSerialization.data(
+    withJSONObject: ["display": displayFields, "window": fields(window)]
+)
+print(String(data: data, encoding: .utf8)!)
+"""
+    result = subprocess.run(
+        ["/usr/bin/swift", "-e", program],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return json.loads(result.stdout)
+
+
+def activate_chrome_fullscreen(profile: pathlib.Path) -> None:
+    process_id = wait_for_kiosk_process_id(profile)
     program = (
         "import AppKit; import CoreGraphics; import Foundation; "
         f"guard let app = NSRunningApplication(processIdentifier: {process_id}) "
         "else { exit(2) }; app.unhide(); "
         "guard app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps]) "
-        "else { exit(3) }; usleep(250000); "
+        "else { exit(3) }; usleep(1000000); "
         "let source = CGEventSource(stateID: .hidSystemState); "
         "let flags: CGEventFlags = [.maskControl, .maskCommand]; "
         "let down = CGEvent(keyboardEventSource: source, virtualKey: 3, keyDown: true); "
@@ -198,6 +259,11 @@ class PlaywrightController:
             raise RuntimeError("Chrome profile is not open")
         activate_chrome_fullscreen(self.profile)
 
+    def native_window_state(self) -> dict:
+        if self.profile is None:
+            raise RuntimeError("Chrome profile is not open")
+        return chrome_window_state(self.profile)
+
     def run_code(self, program: str) -> dict:
         return json.loads(self.command("run-code", program, raw=True))
 
@@ -243,6 +309,7 @@ def enter_capture_mode(
         wait_for_file(trigger_file)
     controller.enter_native_fullscreen()
     sleep(2)
+    native_state = controller.native_window_state()
     state = controller.run_code(
         "async page => await page.evaluate(() => ({width: innerWidth, height: innerHeight, scroll_y: scrollY, marker_sequence: Number(document.getElementById('experiment-marker').dataset.sequence)}))"
     )
@@ -251,11 +318,13 @@ def enter_capture_mode(
         and state["height"] == 1080
         and state["scroll_y"] == 0
         and state["marker_sequence"] == 1
+        and window_covers_display(native_state)
     )
     writer.write(
         "capture_view_ready",
         monotonic_ns=time.monotonic_ns(),
         state=state,
+        native_state=native_state,
         valid=valid,
     )
     if valid and ready_file is not None:
