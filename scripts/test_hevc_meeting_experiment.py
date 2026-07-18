@@ -26,6 +26,29 @@ class PolicyMatrixTests(unittest.TestCase):
         )
         self.assertTrue(all(case.repetitions == 3 for case in cases))
 
+    def test_supplemental_matrix_adds_only_h265_static_27_active_36(self):
+        cases = experiment.supplemental_cases()
+
+        self.assertEqual(
+            [(case.case_id, case.codec_policy, case.static_max_qp,
+              case.active_max_qp, case.repetitions) for case in cases],
+            [("B2", "h265-only", 27, 36, 3)],
+        )
+
+        runtime = {"video_codec_policy": "default", "static_max_qp": 24}
+        tuning = {"encoder": {"max_qp": 32}}
+        generated_runtime, generated_tuning = experiment.generate_configs(
+            runtime, tuning, cases[0]
+        )
+        self.assertEqual(generated_runtime["video_codec_policy"], "h265-only")
+        self.assertEqual(generated_runtime["static_max_qp"], 27)
+        self.assertEqual(generated_tuning["encoder"]["max_qp"], 36)
+
+    def test_case_lookup_includes_supplemental_case(self):
+        case = experiment.case_by_id("B2")
+
+        self.assertEqual(case, experiment.supplemental_cases()[0])
+
     def test_feature_cases_change_one_experiment_dimension(self):
         winner = experiment.base_cases()[3]
         cases = experiment.feature_cases(winner)
@@ -54,6 +77,16 @@ class PolicyMatrixTests(unittest.TestCase):
             "B0": {"eligible": True},
             "B1": {"eligible": False},
         }))
+
+    def test_supplemental_schedule_runs_only_b2_three_times(self):
+        self.assertEqual(
+            experiment.schedule_for_stage("supplemental"),
+            ["B2", "B2", "B2"],
+        )
+        self.assertFalse(
+            {"A0", "A1", "B0", "B1"}
+            & set(experiment.schedule_for_stage("supplemental"))
+        )
 
     def test_attempt_budget_limits_each_case_global_retries_and_total(self):
         budget = experiment.AttemptBudget()

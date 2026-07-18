@@ -31,6 +31,10 @@ def base_cases() -> tuple[PolicyCase, ...]:
     )
 
 
+def supplemental_cases() -> tuple[PolicyCase, ...]:
+    return (PolicyCase("B2", "h265-only", 27, 36, 3),)
+
+
 def feature_cases(winner: PolicyCase) -> tuple[PolicyCase, ...]:
     common = {
         "codec_policy": "h265-only",
@@ -53,7 +57,7 @@ def feature_cases(winner: PolicyCase) -> tuple[PolicyCase, ...]:
 
 
 def stage_order(cases: tuple[PolicyCase, ...]) -> list[str]:
-    groups = (("A0", "A1"), ("B0", "B1"), ("C0", "C1", "C2"))
+    groups = (("A0", "A1"), ("B0", "B1"), ("B2",), ("C0", "C1", "C2"))
     by_id = {case.case_id: case for case in cases}
     result = []
     for group in groups:
@@ -63,6 +67,18 @@ def stage_order(cases: tuple[PolicyCase, ...]) -> list[str]:
         for repetition in range(max(case.repetitions for case in present)):
             result.extend(case.case_id for case in present if repetition < case.repetitions)
     return result
+
+
+def schedule_for_stage(stage: str, winner_id: str | None = None) -> list[str]:
+    if stage == "smoke":
+        return ["A0", "A1"]
+    if stage == "base":
+        return stage_order(base_cases())
+    if stage == "supplemental":
+        return stage_order(supplemental_cases())
+    if stage == "features" and winner_id:
+        return stage_order(feature_cases(case_by_id(winner_id)))
+    raise ValueError(f"unsupported experiment stage: {stage}")
 
 
 def should_run_features(results: dict[str, dict]) -> bool:
@@ -733,7 +749,7 @@ def render_markdown(report: dict) -> str:
 
 
 def case_by_id(case_id: str, winner_id: str | None = None) -> PolicyCase:
-    cases = list(base_cases())
+    cases = [*base_cases(), *supplemental_cases()]
     if winner_id:
         winner = next(case for case in cases if case.case_id == winner_id)
         cases.extend(feature_cases(winner))
@@ -756,6 +772,13 @@ def main() -> None:
     analyze_parser.add_argument("--manual-text-clear", action="store_true")
     report_parser = subparsers.add_parser("report-base")
     report_parser.add_argument("--experiment-root", type=pathlib.Path, required=True)
+    schedule_parser = subparsers.add_parser("schedule")
+    schedule_parser.add_argument(
+        "--stage",
+        choices=("smoke", "base", "supplemental", "features"),
+        required=True,
+    )
+    schedule_parser.add_argument("--winner-id")
     args = parser.parse_args()
     if args.command == "configs":
         case = case_by_id(args.case_id, args.winner_id)
@@ -787,6 +810,8 @@ def main() -> None:
             encoding="utf-8",
         )
         print(args.experiment_root / "report.md")
+    elif args.command == "schedule":
+        print("\n".join(schedule_for_stage(args.stage, args.winner_id)))
 
 
 if __name__ == "__main__":

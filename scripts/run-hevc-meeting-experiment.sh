@@ -15,7 +15,7 @@ TIME_SCALE=1
 CHROME_VERSION="150.0.7871.129"
 
 usage() {
-  print -u2 "usage: $0 --runtime-config path --macos-artifact path [--stage smoke|base|features] [--winner-id A1|B0|B1] [--experiment-root path] [--output-root path] [--document-port n]"
+  print -u2 "usage: $0 --runtime-config path --macos-artifact path [--stage smoke|base|supplemental|features] [--winner-id A1|B0|B1] [--experiment-root path] [--output-root path] [--document-port n]"
   exit 2
 }
 
@@ -32,7 +32,7 @@ while (( $# )); do
   esac
 done
 
-[[ "$STAGE" == smoke || "$STAGE" == base || "$STAGE" == features ]] || usage
+[[ "$STAGE" == smoke || "$STAGE" == base || "$STAGE" == supplemental || "$STAGE" == features ]] || usage
 [[ "$DOCUMENT_PORT" == <-> && "$DOCUMENT_PORT" -ge 1024 && "$DOCUMENT_PORT" -le 65535 ]] || usage
 if [[ "$STAGE" == features ]]; then
   [[ "$WINNER_ID" == A1 || "$WINNER_ID" == B0 || "$WINNER_ID" == B1 ]] || usage
@@ -148,19 +148,14 @@ else
     "$EXPERIMENT_ROOT/manifest.json" >/dev/null
 fi
 
-case "$STAGE" in
-  smoke)
-    schedule=(A0 A1)
-    TIME_SCALE=0.1
-    RUN_SECONDS=30
-    ;;
-  base)
-    schedule=(A0 A1 A0 A1 A0 A1 B0 B1 B0 B1 B0 B1)
-    ;;
-  features)
-    schedule=(C0 C1 C2 C0 C1 C2)
-    ;;
-esac
+typeset -a schedule_args
+schedule_args=(schedule --stage "$STAGE")
+[[ "$STAGE" == features ]] && schedule_args+=(--winner-id "$WINNER_ID")
+schedule=("${(@f)$(python3 "$ROOT/scripts/hevc_meeting_experiment.py" "${schedule_args[@]}")}")
+if [[ "$STAGE" == smoke ]]; then
+  TIME_SCALE=0.1
+  RUN_SECONDS=30
+fi
 
 typeset -A repetitions
 skip_macos_build=0
