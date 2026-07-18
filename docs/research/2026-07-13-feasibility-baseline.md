@@ -2,10 +2,11 @@
 
 本文记录 `webrtc-screencast-playground` 进入设计前已经核实的事实、当前可行的媒体链路，以及仍需确认的产品与工程决策。结论以 WebRTC M150 release、对应 upstream source、Apple 平台文档、现有 coturn runbook 和外部专家建议为依据。
 
-> **2026-07-16 current-state amendment：** 本文保留最初调研过程，但媒体参数已由真实
+> **2026-07-18 current-state amendment：** 本文保留最初调研过程，但媒体参数已由真实
 > 主屏观感与 Android TV E2E 校准为 1920×1080、最大 15 fps、start/max bitrate
-> 3/5 Mbps、max QP 32。复制主屏幕已实现 96×54 luma static-clarity detector：稳定
-> 600 ms 后 live 切到约 1 fps 并请求 H.264 IDR，变化恢复 15 fps。当前权威契约见
+> 3/5 Mbps、active max QP 32。主屏与虚拟扩展屏均使用 ScreenCaptureKit damage metadata：
+> 连续 600 ms 无 damage 后 live 切到约 1 fps 并请求 IDR，任意可见变化恢复 15 fps。
+> 当前权威契约见
 > [macOS screencast design](../superpowers/specs/2026-07-13-macos-webrtc-screencast-design.md)。
 
 ## 当前结论
@@ -74,7 +75,7 @@ M150 的 zero-hertz adapter 在 screen-content mode、source constraints 为 `mi
 
 该取舍已确认，后续工作见 [`content-aware-capture-efficiency.md`](../follow-ups/content-aware-capture-efficiency.md)。
 
-低分辨率亮度差已作为 dirty rect 之外的第二信号落地。复制主屏幕对 NV12 luma plane 做 96×54 grid sampling，以 changed-sample ratio 2%/8% 作为进入/退出 hysteresis；连续稳定 600 ms 后请求刷新 IDR。metrics 记录 ratio、mode、刷新/失败/恢复次数及 encoded/decoded keyframe counters。扩展屏不启用该策略。
+static-clarity activity 只使用 ScreenCaptureKit dirty rect，不再对每帧做低分辨率 luma sampling。连续 600 ms 无 damage 后由 capture queue 上的 delayed wake 进入 STATIC；内容或 cursor 的任意可见 damage 都立即恢复 ACTIVE。metrics 记录 activity mode、last-damage/deadline、transition、刷新成功/失败及 encoded/decoded keyframe counters；主屏和虚拟扩展屏使用同一契约。
 
 Constrained High 的压缩效率通常优于 Constrained Baseline，但它属于 receiver compatibility 决策。macOS-to-macOS 首版可以把 Constrained High 作为实验 profile，同时保留 Baseline 对照；不能在尚未验证目标设备 decoder 前删除 Baseline。
 

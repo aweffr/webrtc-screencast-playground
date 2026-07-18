@@ -6,7 +6,7 @@
 
 M150 源码中的 zero-hertz adapter 支持约每秒重发最后一帧，产品上可以接受这一行为；但当前 CastTuning ObjC 接入只把 `max_fps` 传给 `RTCVideoSource.adaptOutputFormat`，没有把 `min_fps=0` 写入 source constraints。安全过滤后的实际运行日志因此显示 `Zero hertz mode disabled`。后续若需要 idle RTP repeat，必须先补齐并验证这条 framework 接入，不能把“源码具备能力”写成“当前 app 已启用”。
 
-一期不监听全局鼠标或键盘，不申请 Input Monitoring 或 Accessibility 权限，也不在静止后动态把 ScreenCaptureKit 降到 5 fps。静止清晰度模式只依赖低分辨率 luma detector，并用 2% 进入、8% 退出的 hysteresis 隔离 cursor 和局部 UI 微动。
+一期不监听全局鼠标或键盘，不申请 Input Monitoring 或 Accessibility 权限，也不在静止后动态把 ScreenCaptureKit 降到 5 fps。静止清晰度模式只依赖 ScreenCaptureKit dirty rect；内容或 cursor 的任意可见 damage 都立即恢复 ACTIVE，连续 600 ms 无 damage 后进入 STATIC。
 
 ## 启动条件
 

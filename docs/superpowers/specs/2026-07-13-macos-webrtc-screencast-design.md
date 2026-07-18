@@ -111,7 +111,7 @@ Virtual display object 必须被强引用到 session 结束。退出、失败或
 - idle 收到任意变化立即恢复 15 fps。
 - Gate 只控制向 `RTCVideoSource` 的提交，不动态修改 ScreenCaptureKit cadence。
 
-通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。主屏复制和虚拟扩展屏均使用 96×54 luma grid 判断视觉稳定性：连续 600 ms 的 changed-sample ratio 不超过 2% 时，通过 CastTuning live patch 把 WebRTC source/sender 限到 1 fps、保持 5 Mbps，并把 VideoToolbox runtime max QP 切到 machine-local `static_max_qp`（默认 24），然后在提交刷新帧前请求 IDR；变化超过 8% 时恢复 15 fps、5 Mbps 和 bundled motion max QP 32。2%/8% hysteresis 允许 cursor 和局部 UI 微动而不反复切档。这条清晰度策略不修改 ScreenCaptureKit cadence，普通虚拟屏和 `media-baseline` 虚拟屏不作例外。
+通过 `RTCVideoCapturer(delegate: videoSource)` 交付 `RTCVideoFrame(buffer: RTCCVPixelBuffer(...))`，保持 NV12 native-buffer path。主屏复制和虚拟扩展屏均以 ScreenCaptureKit `dirtyRects` 作为 activity 事实来源：任意内容或光标 damage 立即进入 ACTIVE。顶部、近全宽、≤48 px dirty rect 只作为 capture status strip 候选；仅当前后两张完整 NV12 buffer 的 Y/UV active bytes 均一致时忽略，任一真实像素变化或比较失败都按 ACTIVE。同一帧存在其它 dirty rect 时也直接按 ACTIVE。该完整 buffer 比较只在稀疏的 status-strip 候选帧发生，不恢复旧 detector 的逐帧图像采样。连续 600 ms 无 damage 后，由 generation-token 保护的 delayed wake 进入 STATIC，不依赖下一次 capture callback。STATIC 通过 CastTuning live patch 把 WebRTC source/sender 限到 1 fps、保持 5 Mbps，并把 VideoToolbox runtime max QP 切到 machine-local `static_max_qp`（默认 24），然后用缓存的最后一张完整 `CVPixelBuffer` 提交一次新 timestamp 的 IDR clarity refresh；ACTIVE 直接恢复 15 fps、5 Mbps 和 active max QP 32，不经过中间帧率。metadata 缺失和 capture 刚启动都按 ACTIVE 处理。该策略不增加专用线程，也不修改 ScreenCaptureKit cadence。
 
 M150 zero-hertz adapter 在 idle 期间约每秒重发最后一帧，这种行为可以接受，因此不另造 heartbeat。当前 ObjC/CastTuning 接入尚未把 `min_fps=0` 应用到 source constraints；static-clarity 模式实际由 live `max_fps=1` 产生约 1 fps 输出，补齐 zero-hertz adapter 仍记入 follow-up。
 
@@ -176,7 +176,7 @@ Receiver register 后 server 生成 8 位 Crockford Base32 code 和 opaque sessi
 - path：candidate types、protocol、relay protocol、network type、RTT、available outgoing bitrate、loss/jitter。
 - inbound/render：frames received/decoded/dropped/rendered、decode time、jitter-buffer delay、freeze/pause、NACK/PLI/FIR、decoder implementation、render cadence/frame age/size。
 
-RTCStats values 是动态字典，`RTCStatsNormalizer` 负责类型安全提取并在字段缺失时输出 null + capability event，而不是 crash 或伪造 0。JSONL 额外记录 luma changed-sample ratio、visual stability/clarity mode、刷新成功/失败/恢复次数及 encoded/decoded keyframe counters，便于证明 static-clarity 刷新真正到达 Receiver。UI 只显示连接状态、selected path、capture/encode/render fps、bitrate、RTT、loss、QP 和 Frame Gate state 的小型现场面板；完整证据以 JSONL 为准。
+RTCStats values 是动态字典，`RTCStatsNormalizer` 负责类型安全提取并在字段缺失时输出 null + capability event，而不是 crash 或伪造 0。JSONL 额外记录 content activity mode、last-damage/deadline monotonic timestamp、ACTIVE/STATIC transition counters、clarity refresh 成功/失败/恢复次数及 encoded/decoded keyframe counters，便于证明 static-clarity 刷新真正到达 Receiver。UI 只显示连接状态、selected path、capture/encode/render fps、bitrate、RTT、loss、QP 和 Frame Gate state 的小型现场面板；完整证据以 JSONL 为准。
 
 `DiagnosticExporter` 生成结构化诊断 zip，包含 client JSONL、可安全导出的 CastTuning telemetry、server metrics snapshot（若可达）和 manifest/checksum。原始 `RTCFileLogger` 与 RTC event log 会包含无法可靠脱敏的 ICE candidate、ufrag/password，因此一期禁用且 exporter 发现这类历史文件时 fail closed。导出前还运行 runtime credential scan，发现原文时中止并报告错误。
 

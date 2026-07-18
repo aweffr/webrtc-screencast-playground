@@ -281,10 +281,10 @@ git log --oneline main..HEAD
 ## Execution findings (2026-07-18)
 
 - The implementation and full static verification completed. The detector remained a two-state value type; lifecycle scheduling stays on the existing capture queue and uses generation invalidation.
-- D0 produced three analyzable H.264 runs. D1 produced two; both allowed attempts for D1 run-3 failed in Android emulator/receiver infrastructure, so the bounded runner correctly stopped without a third retry.
-- Both D1 runs restored ACTIVE for all six business actions within 79.0 ms, applied the expected 24/32 MaxQP values, and reported zero VideoToolbox drops.
-- The exact 6 ACTIVE / 7 STATIC assumption was invalid for this Chrome workload. Screenshots and compositor/scrollbar tail updates generated additional real dirty rects, producing 14/14 transitions per D1 run. Filtering those updates would contradict the approved detector contract.
-- The sole 1000 ms fallback was not used because observed tail damage could occur about 1.4 seconds after the initiating scroll, outside its allowed condition.
-- The Android gap tracker observes marker-decodable frames rather than every render callback, so its 21–22 second values cannot support the 500 ms render-gap gate. The report treats that gate as unmeasured instead of weakening it.
-- H1 was not authorized. Sanitized conclusions and key screenshots are published in `docs/experiments/2026-07-18-damage-idle-detector.md`.
-- The feature branch is not eligible for merge under the original gates: D1 has only two valid runs, the exact-count assumption failed, render gap is unmeasured, and the post-experiment mainline color-range merge has not been exercised by the D0/D1 workload. Merging requires an explicit gate waiver or a new current-HEAD formal run after measurement repair.
+- The final current-HEAD experiment produced three valid D0 and three valid D1 H.264 runs. All 36 sender/Android activity markers arrived, the expected 24/32 MaxQP values were applied, and VideoToolbox drop was zero.
+- Every D1 run restored ACTIVE for all six business actions within 18.1–86.1 ms and returned to STATIC 601.4–628.9 ms after unambiguous last-damage samples.
+- The exact 6 ACTIVE / 7 STATIC assumption was invalid for this Chrome workload. Marker movement, screenshots and compositor updates generated additional visible dirty rects, producing 13–14 transitions per D1 run. The bounded detector contract accepts those real transitions instead of filtering them.
+- Per-render callback gap tracking was implemented. Its 500 ms window begins at marker delivery, while scroll episodes deliberately wait 500 ms before motion; the resulting 733–742 ms D1 values therefore include experimental pre-motion idle and are not treated as an in-motion freeze.
+- D1 showed one repeated receiver-side latency spike at the second fast-scroll sequence. Sender capture remained within 25.8–78.5 ms; the owner explicitly accepted an isolated sequence spike as a non-blocking observation.
+- With an explicit, recorded H.264 gate waiver, the single H.265 33/39 smoke completed: marker 6/6, detector contract eligible, QP binding applied, VideoToolbox drop zero and all original-detail images clear.
+- The owner approved replacing the old detector. Sanitized conclusions and key H.264/H.265 screenshots are published in `docs/experiments/2026-07-18-damage-idle-detector.md`; raw evidence remains ignored.
