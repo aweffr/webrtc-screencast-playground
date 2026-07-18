@@ -160,14 +160,10 @@ for case_id in "${schedule[@]}"; do
     fi
 
     (
-      for _ in {1..1000}; do
-        if [[ -s "$attempt_root/workload/final.png" ]]; then
-          adb exec-out screencap -p >"$attempt_root/android-final.png"
-          exit 0
-        fi
+      while [[ ! -s "$attempt_root/workload/final.png" ]]; do
         sleep 0.1
       done
-      exit 1
+      adb exec-out screencap -p >"$attempt_root/android-final.png"
     ) &
     watcher_pid=$!
 
@@ -195,6 +191,9 @@ for case_id in "${schedule[@]}"; do
     fi
     wait "$workload_pid"
     workload_status=$?
+    if (( workload_status != 0 )); then
+      kill "$watcher_pid" >/dev/null 2>&1 || true
+    fi
     wait "$watcher_pid"
     watcher_status=$?
     set -e
