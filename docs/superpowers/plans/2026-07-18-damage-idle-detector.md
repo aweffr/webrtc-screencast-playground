@@ -4,7 +4,7 @@
 
 **Goal:** Replace callback-coupled luma stability detection with a ScreenCaptureKit damage/quiet-deadline detector and prove that it improves reliable STATIC/ACTIVE switching without degrading meeting-cast latency or clarity.
 
-**Architecture:** A pure `DamageIdleDetector` owns the two-state model and monotonic deadline. `ScreenCaptureSource` serializes callbacks and one self-rearming quiet check on its existing capture queue, caches the latest complete frame, and submits a synthetic clarity refresh when the deadline expires. Existing FrameGate and WebRTC content-aware QP controller remain separate.
+**Architecture:** A pure `DamageIdleDetector` owns the two-state model and monotonic deadline. `ScreenCaptureSource` serializes callbacks and quiet-check state on its existing capture queue, while one system-GCD delayed wake avoids deadline drift behind callback backlog. It caches the latest complete frame and submits a synthetic clarity refresh when the deadline expires. Existing FrameGate and WebRTC content-aware QP controller remain separate.
 
 **Tech Stack:** Swift 6, ScreenCaptureKit, CoreVideo, VideoToolbox through CastTuning, XCTest, Python unittest, Playwright CLI, Android TV API 31 E2E.
 
@@ -280,11 +280,12 @@ git log --oneline main..HEAD
 
 ## Execution findings (2026-07-18)
 
-- The implementation and full static verification completed. The detector remained a two-state value type; lifecycle scheduling stays on the existing capture queue and uses generation invalidation.
+- The implementation and full static verification completed. The detector remained a two-state value type; all lifecycle state stays on the existing capture queue and uses generation invalidation. A single delayed wake uses the shared GCD scheduler before dispatching back to the capture queue, because the formal workload proved `captureQueue.asyncAfter` could drift behind callback backlog; this adds no dedicated thread or lock.
 - The final current-HEAD experiment produced three valid D0 and three valid D1 H.264 runs. All 36 sender/Android activity markers arrived, the expected 24/32 MaxQP values were applied, and VideoToolbox drop was zero.
 - Every D1 run restored ACTIVE for all six business actions within 18.1–86.1 ms and returned to STATIC 601.4–628.9 ms after unambiguous last-damage samples.
 - The exact 6 ACTIVE / 7 STATIC assumption was invalid for this Chrome workload. Marker movement, screenshots and compositor updates generated additional visible dirty rects, producing 13–14 transitions per D1 run. The bounded detector contract accepts those real transitions instead of filtering them.
 - Per-render callback gap tracking was implemented. Its 500 ms window begins at marker delivery, while scroll episodes deliberately wait 500 ms before motion; the resulting 733–742 ms D1 values therefore include experimental pre-motion idle and are not treated as an in-motion freeze.
 - D1 showed one repeated receiver-side latency spike at the second fast-scroll sequence. Sender capture remained within 25.8–78.5 ms; the owner explicitly accepted an isolated sequence spike as a non-blocking observation.
 - With an explicit, recorded H.264 gate waiver, the single H.265 33/39 smoke completed: marker 6/6, detector contract eligible, QP binding applied, VideoToolbox drop zero and all original-detail images clear.
+- After the status-strip pixel-verification review fix, one bounded same-parameter H.265 regression smoke completed on final code: marker 6/6, six detector wakeups in 18.2–33.8 ms, quiet transitions in 601.0–629.8 ms, 33/39 QP binding, VideoToolbox drop zero and 20/20 original-detail images clear.
 - The owner approved replacing the old detector. Sanitized conclusions and key H.264/H.265 screenshots are published in `docs/experiments/2026-07-18-damage-idle-detector.md`; raw evidence remains ignored.

@@ -31,7 +31,7 @@ ScreenCaptureKit dirty rect 是唯一 activity 事实来源；串行 capture que
 - 乱序 monotonic timestamp 不改变状态或 deadline。
 - lifecycle generation 使 stop/restart 前安排的 quiet check 失效。
 
-`ScreenCaptureSource` 的 ScreenCaptureKit callback 与 quiet check 都在现有串行 `captureQueue` 上执行，不增加 lock 或专用线程。callback 总是缓存最后一张完整 `CVPixelBuffer` 及构造 synthetic refresh 所需 metadata。检测到 damage 时，先向 WebRTC boundary 应用 `exitStaticClarity`，再提交当前真实帧。
+`ScreenCaptureSource` 的 ScreenCaptureKit callback、detector mutation、缓存与 quiet transition 都在现有串行 `captureQueue` 上执行。为了避免 capture callback backlog 延迟 600 ms deadline，最多一个 delayed wake 由系统共享 GCD queue 计时，到点后只向 `captureQueue` 投递 quiet check；不增加专用线程、lock 或第二套状态。callback 总是缓存最后一张完整 `CVPixelBuffer` 及构造 synthetic refresh 所需 metadata。检测到 damage 时，先向 WebRTC boundary 应用 `exitStaticClarity`，再提交当前真实帧。
 
 quiet check 进入 STATIC 时，先应用 1 fps/static MaxQP 并强制 keyframe，再用缓存帧和新的 monotonic WebRTC timestamp 提交一次 synthetic clarity refresh。若没有缓存完整帧，不切换 STATIC，保持 ACTIVE。现有 `FrameGate` 继续独立决定普通 callback frame 是否提交；transition frame 不受 gate 丢弃。
 
