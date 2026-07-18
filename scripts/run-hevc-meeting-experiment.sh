@@ -12,6 +12,7 @@ WINNER_ID=""
 DOCUMENT_PORT=18765
 RUN_SECONDS=100
 TIME_SCALE=1
+CHROME_VERSION="150.0.7871.129"
 
 usage() {
   print -u2 "usage: $0 --runtime-config path --macos-artifact path [--stage smoke|base|features] [--winner-id A1|B0|B1] [--experiment-root path] [--output-root path] [--document-port n]"
@@ -114,7 +115,8 @@ if [[ ! -f "$EXPERIMENT_ROOT/manifest.json" ]]; then
     --arg android_artifact_sha256 "$android_sha" \
     --arg document_source_sha256 "$source_sha" \
     --arg document_html_sha256 "$document_sha" \
-    '{schema_version:2,created_at:$created_at,app_commit:$app_commit,builder_commit:$builder_commit,macos_artifact_sha256:$macos_artifact_sha256,android_artifact_sha256:$android_artifact_sha256,document_source_sha256:$document_source_sha256,document_html_sha256:$document_html_sha256,chrome_version:"150.0.7871.125",profile:"production-relay",source:"main",max_attempts:23,max_infrastructure_retries:4}' \
+    --arg chrome_version "$CHROME_VERSION" \
+    '{schema_version:2,created_at:$created_at,app_commit:$app_commit,builder_commit:$builder_commit,macos_artifact_sha256:$macos_artifact_sha256,android_artifact_sha256:$android_artifact_sha256,document_source_sha256:$document_source_sha256,document_html_sha256:$document_html_sha256,chrome_version:$chrome_version,profile:"production-relay",source:"main",max_attempts:23,max_infrastructure_retries:4}' \
     >"$EXPERIMENT_ROOT/manifest.json"
 else
   jq -e \
@@ -122,14 +124,15 @@ else
     --arg macos "$macos_sha" \
     --arg android "$android_sha" \
     --arg source "$source_sha" \
-    --arg document "$document_sha" '
+    --arg document "$document_sha" \
+    --arg chrome "$CHROME_VERSION" '
       .schema_version == 2
       and .app_commit == $commit
       and .macos_artifact_sha256 == $macos
       and .android_artifact_sha256 == $android
       and .document_source_sha256 == $source
       and .document_html_sha256 == $document
-      and .chrome_version == "150.0.7871.125"
+      and .chrome_version == $chrome
     ' \
     "$EXPERIMENT_ROOT/manifest.json" >/dev/null
 fi
@@ -211,7 +214,7 @@ for case_id in "${schedule[@]}"; do
     python3 "$ROOT/scripts/hevc_meeting_workload.py" \
       --url "http://127.0.0.1:$DOCUMENT_PORT/document.html" \
       --output-directory "$workload_root" \
-      --expected-chrome-version 150.0.7871.125 \
+      --expected-chrome-version "$CHROME_VERSION" \
       --session "$workload_session" \
       --time-scale "$TIME_SCALE" \
       --ready-file "$ready_file" \

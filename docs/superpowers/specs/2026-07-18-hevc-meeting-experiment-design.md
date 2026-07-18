@@ -39,7 +39,7 @@ Chrome 在主屏全屏渲染本地、离线、固定的 Kubernetes 中文 Deploy
 
 准备脚本校验源哈希，去掉 front matter、Hugo shortcode 和远程资源，通过 GitHub Markdown API 一次性生成 HTML body，再与固定本地 CSS、来源说明和 marker overlay 组成 versioned self-contained fixture。正式实验只访问 localhost，不访问公网。
 
-本机使用 Google Chrome `150.0.7871.125`、临时 profile、100% zoom、无扩展和全屏。版本在整批实验中必须一致。Playwright CLI 发送真实 mouse-wheel 输入：每次 12 个 60 px step、间隔 50 ms，共 720 CSS px；每隔 8 秒一次，共 6 次。每次实际 `scrollY` 必须等于预期值 ±1 px。8 秒窗口用于在 1 秒 telemetry sampling 下明确观察每轮 ACTIVE 后重新进入 STATIC，不增加实验 case 或 run 数。
+本机使用 Google Chrome `150.0.7871.129`、临时 profile、100% zoom、无扩展和全屏。版本在整批实验中必须一致。Playwright CLI 发送真实 mouse-wheel 输入：每次 12 个 60 px step、间隔 50 ms，共 720 CSS px；每隔 8 秒一次，共 6 次。每次实际 `scrollY` 必须等于预期值 ±1 px。8 秒窗口用于在 1 秒 telemetry sampling 下明确观察每轮 ACTIVE 后重新进入 STATIC，不增加实验 case 或 run 数。
 
 每个 run 在 Android 首帧后执行：
 

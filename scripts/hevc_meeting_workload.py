@@ -433,7 +433,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
     parser.add_argument("--output-directory", type=pathlib.Path, required=True)
-    parser.add_argument("--expected-chrome-version", default="150.0.7871.125")
+    parser.add_argument("--expected-chrome-version", default="150.0.7871.129")
     parser.add_argument("--session", default="hmw")
     parser.add_argument("--time-scale", type=float, default=1.0)
     parser.add_argument("--no-fullscreen", action="store_true")
